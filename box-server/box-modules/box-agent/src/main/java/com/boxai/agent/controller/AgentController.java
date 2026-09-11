@@ -1,0 +1,143 @@
+package com.boxai.agent.controller;
+
+import com.boxai.agent.api.AgentChatRequest;
+import com.boxai.agent.api.AgentKnowledgeBindingVO;
+import com.boxai.agent.api.AgentPublishVO;
+import com.boxai.agent.api.AgentToolBindingVO;
+import com.boxai.agent.api.AgentVO;
+import com.boxai.agent.api.BindAgentKnowledgeRequest;
+import com.boxai.agent.api.BindAgentToolRequest;
+import com.boxai.agent.api.CreateAgentRequest;
+import com.boxai.agent.api.UpdateAgentModelRequest;
+import com.boxai.agent.api.UpdateAgentPromptRequest;
+import com.boxai.agent.api.UpdateAgentRequest;
+import com.boxai.agent.application.AgentApplicationService;
+import com.boxai.agent.application.AgentBindingApplicationService;
+import com.boxai.agent.application.AgentPublishApplicationService;
+import com.boxai.common.result.Result;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/agents")
+public class AgentController {
+
+    private final AgentApplicationService agentApplicationService;
+    private final AgentBindingApplicationService agentBindingApplicationService;
+    private final AgentPublishApplicationService agentPublishApplicationService;
+
+    public AgentController(AgentApplicationService agentApplicationService,
+                           AgentBindingApplicationService agentBindingApplicationService,
+                           AgentPublishApplicationService agentPublishApplicationService) {
+        this.agentApplicationService = agentApplicationService;
+        this.agentBindingApplicationService = agentBindingApplicationService;
+        this.agentPublishApplicationService = agentPublishApplicationService;
+    }
+
+    @GetMapping
+    public Result<List<AgentVO>> list() {
+        return Result.success(agentApplicationService.list());
+    }
+
+    @GetMapping("/{id}")
+    public Result<AgentVO> detail(@PathVariable Long id) {
+        return Result.success(agentApplicationService.detail(id));
+    }
+
+    @PostMapping
+    public Result<AgentVO> create(@Valid @RequestBody CreateAgentRequest request) {
+        return Result.success(agentApplicationService.create(request));
+    }
+
+    @PutMapping("/{id}")
+    public Result<AgentVO> update(@PathVariable Long id, @Valid @RequestBody UpdateAgentRequest request) {
+        return Result.success(agentApplicationService.update(id, request));
+    }
+
+    @PutMapping("/{id}/prompt")
+    public Result<AgentVO> updatePrompt(@PathVariable Long id, @Valid @RequestBody UpdateAgentPromptRequest request) {
+        return Result.success(agentApplicationService.updatePrompt(id, request));
+    }
+
+    @PutMapping("/{id}/model")
+    public Result<AgentVO> updateModel(@PathVariable Long id, @Valid @RequestBody UpdateAgentModelRequest request) {
+        return Result.success(agentApplicationService.updateModelConfig(id, request));
+    }
+
+    @PostMapping("/{id}/chat")
+    public Object chat(@PathVariable Long id,
+                       @Valid @RequestBody AgentChatRequest request,
+                       HttpServletResponse response) {
+        if (Boolean.TRUE.equals(request.stream())) {
+            return agentApplicationService.streamChat(id, request, response);
+        }
+        return Result.success(agentApplicationService.chat(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        agentApplicationService.delete(id);
+        return Result.success();
+    }
+
+    @GetMapping("/{id}/knowledge")
+    public Result<List<AgentKnowledgeBindingVO>> listKnowledge(@PathVariable Long id) {
+        return Result.success(agentBindingApplicationService.listKnowledge(id));
+    }
+
+    @PostMapping("/{id}/knowledge")
+    public Result<AgentKnowledgeBindingVO> bindKnowledge(@PathVariable Long id,
+                                                       @Valid @RequestBody BindAgentKnowledgeRequest request) {
+        return Result.success(agentBindingApplicationService.bindKnowledge(id, request));
+    }
+
+    @DeleteMapping("/{id}/knowledge/{knowledgeId}")
+    public Result<Void> unbindKnowledge(@PathVariable Long id, @PathVariable Long knowledgeId) {
+        agentBindingApplicationService.unbindKnowledge(id, knowledgeId);
+        return Result.success();
+    }
+
+    @GetMapping("/{id}/tools")
+    public Result<List<AgentToolBindingVO>> listTools(@PathVariable Long id) {
+        return Result.success(agentBindingApplicationService.listTools(id));
+    }
+
+    @PostMapping("/{id}/tools")
+    public Result<AgentToolBindingVO> bindTool(@PathVariable Long id,
+                                               @Valid @RequestBody BindAgentToolRequest request) {
+        return Result.success(agentBindingApplicationService.bindTool(id, request));
+    }
+
+    @DeleteMapping("/{id}/tools/{toolId}")
+    public Result<Void> unbindTool(@PathVariable Long id, @PathVariable Long toolId) {
+        agentBindingApplicationService.unbindTool(id, toolId);
+        return Result.success();
+    }
+
+    @GetMapping("/{id}/publish")
+    public Result<AgentPublishVO> publishStatus(@PathVariable Long id) {
+        return Result.success(agentPublishApplicationService.getPublishStatus(id));
+    }
+
+    @PostMapping("/{id}/publish")
+    public Result<AgentPublishVO> publish(@PathVariable Long id) {
+        return Result.success(agentPublishApplicationService.publish(id));
+    }
+
+    @PostMapping("/{id}/unpublish")
+    public Result<AgentPublishVO> unpublish(@PathVariable Long id) {
+        return Result.success(agentPublishApplicationService.unpublish(id));
+    }
+}

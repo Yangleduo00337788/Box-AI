@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: box-server
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/box?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: root
+  data:
+    redis:
+      host: 103.236.77.188
+      port: 6379
+      password: 030903ZWPp
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+mybatis-flex:
+  global-config:
+    print-banner: false
+
+box:
+  security:
+    jwt:
+      secret: box-dev-jwt-secret-change-me-please-32b
+      expire-seconds: 86400
+    crypto:
+      aes-key: box-dev-aes-256-key-change-me!!
+  minio:
+    endpoint: http://103.236.77.188:9003
+    access-key: admin
+    secret-key: 030903ZWPp
+    bucket: box
+  elasticsearch:
+    host: 127.0.0.1
+    port: 9200
+  ai:
+    openai:
+      api-key: ${BOX_OPENAI_API_KEY:}
+    embedding:
+      model-name: text-embedding-3-small
+
+logging:
+  level:
+    com.boxai: INFO

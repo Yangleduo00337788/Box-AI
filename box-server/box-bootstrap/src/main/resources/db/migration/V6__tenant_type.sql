@@ -1,0 +1,4 @@
+ALTER TABLE tenant
+    ADD COLUMN tenant_type VARCHAR(32) NOT NULL DEFAULT 'ENTERPRISE' COMMENT 'PERSONAL/ENTERPRISE' AFTER slug;
+
+UPDATE tenant SET tenant_type = 'ENTERPRISE' WHERE tenant_type IS NULL OR tenant_type = '';

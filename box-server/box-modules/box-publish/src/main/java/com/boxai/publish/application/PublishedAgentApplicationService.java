@@ -1,0 +1,120 @@
+package com.boxai.publish.application;
+
+import com.boxai.agent.api.AgentChatRequest;
+import com.boxai.agent.api.AgentChatVO;
+import com.boxai.agent.chat.AgentChatExecutor;
+import com.boxai.agent.chat.AgentChatPreparer;
+import com.boxai.agent.chat.PreparedAgentChat;
+import com.boxai.common.constant.PublishResourceTypes;
+import com.boxai.common.exception.BusinessException;
+import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.agent.Agent;
+import com.boxai.domain.agent.AgentRepository;
+import com.boxai.domain.publish.PublishRepository;
+import com.boxai.domain.trace.Execution;
+import com.boxai.security.context.WorkspaceContext;
+import com.boxai.trace.application.ExecutionRecorder;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+@Service
+public class PublishedAgentApplicationService {
+
+    private final AgentRepository agentRepository;
+    private final PublishRepository publishRepository;
+    private final AgentChatPreparer agentChatPreparer;
+    private final AgentChatExecutor agentChatExecutor;
+    private final ExecutionRecorder executionRecorder;
+
+    public PublishedAgentApplicationService(AgentRepository agentRepository,
+                                            PublishRepository publishRepository,
+                                            AgentChatPreparer agentChatPreparer,
+                                            AgentChatExecutor agentChatExecutor,
+                                            ExecutionRecorder executionRecorder) {
+        this.agentRepository = agentRepository;
+        this.publishRepository = publishRepository;
+        this.agentChatPreparer = agentChatPreparer;
+        this.agentChatExecutor = agentChatExecutor;
+        this.executionRecorder = executionRecorder;
+    }
+
+    public AgentChatVO chat(Long agentId, AgentChatRequest request) {
+        requirePublishedAgent(agentId);
+        PreparedAgentChat prepared = agentChatPreparer.preparePublished(agentId, List.of(), request.message().trim());
+        Execution execution = executionRecorder.startAgentExecution(
+                agentId,
+                prepared.agentVersionId(),
+                null,
+                toInputJson(request.message()));
+        try {
+            String content = agentChatExecutor.chat(prepared);
+            executionRecorder.succeed(execution, toOutputJson(content), estimateTokens(content));
+            return new AgentChatVO(content);
+        } catch (RuntimeException e) {
+            executionRecorder.fail(execution, e.getMessage());
+            throw e;
+        }
+    }
+
+    public SseEmitter streamChat(Long agentId, AgentChatRequest request, HttpServletResponse response) {
+        requirePublishedAgent(agentId);
+        PreparedAgentChat prepared = agentChatPreparer.preparePublished(agentId, List.of(), request.message().trim());
+        Execution execution = executionRecorder.startAgentExecution(
+                agentId,
+                prepared.agentVersionId(),
+                null,
+                toInputJson(request.message()));
+        agentChatExecutor.assertQuotaAvailable();
+        configureSseResponse(response);
+        return agentChatExecutor.stream(prepared, content -> {
+            executionRecorder.succeed(execution, toOutputJson(content), estimateTokens(content));
+        });
+    }
+
+    private Agent requirePublishedAgent(Long agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_NOT_FOUND, "智能体不存在"));
+        if (!workspaceId().equals(agent.getWorkspaceId())) {
+            throw new BusinessException(ErrorCode.WORKSPACE_ACCESS_DENIED, "无权访问该智能体");
+        }
+        if (agent.getPublishedVersionId() == null) {
+            throw new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体尚未发布");
+        }
+        publishRepository.findLatestActive(PublishResourceTypes.AGENT, agentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体发布记录不存在"));
+        return agent;
+    }
+
+    private Long workspaceId() {
+        return WorkspaceContext.require().workspaceId();
+    }
+
+    private String toInputJson(String message) {
+        return "{\"message\":\"" + escapeJson(message) + "\"}";
+    }
+
+    private String toOutputJson(String content) {
+        return "{\"content\":\"" + escapeJson(content) + "\"}";
+    }
+
+    private String escapeJson(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private Integer estimateTokens(String content) {
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+        return Math.max(1, content.length() / 4);
+    }
+
+    private void configureSseResponse(HttpServletResponse response) {
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
+    }
+}
