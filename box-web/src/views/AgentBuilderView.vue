@@ -130,9 +130,33 @@
             </t-table>
           </div>
 
+          <div v-else-if="activeTab === 'memory'" class="config-panel">
+            <h2 class="config-panel__title">记忆</h2>
+            <p class="config-panel__desc">控制对话是否携带历史消息（会话记忆窗口）</p>
+            <t-form label-align="top">
+              <t-form-item label="启用会话记忆">
+                <t-switch v-model="memoryForm.memoryEnabled" />
+              </t-form-item>
+              <t-form-item label="记忆窗口（最近消息条数）">
+                <t-input-number
+                  v-model="memoryForm.memoryWindowSize"
+                  :min="0"
+                  :max="100"
+                  :disabled="!memoryForm.memoryEnabled"
+                  theme="column"
+                />
+              </t-form-item>
+              <t-form-item>
+                <t-button theme="primary" :loading="savingMemory" @click="saveMemory">保存记忆配置</t-button>
+              </t-form-item>
+            </t-form>
+          </div>
+
           <div v-else-if="activeTab === 'tools'" class="config-panel">
             <h2 class="config-panel__title">工具</h2>
-            <p class="config-panel__desc">绑定 HTTP 工具后，Agent 支持 Tool Calling</p>
+            <p class="config-panel__desc">绑定 HTTP 工具或 MCP Server 后，Agent 支持 Tool Calling</p>
+
+            <h3 class="config-subtitle">HTTP 工具</h3>
             <t-select
               v-model="selectedToolId"
               :options="toolOptions"
@@ -140,10 +164,28 @@
               clearable
               style="margin-bottom: 12px"
             />
-            <t-button theme="primary" :loading="bindingTool" @click="bindTool">绑定工具</t-button>
+            <t-button theme="primary" :loading="bindingTool" @click="bindTool">绑定 HTTP 工具</t-button>
             <t-table row-key="id" :data="toolBindings" :columns="toolColumns" size="small" style="margin-top: 16px">
               <template #op="{ row }">
                 <t-button variant="text" theme="danger" @click="unbindTool(row.toolId)">解除</t-button>
+              </template>
+            </t-table>
+
+            <h3 class="config-subtitle">MCP Server</h3>
+            <t-select
+              v-model="selectedMcpId"
+              :options="mcpOptions"
+              placeholder="选择要绑定的 MCP Server（需先同步工具目录）"
+              clearable
+              style="margin-bottom: 12px"
+            />
+            <t-button theme="primary" :loading="bindingMcp" @click="bindMcp">绑定 MCP</t-button>
+            <t-table row-key="id" :data="mcpBindings" :columns="mcpColumns" size="small" style="margin-top: 16px">
+              <template #tools="{ row }">
+                {{ parseMcpToolCount(row.toolCatalogJson) }}
+              </template>
+              <template #op="{ row }">
+                <t-button variant="text" theme="danger" @click="unbindMcp(row.mcpServerId)">解除</t-button>
               </template>
             </t-table>
           </div>
@@ -160,6 +202,19 @@
               <t-button theme="primary" :loading="publishing" @click="doPublish">发布</t-button>
               <t-button variant="outline" :loading="publishing" @click="doUnpublish">取消发布</t-button>
             </t-space>
+
+            <section v-if="agent.status === 'PUBLISHED'" class="publish-api">
+              <h3 class="config-subtitle">开放 API</h3>
+              <t-alert
+                theme="info"
+                message="在「设置 → API 密钥」创建密钥后，使用 Bearer Token 调用下方接口。"
+              />
+              <div class="api-snippet">
+                <p><strong>POST</strong> <code>/api/v1/published/agents/{{ agentId }}/chat</code></p>
+                <pre>{{ publishApiExample }}</pre>
+              </div>
+              <t-button variant="outline" @click="router.push('/settings/api-keys')">管理 API 密钥</t-button>
+            </section>
           </div>
         </section>
 
@@ -216,26 +271,32 @@ import type { FormProps } from 'tdesign-vue-next'
 import { extractApiError } from '@/api/apiError'
 import {
   bindAgentKnowledge,
+  bindAgentMcp,
   bindAgentTool,
   chatAgent,
   chatAgentStream,
   getAgent,
   getAgentPublishStatus,
   listAgentKnowledge,
+  listAgentMcp,
   listAgentTools,
   publishAgent,
   unbindAgentKnowledge,
+  unbindAgentMcp,
   unbindAgentTool,
   unpublishAgent,
   updateAgent,
+  updateAgentMemory,
   updateAgentModel,
   updateAgentPrompt,
   type AgentKnowledgeBindingVO,
+  type AgentMcpBindingVO,
   type AgentPublishVO,
   type AgentToolBindingVO,
   type AgentVO,
 } from '@/api/agent'
 import { listKnowledgeBases, type KnowledgeBaseVO } from '@/api/knowledge'
+import { listMcpServers, type McpServerVO } from '@/api/mcp'
 import { listTools, type ToolVO } from '@/api/tool'
 import { listModels, type ModelVO } from '@/api/model'
 import {
@@ -273,6 +334,7 @@ const navItems = [
   { value: 'overview', label: '概览', icon: 'home' },
   { value: 'prompt', label: 'Prompt', icon: 'edit' },
   { value: 'model', label: '模型', icon: 'cpu' },
+  { value: 'memory', label: '记忆', icon: 'time' },
   { value: 'knowledge', label: '知识库', icon: 'book' },
   { value: 'tools', label: '工具', icon: 'tools' },
   { value: 'publish', label: '发布', icon: 'upload' },
@@ -280,19 +342,34 @@ const navItems = [
 
 const knowledgeBases = ref<KnowledgeBaseVO[]>([])
 const tools = ref<ToolVO[]>([])
+const mcpServers = ref<McpServerVO[]>([])
 const knowledgeBindings = ref<AgentKnowledgeBindingVO[]>([])
 const toolBindings = ref<AgentToolBindingVO[]>([])
+const mcpBindings = ref<AgentMcpBindingVO[]>([])
 const publishInfo = ref<AgentPublishVO | null>(null)
 const selectedKnowledgeId = ref<number | undefined>()
 const selectedToolId = ref<number | undefined>()
+const selectedMcpId = ref<number | undefined>()
 const bindingKnowledge = ref(false)
 const bindingTool = ref(false)
+const bindingMcp = ref(false)
+const savingMemory = ref(false)
 const publishing = ref(false)
 
 const knowledgeOptions = computed(() =>
   knowledgeBases.value.map((item) => ({ label: item.name, value: item.id })),
 )
 const toolOptions = computed(() => tools.value.map((item) => ({ label: `${item.name} (${item.toolKey})`, value: item.id })))
+const mcpOptions = computed(() =>
+  mcpServers.value.map((item) => ({ label: `${item.name} (${item.serverKey})`, value: item.id })),
+)
+const publishApiExample = computed(
+  () => `curl -X POST \\
+  -H "Authorization: Bearer ax_live_你的密钥" \\
+  -H "Content-Type: application/json" \\
+  -d '{"message":"你好","stream":false}' \\
+  /api/v1/published/agents/${agentId.value}/chat`,
+)
 const knowledgeColumns = [
   { colKey: 'knowledgeBaseId', title: '知识库 ID' },
   { colKey: 'topK', title: 'Top K', width: 80 },
@@ -301,6 +378,12 @@ const knowledgeColumns = [
 const toolColumns = [
   { colKey: 'toolId', title: '工具 ID' },
   { colKey: 'enabled', title: '启用', width: 80 },
+  { colKey: 'op', title: '操作', width: 100 },
+]
+const mcpColumns = [
+  { colKey: 'mcpServerName', title: 'MCP Server' },
+  { colKey: 'serverKey', title: 'Key', width: 120 },
+  { colKey: 'tools', title: '工具数', width: 80 },
   { colKey: 'op', title: '操作', width: 100 },
 ]
 
@@ -314,6 +397,10 @@ const modelForm = reactive({
   topP: 1,
   maxTokens: 4096,
   streamEnabled: true,
+})
+const memoryForm = reactive({
+  memoryEnabled: true,
+  memoryWindowSize: 20,
 })
 
 const overviewRules: FormProps['rules'] = {
@@ -369,6 +456,18 @@ function applyAgent(data: AgentVO) {
   modelForm.topP = data.topP ?? 1
   modelForm.maxTokens = data.maxTokens ?? 4096
   modelForm.streamEnabled = data.streamEnabled ?? true
+  memoryForm.memoryEnabled = data.memoryEnabled ?? true
+  memoryForm.memoryWindowSize = data.memoryWindowSize ?? 20
+}
+
+function parseMcpToolCount(catalog?: string) {
+  if (!catalog) return 0
+  try {
+    const items = JSON.parse(catalog)
+    return Array.isArray(items) ? items.length : 0
+  } catch {
+    return 0
+  }
 }
 
 async function loadAgent() {
@@ -381,8 +480,10 @@ async function loadAgent() {
       { data: capRes },
       { data: kbRes },
       { data: toolRes },
+      { data: mcpRes },
       { data: bindKbRes },
       { data: bindToolRes },
+      { data: bindMcpRes },
       { data: publishRes },
     ] = await Promise.all([
       getAgent(agentId.value),
@@ -391,8 +492,10 @@ async function loadAgent() {
       fetchPlatformCapabilities(),
       listKnowledgeBases(),
       listTools(),
+      listMcpServers(),
       listAgentKnowledge(agentId.value),
       listAgentTools(agentId.value),
+      listAgentMcp(agentId.value),
       getAgentPublishStatus(agentId.value),
     ])
     models.value = modelRes.data || []
@@ -400,8 +503,10 @@ async function loadAgent() {
     byokEnabled.value = capRes.data?.byokEnabled === true
     knowledgeBases.value = kbRes.data || []
     tools.value = toolRes.data || []
+    mcpServers.value = mcpRes.data || []
     knowledgeBindings.value = bindKbRes.data || []
     toolBindings.value = bindToolRes.data || []
+    mcpBindings.value = bindMcpRes.data || []
     publishInfo.value = publishRes.data || null
     if (agentRes.data) {
       applyAgent(agentRes.data)
@@ -445,6 +550,38 @@ async function bindTool() {
 async function unbindTool(toolId: number) {
   await unbindAgentTool(agentId.value, toolId)
   toolBindings.value = toolBindings.value.filter((item) => item.toolId !== toolId)
+}
+
+async function bindMcp() {
+  if (!selectedMcpId.value) return
+  bindingMcp.value = true
+  try {
+    await bindAgentMcp(agentId.value, { mcpServerId: selectedMcpId.value, enabled: true })
+    const { data } = await listAgentMcp(agentId.value)
+    mcpBindings.value = data.data || []
+    MessagePlugin.success('MCP 已绑定')
+  } finally {
+    bindingMcp.value = false
+  }
+}
+
+async function unbindMcp(mcpServerId: number) {
+  await unbindAgentMcp(agentId.value, mcpServerId)
+  mcpBindings.value = mcpBindings.value.filter((item) => item.mcpServerId !== mcpServerId)
+}
+
+async function saveMemory() {
+  savingMemory.value = true
+  try {
+    const { data } = await updateAgentMemory(agentId.value, {
+      memoryEnabled: memoryForm.memoryEnabled,
+      memoryWindowSize: memoryForm.memoryWindowSize,
+    })
+    if (data.data) applyAgent(data.data)
+    MessagePlugin.success('记忆配置已保存')
+  } finally {
+    savingMemory.value = false
+  }
 }
 
 async function doPublish() {
@@ -710,6 +847,34 @@ onMounted(loadAgent)
   margin: 0 0 20px;
   font: var(--td-font-body-small);
   color: var(--box-muted);
+}
+
+.config-subtitle {
+  margin: 24px 0 12px;
+  font: var(--td-font-title-small);
+}
+
+.config-subtitle:first-of-type {
+  margin-top: 0;
+}
+
+.publish-api {
+  margin-top: 24px;
+}
+
+.api-snippet {
+  margin: 12px 0 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f7f8fa;
+  border: 1px solid var(--box-border);
+}
+
+.api-snippet pre {
+  margin: 8px 0 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .builder-preview {

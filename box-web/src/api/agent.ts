@@ -21,6 +21,8 @@ export interface AgentVO {
   topP?: number
   maxTokens?: number
   streamEnabled?: boolean
+  memoryEnabled?: boolean
+  memoryWindowSize?: number
   createdBy: number
   createdAt: string
   updatedAt: string
@@ -68,6 +70,13 @@ export function updateAgentModel(
   },
 ) {
   return http.put<Result<AgentVO>>(`/agents/${id}/model`, payload)
+}
+
+export function updateAgentMemory(
+  id: number,
+  payload: { memoryEnabled?: boolean; memoryWindowSize?: number },
+) {
+  return http.put<Result<AgentVO>>(`/agents/${id}/memory`, payload)
 }
 
 export function chatAgent(id: number, message: string) {
@@ -196,6 +205,15 @@ export interface AgentToolBindingVO {
   enabled?: boolean
 }
 
+export interface AgentMcpBindingVO {
+  id: number
+  mcpServerId: number
+  mcpServerName?: string
+  serverKey?: string
+  enabled?: boolean
+  toolCatalogJson?: string
+}
+
 export interface AgentPublishVO {
   agentId: number
   status: string
@@ -227,6 +245,18 @@ export function bindAgentTool(agentId: number, payload: { toolId: number; enable
 
 export function unbindAgentTool(agentId: number, toolId: number) {
   return http.delete<Result<void>>(`/agents/${agentId}/tools/${toolId}`)
+}
+
+export function listAgentMcp(agentId: number) {
+  return http.get<Result<AgentMcpBindingVO[]>>(`/agents/${agentId}/mcp`)
+}
+
+export function bindAgentMcp(agentId: number, payload: { mcpServerId: number; enabled?: boolean }) {
+  return http.post<Result<AgentMcpBindingVO>>(`/agents/${agentId}/mcp`, payload)
+}
+
+export function unbindAgentMcp(agentId: number, mcpServerId: number) {
+  return http.delete<Result<void>>(`/agents/${agentId}/mcp/${mcpServerId}`)
 }
 
 export function getAgentPublishStatus(agentId: number) {
