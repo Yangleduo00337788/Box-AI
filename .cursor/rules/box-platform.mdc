@@ -1,0 +1,23 @@
+---
+description: Box 品牌、包名与 TDesign 前端约定
+alwaysApply: true
+---
+
+# Box 平台约定
+
+产品名 **Box**，项目名 **Box AI**。不要再使用 AgentX / agentx / Semi Design。
+
+## 工程
+
+- 后端：`box-server`，包名 `com.boxai`，启动类 `BoxApplication`
+- 模块：`box-bootstrap`、`box-common`、`box-security`、`box-infrastructure`、`box-domain`、`box-application`、`box-modules/box-*`
+- 库名 / 前缀：MySQL `box`，Redis/ES `box:`
+- 领域对象仍叫 Agent / Workflow / Knowledge（产品侧是 Box Agent 等）
+
+## 前端 UI
+
+- Vue 3 + `tdesign-vue-next` + `tdesign-icons-vue-next`
+- 禁止 Semi Design Vue / Semi UI
+- 弹窗用 TDesign `Dialog`，全局反馈用 `Message` / `Notification`
+- 写页面或改组件前，先用 TDesign MCP 查文档（`framework` = `vue-next`）；图标用 `search-icon`
+- 不要凭记忆编造 TDesign Props / 插槽 / 事件名
