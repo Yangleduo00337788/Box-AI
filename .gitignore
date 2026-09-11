@@ -1,0 +1,27 @@
+# Maven
+**/target/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Env / secrets
+.env
+.env.*
+**/application-local.yml
+
+# OS / logs
+.DS_Store
+Thumbs.db
+*.log
+hs_err_pid*
+
+# IDE
+.vscode/
+*.swp
