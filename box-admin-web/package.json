@@ -1,0 +1,27 @@
+{
+  "name": "box-admin-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.8.4",
+    "pinia": "^3.0.2",
+    "tdesign-icons-vue-next": "^0.3.6",
+    "tdesign-vue-next": "^1.11.5",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "typescript": "~5.8.2",
+    "unplugin-vue-components": "^28.4.1",
+    "vite": "^6.2.5",
+    "vue-tsc": "^2.2.8"
+  }
+}
