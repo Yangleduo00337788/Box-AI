@@ -20,6 +20,8 @@ public record AgentVO(
         java.math.BigDecimal topP,
         Integer maxTokens,
         Boolean streamEnabled,
+        Boolean memoryEnabled,
+        Integer memoryWindowSize,
         Long createdBy,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

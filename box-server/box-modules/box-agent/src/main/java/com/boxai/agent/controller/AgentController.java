@@ -2,12 +2,15 @@ package com.boxai.agent.controller;
 
 import com.boxai.agent.api.AgentChatRequest;
 import com.boxai.agent.api.AgentKnowledgeBindingVO;
+import com.boxai.agent.api.AgentMcpBindingVO;
 import com.boxai.agent.api.AgentPublishVO;
 import com.boxai.agent.api.AgentToolBindingVO;
 import com.boxai.agent.api.AgentVO;
 import com.boxai.agent.api.BindAgentKnowledgeRequest;
+import com.boxai.agent.api.BindAgentMcpRequest;
 import com.boxai.agent.api.BindAgentToolRequest;
 import com.boxai.agent.api.CreateAgentRequest;
+import com.boxai.agent.api.UpdateAgentMemoryRequest;
 import com.boxai.agent.api.UpdateAgentModelRequest;
 import com.boxai.agent.api.UpdateAgentPromptRequest;
 import com.boxai.agent.api.UpdateAgentRequest;
@@ -76,6 +79,11 @@ public class AgentController {
         return Result.success(agentApplicationService.updateModelConfig(id, request));
     }
 
+    @PutMapping("/{id}/memory")
+    public Result<AgentVO> updateMemory(@PathVariable Long id, @Valid @RequestBody UpdateAgentMemoryRequest request) {
+        return Result.success(agentApplicationService.updateMemoryConfig(id, request));
+    }
+
     @PostMapping("/{id}/chat")
     public Object chat(@PathVariable Long id,
                        @Valid @RequestBody AgentChatRequest request,
@@ -123,6 +131,22 @@ public class AgentController {
     @DeleteMapping("/{id}/tools/{toolId}")
     public Result<Void> unbindTool(@PathVariable Long id, @PathVariable Long toolId) {
         agentBindingApplicationService.unbindTool(id, toolId);
+        return Result.success();
+    }
+
+    @GetMapping("/{id}/mcp")
+    public Result<List<AgentMcpBindingVO>> listMcp(@PathVariable Long id) {
+        return Result.success(agentBindingApplicationService.listMcp(id));
+    }
+
+    @PostMapping("/{id}/mcp")
+    public Result<AgentMcpBindingVO> bindMcp(@PathVariable Long id, @Valid @RequestBody BindAgentMcpRequest request) {
+        return Result.success(agentBindingApplicationService.bindMcp(id, request));
+    }
+
+    @DeleteMapping("/{id}/mcp/{mcpServerId}")
+    public Result<Void> unbindMcp(@PathVariable Long id, @PathVariable Long mcpServerId) {
+        agentBindingApplicationService.unbindMcp(id, mcpServerId);
         return Result.success();
     }
 

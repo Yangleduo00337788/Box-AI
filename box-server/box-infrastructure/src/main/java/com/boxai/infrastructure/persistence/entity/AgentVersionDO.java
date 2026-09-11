@@ -39,6 +39,8 @@ public class AgentVersionDO {
     private Integer streamEnabled;
     @Column("memory_enabled")
     private Integer memoryEnabled;
+    @Column("memory_window_size")
+    private Integer memoryWindowSize;
     @Column("knowledge_enabled")
     private Integer knowledgeEnabled;
     @Column("tool_enabled")

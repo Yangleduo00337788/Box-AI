@@ -1,20 +1,26 @@
 package com.boxai.agent.application;
 
 import com.boxai.agent.api.AgentKnowledgeBindingVO;
+import com.boxai.agent.api.AgentMcpBindingVO;
 import com.boxai.agent.api.AgentToolBindingVO;
 import com.boxai.agent.api.BindAgentKnowledgeRequest;
+import com.boxai.agent.api.BindAgentMcpRequest;
 import com.boxai.agent.api.BindAgentToolRequest;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.agent.Agent;
 import com.boxai.domain.agent.AgentKnowledge;
 import com.boxai.domain.agent.AgentKnowledgeRepository;
+import com.boxai.domain.agent.AgentMcp;
+import com.boxai.domain.agent.AgentMcpRepository;
 import com.boxai.domain.agent.AgentRepository;
 import com.boxai.domain.agent.AgentTool;
 import com.boxai.domain.agent.AgentToolRepository;
 import com.boxai.domain.agent.AgentVersion;
 import com.boxai.domain.agent.AgentVersionRepository;
 import com.boxai.domain.knowledge.KnowledgeBaseRepository;
+import com.boxai.domain.mcp.McpServer;
+import com.boxai.domain.mcp.McpServerRepository;
 import com.boxai.domain.tool.ToolRepository;
 import com.boxai.security.context.WorkspaceContext;
 import org.springframework.stereotype.Service;
@@ -29,21 +35,27 @@ public class AgentBindingApplicationService {
     private final AgentVersionRepository agentVersionRepository;
     private final AgentKnowledgeRepository agentKnowledgeRepository;
     private final AgentToolRepository agentToolRepository;
+    private final AgentMcpRepository agentMcpRepository;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final ToolRepository toolRepository;
+    private final McpServerRepository mcpServerRepository;
 
     public AgentBindingApplicationService(AgentRepository agentRepository,
                                           AgentVersionRepository agentVersionRepository,
                                           AgentKnowledgeRepository agentKnowledgeRepository,
                                           AgentToolRepository agentToolRepository,
+                                          AgentMcpRepository agentMcpRepository,
                                           KnowledgeBaseRepository knowledgeBaseRepository,
-                                          ToolRepository toolRepository) {
+                                          ToolRepository toolRepository,
+                                          McpServerRepository mcpServerRepository) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.agentKnowledgeRepository = agentKnowledgeRepository;
         this.agentToolRepository = agentToolRepository;
+        this.agentMcpRepository = agentMcpRepository;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.toolRepository = toolRepository;
+        this.mcpServerRepository = mcpServerRepository;
     }
 
     public List<AgentKnowledgeBindingVO> listKnowledge(Long agentId) {
@@ -119,8 +131,7 @@ public class AgentBindingApplicationService {
         binding.setRequireConfirmation(Boolean.TRUE.equals(request.requireConfirmation()));
         binding.setConfigJson(trimToNull(request.configJson()));
         agentToolRepository.save(binding);
-        draft.setToolEnabled(true);
-        agentVersionRepository.update(draft);
+        refreshToolEnabled(draft);
         return toToolVO(binding);
     }
 
@@ -131,10 +142,46 @@ public class AgentBindingApplicationService {
         AgentTool binding = agentToolRepository.findByVersionAndTool(draft.getId(), toolId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TOOL_NOT_FOUND, "绑定关系不存在"));
         agentToolRepository.delete(binding.getId());
-        if (agentToolRepository.listByVersionId(draft.getId()).isEmpty()) {
-            draft.setToolEnabled(false);
-            agentVersionRepository.update(draft);
+        refreshToolEnabled(draft);
+    }
+
+    public List<AgentMcpBindingVO> listMcp(Long agentId) {
+        Agent agent = requireAgent(agentId);
+        AgentVersion draft = requireDraft(agent);
+        return agentMcpRepository.listByVersionId(draft.getId()).stream().map(this::toMcpVO).toList();
+    }
+
+    @Transactional
+    public AgentMcpBindingVO bindMcp(Long agentId, BindAgentMcpRequest request) {
+        Agent agent = requireAgent(agentId);
+        AgentVersion draft = requireDraft(agent);
+        McpServer server = mcpServerRepository.findById(request.mcpServerId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "MCP Server 不存在"));
+        if (!workspaceId().equals(server.getWorkspaceId())) {
+            throw new BusinessException(ErrorCode.WORKSPACE_ACCESS_DENIED, "无权访问该 MCP Server");
         }
+        agentMcpRepository.findByVersionAndMcpServer(draft.getId(), request.mcpServerId())
+                .ifPresent(existing -> {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "该 MCP Server 已绑定");
+                });
+        AgentMcp binding = new AgentMcp();
+        binding.setAgentId(agent.getId());
+        binding.setVersionId(draft.getId());
+        binding.setMcpServerId(request.mcpServerId());
+        binding.setEnabled(request.enabled() == null || request.enabled());
+        agentMcpRepository.save(binding);
+        refreshToolEnabled(draft);
+        return toMcpVO(binding);
+    }
+
+    @Transactional
+    public void unbindMcp(Long agentId, Long mcpServerId) {
+        Agent agent = requireAgent(agentId);
+        AgentVersion draft = requireDraft(agent);
+        AgentMcp binding = agentMcpRepository.findByVersionAndMcpServer(draft.getId(), mcpServerId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "绑定关系不存在"));
+        agentMcpRepository.delete(binding.getId());
+        refreshToolEnabled(draft);
     }
 
     void copyBindings(Long sourceVersionId, Long targetVersionId, Long agentId) {
@@ -160,6 +207,21 @@ public class AgentBindingApplicationService {
             copy.setConfigJson(binding.getConfigJson());
             agentToolRepository.save(copy);
         }
+        for (AgentMcp binding : agentMcpRepository.listByVersionId(sourceVersionId)) {
+            AgentMcp copy = new AgentMcp();
+            copy.setAgentId(agentId);
+            copy.setVersionId(targetVersionId);
+            copy.setMcpServerId(binding.getMcpServerId());
+            copy.setEnabled(binding.getEnabled());
+            agentMcpRepository.save(copy);
+        }
+    }
+
+    private void refreshToolEnabled(AgentVersion draft) {
+        boolean hasTools = !agentToolRepository.listByVersionId(draft.getId()).isEmpty()
+                || !agentMcpRepository.listByVersionId(draft.getId()).isEmpty();
+        draft.setToolEnabled(hasTools);
+        agentVersionRepository.update(draft);
     }
 
     private Agent requireAgent(Long id) {
@@ -193,6 +255,17 @@ public class AgentBindingApplicationService {
                 binding.getEnabled(),
                 binding.getRequireConfirmation(),
                 binding.getConfigJson());
+    }
+
+    private AgentMcpBindingVO toMcpVO(AgentMcp binding) {
+        McpServer server = mcpServerRepository.findById(binding.getMcpServerId()).orElse(null);
+        return new AgentMcpBindingVO(
+                binding.getId(),
+                binding.getMcpServerId(),
+                server == null ? null : server.getName(),
+                server == null ? null : server.getServerKey(),
+                binding.getEnabled(),
+                server == null ? null : server.getToolCatalogJson());
     }
 
     private Long workspaceId() {

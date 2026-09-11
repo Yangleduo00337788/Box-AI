@@ -158,6 +158,7 @@ public class AgentTemplateApplicationService {
         version.setMaxTokens(template.getMaxTokens() == null ? DEFAULT_MAX_TOKENS : template.getMaxTokens());
         version.setStreamEnabled(template.getStreamEnabled() == null || template.getStreamEnabled());
         version.setMemoryEnabled(true);
+        version.setMemoryWindowSize(20);
         version.setKnowledgeEnabled(false);
         version.setToolEnabled(false);
         version.setCreatedBy(userId);

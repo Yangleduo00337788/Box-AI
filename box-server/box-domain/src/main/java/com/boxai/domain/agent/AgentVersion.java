@@ -24,6 +24,7 @@ public class AgentVersion {
     private Integer maxTokens;
     private Boolean streamEnabled;
     private Boolean memoryEnabled;
+    private Integer memoryWindowSize;
     private Boolean knowledgeEnabled;
     private Boolean toolEnabled;
     private String configJson;

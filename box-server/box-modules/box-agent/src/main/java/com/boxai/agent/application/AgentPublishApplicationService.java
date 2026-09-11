@@ -121,6 +121,7 @@ public class AgentPublishApplicationService {
         version.setMaxTokens(source.getMaxTokens());
         version.setStreamEnabled(source.getStreamEnabled());
         version.setMemoryEnabled(source.getMemoryEnabled());
+        version.setMemoryWindowSize(source.getMemoryWindowSize());
         version.setKnowledgeEnabled(source.getKnowledgeEnabled());
         version.setToolEnabled(source.getToolEnabled());
         version.setConfigJson(source.getConfigJson());

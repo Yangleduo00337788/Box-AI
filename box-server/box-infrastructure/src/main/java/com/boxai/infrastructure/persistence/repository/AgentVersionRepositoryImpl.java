@@ -93,6 +93,7 @@ public class AgentVersionRepositoryImpl implements AgentVersionRepository {
         version.setMaxTokens(row.getMaxTokens());
         version.setStreamEnabled(row.getStreamEnabled() != null && row.getStreamEnabled() == 1);
         version.setMemoryEnabled(row.getMemoryEnabled() != null && row.getMemoryEnabled() == 1);
+        version.setMemoryWindowSize(row.getMemoryWindowSize() == null ? 20 : row.getMemoryWindowSize());
         version.setKnowledgeEnabled(row.getKnowledgeEnabled() != null && row.getKnowledgeEnabled() == 1);
         version.setToolEnabled(row.getToolEnabled() != null && row.getToolEnabled() == 1);
         version.setConfigJson(row.getConfigJson());
@@ -119,6 +120,7 @@ public class AgentVersionRepositoryImpl implements AgentVersionRepository {
         row.setMaxTokens(version.getMaxTokens());
         row.setStreamEnabled(Boolean.TRUE.equals(version.getStreamEnabled()) ? 1 : 0);
         row.setMemoryEnabled(Boolean.TRUE.equals(version.getMemoryEnabled()) ? 1 : 0);
+        row.setMemoryWindowSize(version.getMemoryWindowSize() == null ? 20 : version.getMemoryWindowSize());
         row.setKnowledgeEnabled(Boolean.TRUE.equals(version.getKnowledgeEnabled()) ? 1 : 0);
         row.setToolEnabled(Boolean.TRUE.equals(version.getToolEnabled()) ? 1 : 0);
         row.setConfigJson(version.getConfigJson());

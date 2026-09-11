@@ -13,6 +13,8 @@ import com.boxai.conversation.api.SendMessageRequest;
 import com.boxai.conversation.api.SendMessageVO;
 import com.boxai.domain.agent.Agent;
 import com.boxai.domain.agent.AgentRepository;
+import com.boxai.domain.agent.AgentVersion;
+import com.boxai.domain.agent.AgentVersionRepository;
 import com.boxai.domain.conversation.Conversation;
 import com.boxai.domain.conversation.ConversationRepository;
 import com.boxai.domain.conversation.Message;
@@ -37,11 +39,12 @@ import java.util.stream.Collectors;
 @Service
 public class ConversationApplicationService {
 
-    private static final int MAX_HISTORY_MESSAGES = 20;
+    private static final int DEFAULT_HISTORY_MESSAGES = 20;
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final AgentRepository agentRepository;
+    private final AgentVersionRepository agentVersionRepository;
     private final AgentChatPreparer agentChatPreparer;
     private final AgentChatExecutor agentChatExecutor;
     private final TransactionTemplate transactionTemplate;
@@ -49,12 +52,14 @@ public class ConversationApplicationService {
     public ConversationApplicationService(ConversationRepository conversationRepository,
                                           MessageRepository messageRepository,
                                           AgentRepository agentRepository,
+                                          AgentVersionRepository agentVersionRepository,
                                           AgentChatPreparer agentChatPreparer,
                                           AgentChatExecutor agentChatExecutor,
                                           PlatformTransactionManager transactionManager) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.agentRepository = agentRepository;
+        this.agentVersionRepository = agentVersionRepository;
         this.agentChatPreparer = agentChatPreparer;
         this.agentChatExecutor = agentChatExecutor;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -135,9 +140,19 @@ public class ConversationApplicationService {
     }
 
     private List<ChatTurn> historyTurns(Conversation conversation) {
+        AgentVersion draft = agentVersionRepository.findLatestDraft(conversation.getAgentId()).orElse(null);
+        if (draft != null && Boolean.FALSE.equals(draft.getMemoryEnabled())) {
+            return List.of();
+        }
+        int windowSize = draft == null || draft.getMemoryWindowSize() == null
+                ? DEFAULT_HISTORY_MESSAGES
+                : Math.max(0, draft.getMemoryWindowSize());
+        if (windowSize == 0) {
+            return List.of();
+        }
         List<Message> history = messageRepository.listByConversationId(conversation.getId());
         List<ChatTurn> turns = new ArrayList<>();
-        int start = Math.max(0, history.size() - MAX_HISTORY_MESSAGES);
+        int start = Math.max(0, history.size() - windowSize);
         for (int i = start; i < history.size(); i++) {
             Message item = history.get(i);
             if ("USER".equals(item.getRole()) || "ASSISTANT".equals(item.getRole())) {

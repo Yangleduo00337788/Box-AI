@@ -158,7 +158,7 @@ public class AgentChatPreparer {
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             turns.add(new ChatTurn("SYSTEM", systemPrompt));
         }
-        if (history != null) {
+        if (Boolean.TRUE.equals(draft.getMemoryEnabled()) && history != null) {
             for (ChatTurn turn : history) {
                 if (turn == null || turn.content() == null || turn.content().isBlank()) {
                     continue;

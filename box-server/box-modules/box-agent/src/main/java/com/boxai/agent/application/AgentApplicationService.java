@@ -4,6 +4,7 @@ import com.boxai.agent.api.AgentChatRequest;
 import com.boxai.agent.api.AgentChatVO;
 import com.boxai.agent.api.AgentVO;
 import com.boxai.agent.api.CreateAgentRequest;
+import com.boxai.agent.api.UpdateAgentMemoryRequest;
 import com.boxai.agent.api.UpdateAgentModelRequest;
 import com.boxai.agent.api.UpdateAgentPromptRequest;
 import com.boxai.agent.api.UpdateAgentRequest;
@@ -117,6 +118,7 @@ public class AgentApplicationService {
         version.setMaxTokens(DEFAULT_MAX_TOKENS);
         version.setStreamEnabled(true);
         version.setMemoryEnabled(true);
+        version.setMemoryWindowSize(20);
         version.setKnowledgeEnabled(false);
         version.setToolEnabled(false);
         version.setCreatedBy(userId);
@@ -153,6 +155,24 @@ public class AgentApplicationService {
         Long userId = WorkspaceContext.require().userId();
         AgentVersion draft = requireDraft(agent);
         draft.setSystemPrompt(trimToNull(request.systemPrompt()));
+        draft.setUpdatedBy(userId);
+        agentVersionRepository.update(draft);
+        agent.setUpdatedBy(userId);
+        agentRepository.update(agent);
+        return toVO(agent);
+    }
+
+    @Transactional
+    public AgentVO updateMemoryConfig(Long id, UpdateAgentMemoryRequest request) {
+        Agent agent = requireAgent(id);
+        Long userId = WorkspaceContext.require().userId();
+        AgentVersion draft = requireDraft(agent);
+        if (request.memoryEnabled() != null) {
+            draft.setMemoryEnabled(request.memoryEnabled());
+        }
+        if (request.memoryWindowSize() != null) {
+            draft.setMemoryWindowSize(request.memoryWindowSize());
+        }
         draft.setUpdatedBy(userId);
         agentVersionRepository.update(draft);
         agent.setUpdatedBy(userId);
@@ -253,6 +273,8 @@ public class AgentApplicationService {
         BigDecimal topP = draft == null ? null : draft.getTopP();
         Integer maxTokens = draft == null ? null : draft.getMaxTokens();
         Boolean streamEnabled = draft == null ? null : draft.getStreamEnabled();
+        Boolean memoryEnabled = draft == null ? null : draft.getMemoryEnabled();
+        Integer memoryWindowSize = draft == null ? null : draft.getMemoryWindowSize();
 
         if (agent.getPublishedVersionId() != null) {
             AgentVersion published = agentVersionRepository.findById(agent.getPublishedVersionId()).orElse(null);
@@ -286,6 +308,8 @@ public class AgentApplicationService {
                 topP,
                 maxTokens,
                 streamEnabled,
+                memoryEnabled,
+                memoryWindowSize,
                 agent.getCreatedBy(),
                 agent.getCreatedAt(),
                 agent.getUpdatedAt());
