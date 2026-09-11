@@ -53,6 +53,7 @@ const router = createRouter({
         { path: 'team', component: () => import('@/views/TeamView.vue'), meta: { title: '团队' } },
         { path: 'market', component: () => import('@/views/MarketView.vue'), meta: { title: '市场' } },
         { path: 'analytics', component: () => import('@/views/AnalyticsView.vue'), meta: { title: '分析' } },
+        { path: 'executions', component: () => import('@/views/ExecutionsView.vue'), meta: { title: '执行记录' } },
         {
           path: 'settings',
           component: () => import('@/layouts/SettingsLayout.vue'),
@@ -62,6 +63,7 @@ const router = createRouter({
             { path: 'appearance', component: () => import('@/views/settings/SettingsAppearanceView.vue'), meta: { title: '外观设置' } },
             { path: 'general', component: () => import('@/views/settings/SettingsGeneralView.vue'), meta: { title: '通用设置' } },
             { path: 'security', component: () => import('@/views/settings/SettingsSecurityView.vue'), meta: { title: '账号与安全' } },
+            { path: 'api-keys', component: () => import('@/views/settings/SettingsApiKeysView.vue'), meta: { title: 'API 密钥' } },
             { path: 'quota', component: () => import('@/views/settings/SettingsQuotaView.vue'), meta: { title: '额度管理' } },
             { path: 'capacity', component: () => import('@/views/settings/SettingsCapacityView.vue'), meta: { title: '容量管理' } },
             { path: 'about', component: () => import('@/views/settings/SettingsAboutView.vue'), meta: { title: '关于盒子' } },

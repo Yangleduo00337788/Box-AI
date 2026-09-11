@@ -1,6 +1,10 @@
 <template>
   <div>
-    <page-header title="分析" desc="查看工作空间内的智能体、对话与资源使用情况" />
+    <page-header title="分析" desc="查看工作空间内的智能体、对话与资源使用情况">
+      <template #actions>
+        <t-button variant="outline" @click="router.push('/executions')">查看执行记录</t-button>
+      </template>
+    </page-header>
 
     <t-loading :loading="loading" size="small">
       <div v-if="overview" class="stats-grid">
@@ -30,9 +34,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import { fetchAnalyticsOverview, type AnalyticsOverviewVO } from '@/api/analytics'
 
+const router = useRouter()
 const loading = ref(false)
 const overview = ref<AnalyticsOverviewVO | null>(null)
 

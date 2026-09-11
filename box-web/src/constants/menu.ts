@@ -13,6 +13,7 @@ export const CONSUMER_MENU_GROUPS: MenuGroup[] = [
       { value: '/mcp', label: 'MCP', icon: 'link', desc: 'MCP Server' },
       { value: '/plugin-market', label: '插件市场', icon: 'ai-tool', desc: '模板与插件' },
       { value: '/models', label: '模型', icon: 'ai-1', desc: '模型与 Provider' },
+      { value: '/executions', label: '执行记录', icon: 'history', desc: 'Trace 与运行历史' },
     ],
   },
 ]

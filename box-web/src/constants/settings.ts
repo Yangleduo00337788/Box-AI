@@ -6,6 +6,7 @@ export const SETTINGS_NAV = [
       { value: '/settings/appearance', label: '外观设置', icon: 'palette' },
       { value: '/settings/general', label: '通用设置', icon: 'setting' },
       { value: '/settings/security', label: '账号与安全', icon: 'lock-on' },
+      { value: '/settings/api-keys', label: 'API 密钥', icon: 'key' },
     ],
   },
   {
