@@ -1,0 +1,97 @@
+<template>
+  <app-shell-layout
+    shell-variant="consumer"
+    :menu-groups="CONSUMER_MENU_GROUPS"
+    :active="active"
+    content-panel
+    :content-padded="contentPadded"
+    :hide-sidebar="isSettingsRoute"
+    :user-name="userName"
+    user-hint="Box"
+    @search="searchVisible = true"
+  >
+    <template #sidebar-nav>
+      <consumer-sidebar-workspace :active="active" />
+    </template>
+    <template #sidebar-footer="{ collapsed, userName: slotUserName, avatarText }">
+      <consumer-sidebar-footer
+        :collapsed="collapsed"
+        :user-name="slotUserName"
+        :avatar-text="avatarText"
+        @logout="onLogout"
+      />
+    </template>
+  </app-shell-layout>
+
+  <global-search-dialog v-model:visible="searchVisible" />
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { MessagePlugin } from 'tdesign-vue-next'
+import AppShellLayout from '@box/ui/layouts/AppShellLayout.vue'
+import ConsumerSidebarFooter from '@/components/ConsumerSidebarFooter.vue'
+import ConsumerSidebarWorkspace from '@/components/ConsumerSidebarWorkspace.vue'
+import GlobalSearchDialog from '@/components/GlobalSearchDialog.vue'
+import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
+import { loadAppPreferencesFromServer } from '@/composables/useAppPreferences'
+import { useAuthStore } from '@/stores/auth'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const searchVisible = ref(false)
+
+const userName = computed(() => auth.user?.nickname || auth.user?.username || auth.user?.email || '用户')
+const isSettingsRoute = computed(() => route.path.startsWith('/settings'))
+
+const active = computed(() => {
+  const path = route.path
+  if (path === '/chat') {
+    return '/chat'
+  }
+  if (path.startsWith('/chat/')) {
+    return ''
+  }
+  if (path === '/plugin-market' || path.startsWith('/workflows') || path.startsWith('/knowledge') || path.startsWith('/tools') || path.startsWith('/mcp')) {
+    return '/plugin-market'
+  }
+  if (path === '/agents' || path.startsWith('/agents/')) {
+    return ''
+  }
+  for (const group of CONSUMER_MENU_GROUPS) {
+    for (const item of group.items) {
+      if (path === item.value || path.startsWith(`${item.value}/`)) {
+        return item.value
+      }
+    }
+  }
+  if (path.startsWith('/dashboard')) return ''
+  if (path.startsWith('/analytics')) return ''
+  if (path.startsWith('/settings')) return ''
+  return path
+})
+
+const contentPadded = computed(() => {
+  if (route.path === '/chat' || route.path.startsWith('/chat/')) {
+    return false
+  }
+  if (route.path.startsWith('/settings')) {
+    return false
+  }
+  return route.name !== 'agent-builder'
+})
+
+function onLogout() {
+  auth.logout()
+  MessagePlugin.success('已退出登录')
+  router.push('/login')
+}
+
+onMounted(() => {
+  if (auth.token) {
+    loadAppPreferencesFromServer()
+  }
+})
+</script>
