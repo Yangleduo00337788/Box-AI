@@ -108,7 +108,15 @@ public class AgentChatPreparer {
                 throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "所选平台模型不可用");
             }
             ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(platformModelOverride);
-            return buildPrepared(resolved.runtimeConfig(), turns, draft, resolved.platformCredentialId(), true, resolved.platformModelId());
+            return buildPrepared(
+                    agent.getId(),
+                    resolved.runtimeConfig(),
+                    turns,
+                    draft,
+                    resolved.platformCredentialId(),
+                    true,
+                    resolved.platformModelId(),
+                    null);
         }
         if (ModelSources.PLATFORM.equals(modelSource)) {
             Long platformModelId = draft.getPlatformModelId();
@@ -124,7 +132,15 @@ public class AgentChatPreparer {
                 platformModelId = runnableId;
             }
             ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(platformModelId);
-            return buildPrepared(resolved.runtimeConfig(), turns, draft, resolved.platformCredentialId(), true, resolved.platformModelId());
+            return buildPrepared(
+                    agent.getId(),
+                    resolved.runtimeConfig(),
+                    turns,
+                    draft,
+                    resolved.platformCredentialId(),
+                    true,
+                    resolved.platformModelId(),
+                    null);
         }
 
         if (draft.getModelId() == null) {
@@ -138,26 +154,31 @@ public class AgentChatPreparer {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CREDENTIAL_MISSING, "请先为该 Provider 配置 API Key"));
         String apiKey = secretCipher.decrypt(credential.getEncryptedApiKey());
         return buildPrepared(
+                agent.getId(),
                 new com.boxai.ai.ModelRuntimeConfig(provider.getBaseUrl(), apiKey, model.getModelCode()),
                 turns,
                 draft,
                 credential.getId(),
                 false,
-                model.getId());
+                model.getId(),
+                null);
     }
 
-    private PreparedAgentChat buildPrepared(com.boxai.ai.ModelRuntimeConfig runtimeConfig,
+    private PreparedAgentChat buildPrepared(Long agentId,
+                                            com.boxai.ai.ModelRuntimeConfig runtimeConfig,
                                             List<ChatTurn> turns,
                                             AgentVersion draft,
                                             Long credentialId,
                                             boolean platformCredential,
-                                            Long modelId) {
+                                            Long modelId,
+                                            String toolConfirmationToken) {
         List<ToolDefinition> tools = Boolean.TRUE.equals(draft.getToolEnabled())
                 ? agentToolRuntimeService.resolveTools(draft.getId()).stream()
                 .map(item -> new ToolDefinition(item.toolKey(), item.description()))
                 .toList()
                 : List.of();
         return new PreparedAgentChat(
+                agentId,
                 runtimeConfig,
                 turns,
                 toDouble(draft.getTemperature()),
@@ -167,7 +188,8 @@ public class AgentChatPreparer {
                 platformCredential,
                 modelId,
                 draft.getId(),
-                tools);
+                tools,
+                toolConfirmationToken);
     }
 
     private List<ChatTurn> buildTurns(Long agentId, AgentVersion draft, List<ChatTurn> history, String userMessage) {

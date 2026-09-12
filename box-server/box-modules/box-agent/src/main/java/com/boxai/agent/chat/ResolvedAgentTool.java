@@ -8,10 +8,11 @@ public record ResolvedAgentTool(
         String type,
         Long mcpServerId,
         String mcpToolName,
-        Long subAgentId
+        Long subAgentId,
+        boolean requireConfirmation
 ) {
     public ResolvedAgentTool(Long toolId, String toolKey, String name, String description, String type) {
-        this(toolId, toolKey, name, description, type, null, null, null);
+        this(toolId, toolKey, name, description, type, null, null, null, false);
     }
 
     public ResolvedAgentTool(Long toolId,
@@ -21,6 +22,17 @@ public record ResolvedAgentTool(
                              String type,
                              Long mcpServerId,
                              String mcpToolName) {
-        this(toolId, toolKey, name, description, type, mcpServerId, mcpToolName, null);
+        this(toolId, toolKey, name, description, type, mcpServerId, mcpToolName, null, false);
+    }
+
+    public ResolvedAgentTool(Long toolId,
+                             String toolKey,
+                             String name,
+                             String description,
+                             String type,
+                             Long mcpServerId,
+                             String mcpToolName,
+                             Long subAgentId) {
+        this(toolId, toolKey, name, description, type, mcpServerId, mcpToolName, subAgentId, false);
     }
 }

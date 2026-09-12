@@ -16,7 +16,9 @@ import com.boxai.agent.api.BindAgentSubAgentRequest;
 import com.boxai.agent.api.BindAgentToolRequest;
 import com.boxai.agent.api.CreateAgentRequest;
 import com.boxai.agent.api.CreateAgentVersionRequest;
+import com.boxai.agent.api.AgentEmbedConfigVO;
 import com.boxai.agent.api.UpdateAgentConfigRequest;
+import com.boxai.agent.api.UpdateAgentEmbedConfigRequest;
 import com.boxai.agent.api.UpdateAgentMemoryRequest;
 import com.boxai.agent.api.UpdateAgentModelRequest;
 import com.boxai.agent.api.UpdateAgentPromptRequest;
@@ -116,6 +118,17 @@ public class AgentController {
         return Result.success(agentApplicationService.updateConfig(id, request));
     }
 
+    @GetMapping("/{id}/embed-config")
+    public Result<AgentEmbedConfigVO> getEmbedConfig(@PathVariable Long id) {
+        return Result.success(agentApplicationService.getEmbedConfig(id));
+    }
+
+    @PutMapping("/{id}/embed-config")
+    public Result<AgentEmbedConfigVO> updateEmbedConfig(@PathVariable Long id,
+                                                        @Valid @RequestBody UpdateAgentEmbedConfigRequest request) {
+        return Result.success(agentApplicationService.updateEmbedConfig(id, request));
+    }
+
     @PostMapping("/{id}/chat")
     public Object chat(@PathVariable Long id,
                        @Valid @RequestBody AgentChatRequest request,
@@ -124,6 +137,12 @@ public class AgentController {
             return agentApplicationService.streamChat(id, request, response);
         }
         return Result.success(agentApplicationService.chat(id, request));
+    }
+
+    @PostMapping("/{id}/tools/confirm")
+    public Result<com.boxai.agent.api.AgentToolConfirmVO> confirmTool(@PathVariable Long id,
+                                                                      @Valid @RequestBody com.boxai.agent.api.ConfirmAgentToolRequest request) {
+        return Result.success(agentApplicationService.confirmTool(id, request));
     }
 
     @DeleteMapping("/{id}")
@@ -158,6 +177,13 @@ public class AgentController {
     public Result<AgentToolBindingVO> bindTool(@PathVariable Long id,
                                                @Valid @RequestBody BindAgentToolRequest request) {
         return Result.success(agentBindingApplicationService.bindTool(id, request));
+    }
+
+    @PutMapping("/{id}/tools/{toolId}")
+    public Result<com.boxai.agent.api.AgentToolBindingVO> updateTool(@PathVariable Long id,
+                                                                     @PathVariable Long toolId,
+                                                                     @RequestBody com.boxai.agent.api.UpdateAgentToolRequest request) {
+        return Result.success(agentBindingApplicationService.updateTool(id, toolId, request));
     }
 
     @DeleteMapping("/{id}/tools/{toolId}")

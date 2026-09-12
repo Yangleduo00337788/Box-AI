@@ -6,18 +6,24 @@ import com.boxai.ai.ChatStreamHandler;
 import com.boxai.ai.ToolCall;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.common.exception.ToolConfirmationRequiredException;
 import com.boxai.domain.model.ModelCredentialRepository;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.ratelimit.RateLimitService;
 import com.boxai.domain.trace.Execution;
 import com.boxai.tenant.application.QuotaApplicationService;
 import com.boxai.trace.application.ExecutionRecorder;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -32,23 +38,51 @@ public class AgentChatExecutor {
     private final PlatformModelApplicationService platformModelApplicationService;
     private final AgentToolRuntimeService agentToolRuntimeService;
     private final ExecutionRecorder executionRecorder;
+    private final ObjectMapper objectMapper;
+    private final RateLimitService rateLimitService;
+    private final ToolConfirmationService toolConfirmationService;
 
     public AgentChatExecutor(ChatModelGateway chatModelGateway,
                              ModelCredentialRepository credentialRepository,
                              QuotaApplicationService quotaApplicationService,
                              PlatformModelApplicationService platformModelApplicationService,
                              AgentToolRuntimeService agentToolRuntimeService,
-                             ExecutionRecorder executionRecorder) {
+                             ExecutionRecorder executionRecorder,
+                             ObjectMapper objectMapper,
+                             RateLimitService rateLimitService,
+                             ToolConfirmationService toolConfirmationService) {
         this.chatModelGateway = chatModelGateway;
         this.credentialRepository = credentialRepository;
         this.quotaApplicationService = quotaApplicationService;
         this.platformModelApplicationService = platformModelApplicationService;
         this.agentToolRuntimeService = agentToolRuntimeService;
         this.executionRecorder = executionRecorder;
+        this.objectMapper = objectMapper;
+        this.rateLimitService = rateLimitService;
+        this.toolConfirmationService = toolConfirmationService;
     }
 
     public void assertQuotaAvailable() {
         quotaApplicationService.assertAiQuotaAvailable(WorkspaceContext.require().workspaceId());
+    }
+
+    public void assertChatRateLimit() {
+        Long workspaceId = WorkspaceContext.require().workspaceId();
+        Long userId = WorkspaceContext.require().userId();
+        rateLimitService.assertAllowed(
+                "chat",
+                workspaceId + ":" + userId,
+                60,
+                Duration.ofMinutes(1));
+    }
+
+    public void assertPublishedChatRateLimit(Long agentId) {
+        String ip = com.boxai.security.audit.HttpRequestContext.clientIp();
+        rateLimitService.assertAllowed(
+                "published-chat",
+                agentId + ":" + (ip == null ? "unknown" : ip),
+                60,
+                Duration.ofMinutes(1));
     }
 
     public String chat(PreparedAgentChat prepared) {
@@ -57,6 +91,7 @@ public class AgentChatExecutor {
 
     public String chat(PreparedAgentChat prepared, Execution execution) {
         Long workspaceId = WorkspaceContext.require().workspaceId();
+        assertChatRateLimit();
         quotaApplicationService.assertAiQuotaAvailable(workspaceId);
         try {
             String content;
@@ -66,7 +101,7 @@ public class AgentChatExecutor {
                         prepared.runtimeConfig(),
                         prepared.turns(),
                         prepared.tools(),
-                        toolCall -> executeToolWithTrace(execution, resolvedTools, toolCall),
+                        toolCall -> executeToolWithTrace(execution, prepared, resolvedTools, toolCall),
                         prepared.temperature(),
                         prepared.topP(),
                         prepared.maxTokens());
@@ -104,7 +139,16 @@ public class AgentChatExecutor {
                              Consumer<String> onCompleted,
                              Long executionId,
                              String citationsJson) {
+        return stream(prepared, onCompleted, executionId, citationsJson, null);
+    }
+
+    public SseEmitter stream(PreparedAgentChat prepared,
+                             Consumer<String> onCompleted,
+                             Long executionId,
+                             String citationsJson,
+                             Execution execution) {
         Long workspaceId = WorkspaceContext.require().workspaceId();
+        assertChatRateLimit();
         quotaApplicationService.assertAiQuotaAvailable(workspaceId);
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
         emitter.onTimeout(emitter::complete);
@@ -113,6 +157,10 @@ public class AgentChatExecutor {
             try {
                 if (citationsJson != null && !citationsJson.isBlank()) {
                     sendStreamEvent(emitter, ChatStreamEvent.citations(citationsJson));
+                }
+                if (prepared.tools() != null && !prepared.tools().isEmpty()) {
+                    streamWithTools(emitter, prepared, onCompleted, executionId, execution, workspaceId, contentBuilder);
+                    return;
                 }
                 chatModelGateway.streamChat(
                         prepared.runtimeConfig(),
@@ -163,6 +211,105 @@ public class AgentChatExecutor {
         return emitter;
     }
 
+    private void streamWithTools(SseEmitter emitter,
+                                 PreparedAgentChat prepared,
+                                 Consumer<String> onCompleted,
+                                 Long executionId,
+                                 Execution execution,
+                                 Long workspaceId,
+                                 StringBuilder contentBuilder) throws IOException {
+        List<ResolvedAgentTool> resolvedTools = agentToolRuntimeService.resolveTools(prepared.agentVersionId());
+        try {
+        String answer = chatModelGateway.chatWithTools(
+                prepared.runtimeConfig(),
+                prepared.turns(),
+                prepared.tools(),
+                toolCall -> {
+                    try {
+                        sendStreamEvent(emitter, ChatStreamEvent.toolStart(toolPayload(
+                                toolCall.toolKey(),
+                                toolCall.arguments(),
+                                null,
+                                null)));
+                        String result = executeToolWithTrace(execution, prepared, resolvedTools, toolCall);
+                        sendStreamEvent(emitter, ChatStreamEvent.toolDelta(toolPayload(
+                                toolCall.toolKey(),
+                                toolCall.arguments(),
+                                result,
+                                null)));
+                        sendStreamEvent(emitter, ChatStreamEvent.toolEnd(toolPayload(
+                                toolCall.toolKey(),
+                                toolCall.arguments(),
+                                result,
+                                "SUCCEEDED")));
+                        return result;
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    } catch (RuntimeException e) {
+                        try {
+                            sendStreamEvent(emitter, ChatStreamEvent.toolEnd(toolPayload(
+                                    toolCall.toolKey(),
+                                    toolCall.arguments(),
+                                    null,
+                                    e.getMessage())));
+                        } catch (IOException ioException) {
+                            throw new RuntimeException(ioException);
+                        }
+                        throw e;
+                    }
+                },
+                prepared.temperature(),
+                prepared.topP(),
+                prepared.maxTokens());
+        pseudoStreamAnswer(emitter, contentBuilder, answer);
+        touchCredential(prepared);
+        quotaApplicationService.consumeAiUsage(workspaceId, estimateTokens(prepared, answer));
+        if (onCompleted != null) {
+            onCompleted.accept(answer);
+        }
+        sendStreamEvent(emitter, executionId == null ? ChatStreamEvent.done() : ChatStreamEvent.done(executionId));
+        emitter.complete();
+        } catch (ToolConfirmationRequiredException confirmation) {
+            sendStreamEvent(emitter, ChatStreamEvent.toolConfirmRequired(confirmPayload(confirmation)));
+            sendStreamEvent(emitter, executionId == null ? ChatStreamEvent.done() : ChatStreamEvent.done(executionId));
+            emitter.complete();
+        }
+    }
+
+    private void pseudoStreamAnswer(SseEmitter emitter, StringBuilder contentBuilder, String answer) throws IOException {
+        if (answer == null || answer.isEmpty()) {
+            return;
+        }
+        int chunkSize = 32;
+        for (int index = 0; index < answer.length(); index += chunkSize) {
+            String chunk = answer.substring(index, Math.min(index + chunkSize, answer.length()));
+            contentBuilder.append(chunk);
+            sendStreamEvent(emitter, ChatStreamEvent.delta(chunk));
+        }
+    }
+
+    private String toolPayload(String toolKey,
+                               Map<String, Object> arguments,
+                               String output,
+                               String status) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("toolKey", toolKey);
+        if (arguments != null && !arguments.isEmpty()) {
+            payload.put("arguments", arguments);
+        }
+        if (output != null) {
+            payload.put("output", output);
+        }
+        if (status != null) {
+            payload.put("status", status);
+        }
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            return "{\"toolKey\":\"" + toolKey + "\"}";
+        }
+    }
+
     private void sendStreamEvent(SseEmitter emitter, ChatStreamEvent event) throws IOException {
         emitter.send(SseEmitter.event().data(event));
     }
@@ -187,8 +334,34 @@ public class AgentChatExecutor {
         return Math.max(total, 1L);
     }
 
-    private String executeToolWithTrace(Execution execution, List<ResolvedAgentTool> tools, ToolCall toolCall) {
+    private String executeToolWithTrace(Execution execution,
+                                        PreparedAgentChat prepared,
+                                        List<ResolvedAgentTool> tools,
+                                        ToolCall toolCall) {
         String toolKey = toolCall.toolKey();
+        ResolvedAgentTool resolved = tools.stream()
+                .filter(item -> item.toolKey().equals(toolKey))
+                .findFirst()
+                .orElse(null);
+        if (resolved != null && resolved.requireConfirmation()) {
+            String token = prepared.toolConfirmationToken();
+            if (token == null || token.isBlank()) {
+                String confirmationToken = toolConfirmationService.create(new ToolConfirmationService.PendingConfirmation(
+                        WorkspaceContext.require().userId(),
+                        WorkspaceContext.require().workspaceId(),
+                        prepared.agentId(),
+                        prepared.agentVersionId(),
+                        toolKey,
+                        resolved.name(),
+                        toolCall.arguments()));
+                throw new ToolConfirmationRequiredException(
+                        confirmationToken,
+                        toolKey,
+                        resolved.name(),
+                        toolCall.arguments());
+            }
+            toolConfirmationService.consume(token, WorkspaceContext.require().userId(), WorkspaceContext.require().workspaceId(), toolKey);
+        }
         Map<String, Object> input = toolCall.arguments() == null || toolCall.arguments().isEmpty()
                 ? Map.of("toolKey", toolKey)
                 : Map.of("toolKey", toolKey, "arguments", toolCall.arguments());
@@ -203,6 +376,21 @@ public class AgentChatExecutor {
                 executionRecorder.recordToolSpanFailed(execution, toolKey, input, e.getMessage());
             }
             throw e;
+        }
+    }
+
+    private String confirmPayload(ToolConfirmationRequiredException confirmation) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("confirmationToken", confirmation.confirmationToken());
+        payload.put("toolKey", confirmation.toolKey());
+        payload.put("toolName", confirmation.toolName());
+        if (confirmation.arguments() != null && !confirmation.arguments().isEmpty()) {
+            payload.put("arguments", confirmation.arguments());
+        }
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            return "{\"toolKey\":\"" + confirmation.toolKey() + "\"}";
         }
     }
 

@@ -9,6 +9,7 @@ import java.util.List;
 public record AgentChatRequest(
         @NotBlank @Size(max = 8000) String message,
         Boolean stream,
-        @Valid List<AgentChatHistoryItem> history
+        @Valid List<AgentChatHistoryItem> history,
+        String toolConfirmationToken
 ) {
 }

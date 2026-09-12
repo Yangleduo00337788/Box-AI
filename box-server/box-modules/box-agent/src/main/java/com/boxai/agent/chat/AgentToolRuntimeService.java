@@ -90,7 +90,8 @@ public class AgentToolRuntimeService {
                     tool.getType(),
                     null,
                     null,
-                    null));
+                    null,
+                    Boolean.TRUE.equals(binding.getRequireConfirmation())));
         }
         return tools;
     }

@@ -3,9 +3,13 @@ package com.boxai.agent.application;
 import com.boxai.agent.api.AgentChatHistoryItem;
 import com.boxai.agent.api.AgentChatRequest;
 import com.boxai.agent.api.AgentChatVO;
+import com.boxai.agent.api.AgentEmbedConfigVO;
+import com.boxai.agent.api.AgentToolConfirmVO;
+import com.boxai.agent.api.ConfirmAgentToolRequest;
 import com.boxai.agent.api.AgentVO;
 import com.boxai.agent.api.CreateAgentRequest;
 import com.boxai.agent.api.UpdateAgentConfigRequest;
+import com.boxai.agent.api.UpdateAgentEmbedConfigRequest;
 import com.boxai.agent.api.UpdateAgentMemoryRequest;
 import com.boxai.agent.api.UpdateAgentModelRequest;
 import com.boxai.agent.api.UpdateAgentPromptRequest;
@@ -13,9 +17,18 @@ import com.boxai.agent.api.UpdateAgentRequest;
 import com.boxai.ai.ChatTurn;
 import com.boxai.agent.chat.AgentChatExecutor;
 import com.boxai.agent.chat.AgentChatPreparer;
+import com.boxai.agent.chat.AgentToolRuntimeService;
 import com.boxai.agent.chat.PreparedAgentChat;
+import com.boxai.agent.chat.ResolvedAgentTool;
+import com.boxai.agent.chat.ToolConfirmationService;
+import com.boxai.agent.support.AgentEmbedConfigSupport;
 import com.boxai.knowledge.application.KnowledgeRetrievalResult;
+import com.boxai.common.constant.AuditActions;
+import com.boxai.common.constant.AuditResourceTypes;
 import com.boxai.common.constant.ModelSources;
+import com.boxai.common.constant.PermissionCodes;
+import com.boxai.security.audit.AuditLogService;
+import com.boxai.security.guard.ResourceDeleteGuard;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.platform.PlatformModel;
@@ -65,6 +78,10 @@ public class AgentApplicationService {
     private final AgentPublishApplicationService agentPublishApplicationService;
     private final WorkspacePermissionService workspacePermissionService;
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
+    private final AuditLogService auditLogService;
+    private final ResourceDeleteGuard resourceDeleteGuard;
+    private final ToolConfirmationService toolConfirmationService;
+    private final AgentToolRuntimeService agentToolRuntimeService;
 
     public AgentApplicationService(AgentRepository agentRepository,
                                    AgentVersionRepository agentVersionRepository,
@@ -78,7 +95,11 @@ public class AgentApplicationService {
                                    AgentBindingApplicationService agentBindingApplicationService,
                                    AgentPublishApplicationService agentPublishApplicationService,
                                    WorkspacePermissionService workspacePermissionService,
-                                   AgentLongTermMemoryApplicationService longTermMemoryApplicationService) {
+                                   AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
+                                   AuditLogService auditLogService,
+                                   ResourceDeleteGuard resourceDeleteGuard,
+                                   ToolConfirmationService toolConfirmationService,
+                                   AgentToolRuntimeService agentToolRuntimeService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.modelDefinitionRepository = modelDefinitionRepository;
@@ -92,21 +113,25 @@ public class AgentApplicationService {
         this.agentPublishApplicationService = agentPublishApplicationService;
         this.workspacePermissionService = workspacePermissionService;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
+        this.auditLogService = auditLogService;
+        this.resourceDeleteGuard = resourceDeleteGuard;
+        this.toolConfirmationService = toolConfirmationService;
+        this.agentToolRuntimeService = agentToolRuntimeService;
     }
 
     public List<AgentVO> list() {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         return agentRepository.listByWorkspace(workspaceId()).stream().map(this::toVO).toList();
     }
 
     public AgentVO detail(Long id) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         return toVO(requireAgent(id));
     }
 
     @Transactional
     public AgentVO create(CreateAgentRequest request) {
-        workspacePermissionService.requirePermission("agent:create");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_CREATE);
         Long userId = WorkspaceContext.require().userId();
         Agent agent = new Agent();
         agent.setWorkspaceId(workspaceId());
@@ -148,12 +173,18 @@ public class AgentApplicationService {
         version.setUpdatedBy(userId);
         agentVersionRepository.save(version);
 
+        auditLogService.recordSuccess(
+                AuditActions.AGENT_CREATE,
+                AuditResourceTypes.AGENT,
+                agent.getId(),
+                agent.getName(),
+                null);
         return toVO(agent);
     }
 
     @Transactional
     public AgentVO update(Long id, UpdateAgentRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(id);
         Long userId = WorkspaceContext.require().userId();
         agent.setName(request.name().trim());
@@ -170,12 +201,18 @@ public class AgentApplicationService {
             agentVersionRepository.update(draft);
         }
 
+        auditLogService.recordSuccess(
+                AuditActions.AGENT_UPDATE,
+                AuditResourceTypes.AGENT,
+                agent.getId(),
+                agent.getName(),
+                null);
         return toVO(agent);
     }
 
     @Transactional
     public AgentVO updatePrompt(Long id, UpdateAgentPromptRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(id);
         Long userId = WorkspaceContext.require().userId();
         AgentVersion draft = requireDraft(agent);
@@ -189,7 +226,7 @@ public class AgentApplicationService {
 
     @Transactional
     public AgentVO updateMemoryConfig(Long id, UpdateAgentMemoryRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(id);
         Long userId = WorkspaceContext.require().userId();
         AgentVersion draft = requireDraft(agent);
@@ -211,7 +248,7 @@ public class AgentApplicationService {
 
     @Transactional
     public AgentVO updateConfig(Long id, UpdateAgentConfigRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(id);
         Long userId = WorkspaceContext.require().userId();
         AgentVersion draft = requireDraft(agent);
@@ -223,9 +260,30 @@ public class AgentApplicationService {
         return toVO(agent);
     }
 
+    public AgentEmbedConfigVO getEmbedConfig(Long id) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
+        Agent agent = requireAgent(id);
+        AgentVersion draft = requireDraft(agent);
+        return AgentEmbedConfigSupport.toVO(draft.getConfigJson(), agent.getName());
+    }
+
+    @Transactional
+    public AgentEmbedConfigVO updateEmbedConfig(Long id, UpdateAgentEmbedConfigRequest request) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
+        Agent agent = requireAgent(id);
+        Long userId = WorkspaceContext.require().userId();
+        AgentVersion draft = requireDraft(agent);
+        draft.setConfigJson(AgentEmbedConfigSupport.merge(draft.getConfigJson(), request));
+        draft.setUpdatedBy(userId);
+        agentVersionRepository.update(draft);
+        agent.setUpdatedBy(userId);
+        agentRepository.update(agent);
+        return AgentEmbedConfigSupport.toVO(draft.getConfigJson(), agent.getName());
+    }
+
     @Transactional
     public AgentVO updateModelConfig(Long id, UpdateAgentModelRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(id);
         Long userId = WorkspaceContext.require().userId();
         AgentVersion draft = requireDraft(agent);
@@ -242,13 +300,15 @@ public class AgentApplicationService {
     }
 
     public AgentChatVO chat(Long id, AgentChatRequest request) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(id);
         AgentVersion draft = requireDraft(agent);
         String message = request.message().trim();
         List<ChatTurn> history = resolveHistory(draft, request.history());
         KnowledgeRetrievalResult retrieval = agentChatPreparer.retrieveKnowledge(draft, message);
-        PreparedAgentChat prepared = agentChatPreparer.prepare(id, history, message);
+        PreparedAgentChat prepared = applyToolConfirmation(
+                agentChatPreparer.prepare(id, history, message),
+                request.toolConfirmationToken());
         Execution execution = executionRecorder.startAgentExecution(
                 id,
                 prepared.agentVersionId(),
@@ -274,13 +334,15 @@ public class AgentApplicationService {
     }
 
     public SseEmitter streamChat(Long id, AgentChatRequest request, HttpServletResponse response) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(id);
         AgentVersion draft = requireDraft(agent);
         String message = request.message().trim();
         List<ChatTurn> history = resolveHistory(draft, request.history());
         KnowledgeRetrievalResult retrieval = agentChatPreparer.retrieveKnowledge(draft, message);
-        PreparedAgentChat prepared = agentChatPreparer.prepare(id, history, message);
+        PreparedAgentChat prepared = applyToolConfirmation(
+                agentChatPreparer.prepare(id, history, message),
+                request.toolConfirmationToken());
         Execution execution = executionRecorder.startAgentExecution(
                 id,
                 prepared.agentVersionId(),
@@ -296,22 +358,52 @@ public class AgentApplicationService {
             executionRecorder.succeed(execution, toOutputJson(content), estimateTokens(content));
             longTermMemoryApplicationService.captureFromTurn(
                     draft, id, workspaceId, userId, message, content);
-        });
+        }, execution.getId(), null, execution);
+    }
+
+    public AgentToolConfirmVO confirmTool(Long id, ConfirmAgentToolRequest request) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
+        requireAgent(id);
+        Long userId = WorkspaceContext.require().userId();
+        Long workspaceId = workspaceId();
+        ToolConfirmationService.PendingConfirmation pending = toolConfirmationService.peek(request.confirmationToken());
+        if (!id.equals(pending.agentId())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "确认令牌与智能体不匹配");
+        }
+        pending = toolConfirmationService.consume(
+                request.confirmationToken(),
+                userId,
+                workspaceId,
+                pending.toolKey());
+        List<ResolvedAgentTool> tools = agentToolRuntimeService.resolveTools(pending.versionId());
+        String output = agentToolRuntimeService.executeByKey(tools, pending.toolKey(), pending.arguments());
+        return new AgentToolConfirmVO(pending.toolKey(), pending.toolName(), output);
+    }
+
+    private PreparedAgentChat applyToolConfirmation(PreparedAgentChat prepared, String token) {
+        if (token == null || token.isBlank()) {
+            return prepared;
+        }
+        return prepared.withToolConfirmationToken(token.trim());
     }
 
     @Transactional
     public void delete(Long id) {
-        workspacePermissionService.requirePermission("agent:delete");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_DELETE);
         Agent agent = requireAgent(id);
-        if ("PUBLISHED".equalsIgnoreCase(agent.getStatus())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "已发布的智能体请先取消发布后再删除");
-        }
+        resourceDeleteGuard.assertAgentDeletable(agent);
         agentRepository.delete(id);
+        auditLogService.recordSuccess(
+                AuditActions.AGENT_DELETE,
+                AuditResourceTypes.AGENT,
+                id,
+                agent.getName(),
+                null);
     }
 
     @Transactional
     public AgentVO duplicate(Long id) {
-        workspacePermissionService.requirePermission("agent:create");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_CREATE);
         Agent source = requireAgent(id);
         AgentVersion sourceDraft = requireDraft(source);
         Long userId = WorkspaceContext.require().userId();
@@ -354,7 +446,7 @@ public class AgentApplicationService {
 
     @Transactional
     public AgentVO archive(Long id) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(id);
         if ("ARCHIVED".equals(agent.getStatus())) {
             return toVO(agent);

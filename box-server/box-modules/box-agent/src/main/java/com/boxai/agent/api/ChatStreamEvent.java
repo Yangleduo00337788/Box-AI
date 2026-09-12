@@ -25,4 +25,20 @@ public record ChatStreamEvent(String type, String content, String message, Long 
     public static ChatStreamEvent error(String message) {
         return new ChatStreamEvent("error", null, message, null);
     }
+
+    public static ChatStreamEvent toolStart(String payload) {
+        return new ChatStreamEvent("tool.start", payload, null, null);
+    }
+
+    public static ChatStreamEvent toolDelta(String payload) {
+        return new ChatStreamEvent("tool.delta", payload, null, null);
+    }
+
+    public static ChatStreamEvent toolEnd(String payload) {
+        return new ChatStreamEvent("tool.end", payload, null, null);
+    }
+
+    public static ChatStreamEvent toolConfirmRequired(String payload) {
+        return new ChatStreamEvent("tool.confirm", payload, null, null);
+    }
 }
