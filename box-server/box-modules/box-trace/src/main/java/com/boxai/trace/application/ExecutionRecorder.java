@@ -6,7 +6,9 @@ import com.boxai.domain.trace.Trace;
 import com.boxai.domain.trace.TraceRepository;
 import com.boxai.domain.trace.TraceSpan;
 import com.boxai.domain.trace.TraceSpanRepository;
+import com.boxai.security.audit.HttpRequestContext;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.logging.LoggingContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ public class ExecutionRecorder {
     public Execution startAgentExecution(Long agentId, Long agentVersionId, Long conversationId, String inputJson) {
         Execution execution = new Execution();
         execution.setExecutionNo("exe_" + UUID.randomUUID().toString().replace("-", ""));
+        execution.setRequestId(HttpRequestContext.requestId());
         execution.setWorkspaceId(WorkspaceContext.require().workspaceId());
         execution.setExecutionType("AGENT");
         execution.setAgentId(agentId);
@@ -49,6 +52,7 @@ public class ExecutionRecorder {
         execution.setInputJson(inputJson);
         execution.setStartedAt(LocalDateTime.now());
         execution = executionRepository.save(execution);
+        LoggingContext.setExecutionId(execution.getId());
         createTrace(execution, "Agent Execution");
         return execution;
     }
@@ -114,6 +118,7 @@ public class ExecutionRecorder {
     public Execution startWorkflowExecution(Long workflowId, Long workflowVersionId, String inputJson) {
         Execution execution = new Execution();
         execution.setExecutionNo("exe_" + UUID.randomUUID().toString().replace("-", ""));
+        execution.setRequestId(HttpRequestContext.requestId());
         execution.setWorkspaceId(WorkspaceContext.require().workspaceId());
         execution.setExecutionType("WORKFLOW");
         execution.setWorkflowId(workflowId);
@@ -123,6 +128,7 @@ public class ExecutionRecorder {
         execution.setInputJson(inputJson);
         execution.setStartedAt(LocalDateTime.now());
         execution = executionRepository.save(execution);
+        LoggingContext.setExecutionId(execution.getId());
         createTrace(execution, "Workflow Execution");
         return execution;
     }
@@ -136,8 +142,12 @@ public class ExecutionRecorder {
         trace.setName(name);
         trace.setStatus("RUNNING");
         trace.setStartTime(LocalDateTime.now());
+        if (execution.getRequestId() != null && !execution.getRequestId().isBlank()) {
+            trace.setMetadataJson(toJson(Map.of("requestId", execution.getRequestId())));
+        }
         traceRepository.save(trace);
         executionTraceIds.put(execution.getId(), traceId);
+        LoggingContext.setTraceId(traceId);
     }
 
     private void finishTrace(Execution execution, String status) {

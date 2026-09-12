@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record ExecutionVO(
         Long id,
         String executionNo,
+        String requestId,
         String executionType,
         Long agentId,
         Long agentVersionId,

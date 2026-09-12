@@ -4,6 +4,7 @@ import com.boxai.common.constant.HeaderNames;
 import com.boxai.common.constant.UserTypes;
 import com.boxai.security.context.LoginUser;
 import com.boxai.security.jwt.JwtService;
+import com.boxai.security.logging.LoggingContext;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -43,6 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 var authentication = new UsernamePasswordAuthenticationToken(
                         new LoginUser(userId, username, userType), null, List.of());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                LoggingContext.setUserId(userId);
             } catch (JwtException | IllegalArgumentException ignored) {
                 SecurityContextHolder.clearContext();
             }

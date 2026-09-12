@@ -16,6 +16,8 @@ public class ExecutionDO {
     private Long id;
     @Column("execution_no")
     private String executionNo;
+    @Column("request_id")
+    private String requestId;
     @Column("workspace_id")
     private Long workspaceId;
     @Column("execution_type")

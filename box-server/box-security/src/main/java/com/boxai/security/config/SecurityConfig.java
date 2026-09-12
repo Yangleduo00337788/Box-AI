@@ -52,6 +52,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/verification-code",
                                 "/api/v1/auth/password/reset",
+                                "/api/v1/auth/oauth/providers",
+                                "/api/v1/auth/oauth/*/authorize",
+                                "/api/v1/auth/oauth/*/callback",
                                 "/api/v1/admin/auth/login",
                                 "/api/v1/system/health",
                                 "/api/v1/system/content",
@@ -70,6 +73,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("X-Request-Id"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

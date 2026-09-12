@@ -11,6 +11,7 @@ public class Execution {
 
     private Long id;
     private String executionNo;
+    private String requestId;
     private Long workspaceId;
     private String executionType;
     private Long agentId;

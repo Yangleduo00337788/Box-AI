@@ -1,5 +1,6 @@
 package com.boxai.trace.application;
 
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.trace.Execution;
@@ -44,7 +45,7 @@ public class ExecutionApplicationService {
                                   String status,
                                   Long agentId,
                                   Long conversationId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         int safeLimit = limit <= 0 ? 50 : Math.min(limit, 200);
         return executionRepository.listByWorkspace(
                         workspaceId(),
@@ -59,12 +60,12 @@ public class ExecutionApplicationService {
     }
 
     public ExecutionVO detail(Long id) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         return toVO(requireExecution(id));
     }
 
     public ExecutionVO latestByConversation(Long conversationId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         return executionRepository.listByConversation(conversationId, 1).stream()
                 .findFirst()
                 .map(this::toVO)
@@ -72,7 +73,7 @@ public class ExecutionApplicationService {
     }
 
     public TraceDetailVO trace(Long id) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Execution execution = requireExecution(id);
         Trace trace = traceRepository.findByExecutionId(execution.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Trace 不存在"));
@@ -110,6 +111,7 @@ public class ExecutionApplicationService {
         return new ExecutionVO(
                 execution.getId(),
                 execution.getExecutionNo(),
+                execution.getRequestId(),
                 execution.getExecutionType(),
                 execution.getAgentId(),
                 execution.getAgentVersionId(),

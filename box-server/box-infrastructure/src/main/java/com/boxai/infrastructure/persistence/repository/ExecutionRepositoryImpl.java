@@ -95,6 +95,7 @@ public class ExecutionRepositoryImpl implements ExecutionRepository {
         Execution execution = new Execution();
         execution.setId(row.getId());
         execution.setExecutionNo(row.getExecutionNo());
+        execution.setRequestId(row.getRequestId());
         execution.setWorkspaceId(row.getWorkspaceId());
         execution.setExecutionType(row.getExecutionType());
         execution.setAgentId(row.getAgentId());
@@ -119,6 +120,7 @@ public class ExecutionRepositoryImpl implements ExecutionRepository {
     private ExecutionDO toDo(Execution execution) {
         ExecutionDO row = new ExecutionDO();
         row.setExecutionNo(execution.getExecutionNo());
+        row.setRequestId(execution.getRequestId());
         row.setWorkspaceId(execution.getWorkspaceId());
         row.setExecutionType(execution.getExecutionType());
         row.setAgentId(execution.getAgentId());

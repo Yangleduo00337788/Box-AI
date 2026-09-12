@@ -26,6 +26,20 @@ public class RedisService {
         redisTemplate.delete(key);
     }
 
+    /**
+     * 固定窗口计数：首次写入时设置 TTL，超过 maxAttempts 返回 false。
+     */
+    public boolean incrementWithinLimit(String key, int maxAttempts, Duration window) {
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count == null) {
+            return true;
+        }
+        if (count == 1L) {
+            redisTemplate.expire(key, window);
+        }
+        return count <= maxAttempts;
+    }
+
     public boolean ping() {
         String pong = redisTemplate.getConnectionFactory().getConnection().ping();
         return pong != null;

@@ -1,7 +1,12 @@
 package com.boxai.user.application;
 
+import com.boxai.common.constant.AuditActions;
+import com.boxai.common.constant.AuditResourceTypes;
 import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.constant.UserTypes;
+import com.boxai.security.audit.AuditLogService;
+import com.boxai.security.audit.HttpRequestContext;
+import com.boxai.security.ratelimit.RateLimitService;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.user.User;
@@ -29,6 +34,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 
@@ -42,6 +48,8 @@ public class AuthApplicationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final VerificationCodeService verificationCodeService;
+    private final AuditLogService auditLogService;
+    private final RateLimitService rateLimitService;
 
     public AuthApplicationService(UserRepository userRepository,
                                   WorkspaceRepository workspaceRepository,
@@ -49,7 +57,9 @@ public class AuthApplicationService {
                                   TenantApplicationService tenantApplicationService,
                                   PasswordEncoder passwordEncoder,
                                   JwtService jwtService,
-                                  VerificationCodeService verificationCodeService) {
+                                  VerificationCodeService verificationCodeService,
+                                  AuditLogService auditLogService,
+                                  RateLimitService rateLimitService) {
         this.userRepository = userRepository;
         this.workspaceRepository = workspaceRepository;
         this.workspaceApplicationService = workspaceApplicationService;
@@ -57,6 +67,8 @@ public class AuthApplicationService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.verificationCodeService = verificationCodeService;
+        this.auditLogService = auditLogService;
+        this.rateLimitService = rateLimitService;
     }
 
     @Transactional
@@ -86,10 +98,22 @@ public class AuthApplicationService {
         var tenant = tenantApplicationService.createForRegistration(
                 user, accountType, request.companyName(), request.contactEmail());
         workspaceApplicationService.createDefaultWorkspace(user, tenant.getId(), tenant.getTenantType());
-        return issue(user);
+        AuthVO auth = issue(user);
+        auditLogService.recordForUser(
+                user.getId(),
+                null,
+                AuditActions.REGISTER,
+                AuditResourceTypes.AUTH,
+                String.valueOf(user.getId()),
+                user.getEmail(),
+                AuditLogService.RESULT_SUCCESS,
+                null);
+        return auth;
     }
 
     public AuthVO login(LoginRequest request) {
+        String clientIp = HttpRequestContext.clientIp();
+        rateLimitService.assertAllowed("login", clientIp == null ? "unknown" : clientIp, 20, Duration.ofMinutes(1));
         String account = request.account().trim();
         User user = userRepository.findByEmail(account.toLowerCase(Locale.ROOT))
                 .or(() -> userRepository.findByUsername(account))
@@ -112,7 +136,17 @@ public class AuthApplicationService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "该账号为个人账号，请切换到个人端登录");
         }
         userRepository.updateLastLogin(user.getId());
-        return issue(user);
+        AuthVO auth = issue(user);
+        auditLogService.recordForUser(
+                user.getId(),
+                null,
+                AuditActions.LOGIN,
+                AuditResourceTypes.AUTH,
+                String.valueOf(user.getId()),
+                user.getEmail(),
+                AuditLogService.RESULT_SUCCESS,
+                null);
+        return auth;
     }
 
     public AuthVO me(LoginUser loginUser) {
