@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionStore } from '@/stores/permission'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -29,6 +30,11 @@ const router = createRouter({
       component: () => import('@/layouts/AppLayout.vue'),
       children: [
         { path: '', redirect: '/chat' },
+        {
+          path: 'forbidden',
+          component: () => import('@/views/ForbiddenView.vue'),
+          meta: { title: '无权限' },
+        },
         {
           path: 'dashboard',
           component: () => import('@/views/DashboardView.vue'),
@@ -60,7 +66,7 @@ const router = createRouter({
         { path: 'mcp', component: () => import('@/views/McpView.vue'), meta: { title: 'MCP' } },
         { path: 'plugin-market', component: () => import('@/views/PluginMarketView.vue'), meta: { title: '插件市场' } },
         { path: 'models', component: () => import('@/views/ModelsView.vue'), meta: { title: '模型' } },
-        { path: 'team', component: () => import('@/views/TeamView.vue'), meta: { title: '团队' } },
+        { path: 'team', component: () => import('@/views/TeamView.vue'), meta: { title: '团队', permission: 'member:manage' } },
         { path: 'market', component: () => import('@/views/MarketView.vue'), meta: { title: '市场' } },
         { path: 'analytics', component: () => import('@/views/AnalyticsView.vue'), meta: { title: '分析' } },
         { path: 'executions', component: () => import('@/views/ExecutionsView.vue'), meta: { title: '执行记录' } },
@@ -74,8 +80,9 @@ const router = createRouter({
             { path: 'appearance', component: () => import('@/views/settings/SettingsAppearanceView.vue'), meta: { title: '外观设置' } },
             { path: 'general', component: () => import('@/views/settings/SettingsGeneralView.vue'), meta: { title: '通用设置' } },
             { path: 'security', component: () => import('@/views/settings/SettingsSecurityView.vue'), meta: { title: '账号与安全' } },
-            { path: 'api-keys', component: () => import('@/views/settings/SettingsApiKeysView.vue'), meta: { title: 'API 密钥' } },
-            { path: 'roles', component: () => import('@/views/settings/SettingsRolesView.vue'), meta: { title: '角色与权限' } },
+            { path: 'api-keys', component: () => import('@/views/settings/SettingsApiKeysView.vue'), meta: { title: 'API 密钥', permission: 'api_key:manage' } },
+            { path: 'roles', component: () => import('@/views/settings/SettingsRolesView.vue'), meta: { title: '角色与权限', permission: 'role:manage' } },
+            { path: 'audit-logs', component: () => import('@/views/settings/SettingsAuditLogsView.vue'), meta: { title: '审计日志', permission: 'audit:read' } },
             { path: 'quota', component: () => import('@/views/settings/SettingsQuotaView.vue'), meta: { title: '额度管理' } },
             { path: 'billing', component: () => import('@/views/settings/SettingsBillingView.vue'), meta: { title: '账单概览' } },
             { path: 'capacity', component: () => import('@/views/settings/SettingsCapacityView.vue'), meta: { title: '容量管理' } },
@@ -103,6 +110,18 @@ router.beforeEach(async (to) => {
       auth.logout()
       return '/login'
     }
+  }
+  const permissionStore = usePermissionStore()
+  if (!permissionStore.loaded) {
+    try {
+      await permissionStore.load()
+    } catch {
+      // 权限加载失败时不阻断页面，按钮级守卫仍可用
+    }
+  }
+  const required = to.meta.permission
+  if (typeof required === 'string' && !permissionStore.can(required)) {
+    return '/forbidden'
   }
   return true
 })

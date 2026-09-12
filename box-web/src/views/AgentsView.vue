@@ -2,7 +2,7 @@
   <div>
     <page-header title="智能体" desc="创建和管理你的 AI 智能体，配置模型、知识库与工具">
       <template #actions>
-        <t-button theme="primary" @click="openCreate">
+        <t-button v-if="can(PermissionCodes.AGENT_CREATE)" theme="primary" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
           创建智能体
         </t-button>
@@ -49,6 +49,7 @@
                 归档
               </t-button>
               <t-button
+                v-if="can(PermissionCodes.AGENT_DELETE)"
                 theme="danger"
                 variant="text"
                 size="small"
@@ -123,10 +124,14 @@ import {
   type AgentVO,
 } from '@/api/agent'
 import { extractApiError } from '@/api/apiError'
+import { PermissionCodes } from '@/constants/permissions'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
+import { usePermission } from '@/composables/usePermission'
+import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 
 const { openCreateAgentDialog } = useCreateAgentDialog()
+const { can } = usePermission()
 
 const router = useRouter()
 
@@ -258,16 +263,19 @@ function archiveAgentItem(item: AgentVO) {
 }
 
 function removeAgent(item: AgentVO) {
-  const dialog = DialogPlugin.confirm({
+  const publishedHint =
+    item.status === 'PUBLISHED'
+      ? '\n\n该智能体已发布，删除后对外 API 将不可用。'
+      : ''
+  void confirmResourceDelete({
     header: '确认删除',
-    body: `确定删除智能体「${item.name}」吗？此操作不可恢复。`,
-    confirmBtn: '删除',
-    cancelBtn: '取消',
-    theme: 'warning',
-    onConfirm: async () => {
+    body: `确定删除智能体「${item.name}」吗？此操作不可恢复。${publishedHint}`,
+    resourceLabel: '智能体',
+    onDelete: async () => {
       await deleteAgent(item.id)
+    },
+    onSuccess: async () => {
       MessagePlugin.success('删除成功')
-      dialog.hide()
       await loadAgents()
     },
   })

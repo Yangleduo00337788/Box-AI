@@ -8,6 +8,7 @@ export const SETTINGS_NAV = [
       { value: '/settings/security', label: '账号与安全', icon: 'lock-on' },
       { value: '/settings/api-keys', label: 'API 密钥', icon: 'key' },
       { value: '/settings/roles', label: '角色与权限', icon: 'usergroup' },
+      { value: '/settings/audit-logs', label: '审计日志', icon: 'history', permission: 'audit:read' },
     ],
   },
   {

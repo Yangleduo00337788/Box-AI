@@ -7,7 +7,7 @@
       :back-label="backLabel"
     >
       <template #actions>
-        <t-button theme="primary" @click="openCreate">
+        <t-button v-if="can(PermissionCodes.WORKFLOW_CREATE)" theme="primary" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
           新建工作流
         </t-button>
@@ -44,9 +44,12 @@ import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
 import { useResourceManageBack } from '@/composables/useResourceManageBack'
+import { usePermission } from '@/composables/usePermission'
+import { PermissionCodes } from '@/constants/permissions'
 import { createWorkflow, listWorkflows, type WorkflowVO } from '@/api/workflow'
 
 const { backTo, backLabel } = useResourceManageBack('workflows')
+const { can } = usePermission()
 
 const router = useRouter()
 const loading = ref(false)

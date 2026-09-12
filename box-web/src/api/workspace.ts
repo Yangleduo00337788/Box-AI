@@ -5,6 +5,10 @@ export function createWorkspace(payload: { name: string; description?: string })
   return http.post<Result<WorkspaceVO>>('/workspaces', payload)
 }
 
+export function fetchCurrentPermissions() {
+  return http.get<Result<string[]>>('/workspaces/current-permissions')
+}
+
 export interface WorkspaceMemberVO {
   id: number
   userId: number

@@ -33,28 +33,37 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { SETTINGS_NAV } from '@/constants/settings'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionStore } from '@/stores/permission'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const permissionStore = usePermissionStore()
 
 const settingsNav = computed(() => {
-  if (auth.tenant?.tenantType !== 'ENTERPRISE') {
-    return SETTINGS_NAV
-  }
-  return SETTINGS_NAV.map((group) => {
-    if (group.title !== '账号') {
-      return group
-    }
-    return {
-      ...group,
-      items: [
-        ...group.items.slice(0, 5),
-        { value: '/team', label: '团队', icon: 'usergroup-add' },
-        ...group.items.slice(5),
-      ],
-    }
-  })
+  const base = auth.tenant?.tenantType !== 'ENTERPRISE'
+    ? SETTINGS_NAV
+    : SETTINGS_NAV.map((group) => {
+        if (group.title !== '账号') {
+          return group
+        }
+        return {
+          ...group,
+          items: [
+            ...group.items.slice(0, 5),
+            { value: '/team', label: '团队', icon: 'usergroup-add' },
+            ...group.items.slice(5),
+          ],
+        }
+      })
+
+  return base.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const permission = (item as { permission?: string }).permission
+      return !permission || permissionStore.can(permission)
+    }),
+  }))
 })
 </script>
 

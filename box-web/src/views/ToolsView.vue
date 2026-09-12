@@ -7,7 +7,7 @@
       :back-label="backLabel"
     >
       <template #actions>
-        <t-button theme="primary" @click="openCreate">
+        <t-button v-if="can(PermissionCodes.TOOL_CREATE)" theme="primary" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
           新建工具
         </t-button>
@@ -19,7 +19,7 @@
         <template #op="{ row }">
           <t-space>
             <t-button variant="text" theme="primary" :loading="testingId === row.id" @click="runTest(row.id)">测试</t-button>
-            <t-button variant="text" theme="danger" @click="remove(row.id)">删除</t-button>
+            <t-button v-if="can(PermissionCodes.TOOL_DELETE)" variant="text" theme="danger" @click="remove(row)">删除</t-button>
           </t-space>
         </template>
       </t-table>
@@ -47,9 +47,13 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
 import { useResourceManageBack } from '@/composables/useResourceManageBack'
+import { usePermission } from '@/composables/usePermission'
+import { confirmResourceDelete } from '@/composables/useResourceDelete'
+import { PermissionCodes } from '@/constants/permissions'
 import { createTool, deleteTool, listTools, testTool, type ToolVO } from '@/api/tool'
 
 const { backTo, backLabel } = useResourceManageBack('tools')
+const { can } = usePermission()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -110,10 +114,19 @@ async function runTest(id: number) {
   }
 }
 
-async function remove(id: number) {
-  await deleteTool(id)
-  MessagePlugin.success('已删除')
-  await load()
+function remove(item: ToolVO) {
+  void confirmResourceDelete({
+    header: '确认删除',
+    body: `确定删除工具「${item.name}」吗？`,
+    resourceLabel: '工具',
+    onDelete: async () => {
+      await deleteTool(item.id)
+    },
+    onSuccess: async () => {
+      MessagePlugin.success('已删除')
+      await load()
+    },
+  })
 }
 
 load()

@@ -3,6 +3,35 @@ import type { Result } from './http'
 export const TENANT_DISABLED_CODE = 18002
 export const QUOTA_EXCEEDED_CODE = 18003
 export const UNAUTHORIZED_CODE = 401
+export const CONFLICT_CODE = 409
+export const TOO_MANY_REQUESTS_CODE = 429
+
+const LAST_TRACE_ID_KEY = 'box.lastTraceId'
+
+export function rememberTraceId(traceId?: string | null) {
+  if (traceId) {
+    sessionStorage.setItem(LAST_TRACE_ID_KEY, traceId)
+  }
+}
+
+export function readLastTraceId() {
+  return sessionStorage.getItem(LAST_TRACE_ID_KEY)
+}
+
+export function isTooManyRequests(payload?: Result<unknown> | null) {
+  return payload?.code === TOO_MANY_REQUESTS_CODE
+}
+
+export interface ResourceDependency {
+  resourceType: string
+  resourceId: number
+  resourceName: string
+  relation: string
+}
+
+export interface DependencyConflictData {
+  dependencies: ResourceDependency[]
+}
 
 export function isQuotaExceeded(payload?: Result<unknown> | null) {
   return payload?.code === QUOTA_EXCEEDED_CODE
@@ -14,6 +43,28 @@ export function isTenantDisabled(payload?: Result<unknown> | null) {
 
 export function isUnauthorized(payload?: Result<unknown> | null) {
   return payload?.code === UNAUTHORIZED_CODE
+}
+
+export function isDependencyConflict(payload?: Result<unknown> | null) {
+  return payload?.code === CONFLICT_CODE
+}
+
+export function extractDependencyConflict(error: unknown): ResourceDependency[] | null {
+  const axiosError = error as {
+    response?: { status?: number; data?: Result<DependencyConflictData> }
+  }
+  const responsePayload = axiosError.response?.data
+  if (axiosError.response?.status === CONFLICT_CODE || isDependencyConflict(responsePayload)) {
+    const dependencies = responsePayload?.data?.dependencies
+    if (dependencies?.length) {
+      return dependencies
+    }
+  }
+  const payload = error as Result<DependencyConflictData>
+  if (isDependencyConflict(payload) && payload.data?.dependencies?.length) {
+    return payload.data.dependencies
+  }
+  return null
 }
 
 export function resolveErrorMessage(payload?: Result<unknown> | null, fallback = '请求失败') {

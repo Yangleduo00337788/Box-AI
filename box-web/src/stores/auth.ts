@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { usePermissionStore } from '@/stores/permission'
 import {
   fetchMe,
   login as loginApi,
@@ -43,6 +44,9 @@ export const useAuthStore = defineStore('auth', () => {
   function setWorkspace(id: number) {
     currentWorkspaceId.value = String(id)
     localStorage.setItem(WORKSPACE_KEY, String(id))
+    const permissionStore = usePermissionStore()
+    permissionStore.reset()
+    void permissionStore.load(true)
   }
 
   async function login(account: string, password: string, accountType: 'PERSONAL' | 'ENTERPRISE') {
@@ -85,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
     currentWorkspaceId.value = ''
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(WORKSPACE_KEY)
+    usePermissionStore().reset()
   }
 
   return {

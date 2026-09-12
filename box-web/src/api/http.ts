@@ -1,13 +1,17 @@
 import axios from 'axios'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
+  CONFLICT_CODE,
   extractApiError,
   isAuthApiPath,
+  isDependencyConflict,
   isTenantDisabled,
   isUnauthorized,
   QUOTA_EXCEEDED_CODE,
+  rememberTraceId,
   resolveErrorMessage,
   TENANT_DISABLED_CODE,
+  TOO_MANY_REQUESTS_CODE,
   UNAUTHORIZED_CODE,
 } from './apiError'
 
@@ -17,7 +21,7 @@ export interface Result<T> {
   data: T
 }
 
-export { QUOTA_EXCEEDED_CODE, TENANT_DISABLED_CODE, UNAUTHORIZED_CODE }
+export { CONFLICT_CODE, QUOTA_EXCEEDED_CODE, TENANT_DISABLED_CODE, TOO_MANY_REQUESTS_CODE, UNAUTHORIZED_CODE }
 
 const http = axios.create({
   baseURL: '/api/v1',
@@ -64,6 +68,7 @@ function handleBusinessError(payload: Result<unknown>) {
 
 http.interceptors.response.use(
   (response) => {
+    rememberTraceId(response.headers['x-request-id'])
     const payload = response.data as Result<unknown>
     const url = response.config.url || ''
     if (payload && typeof payload.code === 'number' && payload.code !== 0) {
@@ -75,6 +80,7 @@ http.interceptors.response.use(
     return response
   },
   (error) => {
+    rememberTraceId(error.response?.headers?.['x-request-id'])
     const url = error.config?.url || ''
     const payload = error.response?.data as Result<unknown> | undefined
     const message = extractApiError(error, '网络异常')
@@ -86,7 +92,7 @@ http.interceptors.response.use(
           data: null,
         })
       }
-    } else if (!isAuthApiPath(url)) {
+    } else if (!isAuthApiPath(url) && !isDependencyConflict(payload) && error.response?.status !== CONFLICT_CODE) {
       MessagePlugin.error(message)
     }
     return Promise.reject(error)
