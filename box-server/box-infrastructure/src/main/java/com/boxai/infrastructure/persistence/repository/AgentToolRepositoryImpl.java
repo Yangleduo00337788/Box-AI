@@ -31,6 +31,13 @@ public class AgentToolRepositoryImpl implements AgentToolRepository {
     }
 
     @Override
+    public void update(AgentTool binding) {
+        AgentToolDO row = toDo(binding);
+        row.setId(binding.getId());
+        mapper.update(row);
+    }
+
+    @Override
     public void delete(Long id) {
         mapper.deleteById(id);
     }
@@ -57,6 +64,15 @@ public class AgentToolRepositoryImpl implements AgentToolRepository {
         return count == null ? 0 : count.intValue();
     }
 
+    @Override
+    public List<Long> listDistinctAgentIdsByToolId(Long toolId) {
+        return mapper.selectListByQuery(QueryWrapper.create().eq("tool_id", toolId))
+                .stream()
+                .map(AgentToolDO::getAgentId)
+                .distinct()
+                .toList();
+    }
+
     private AgentTool toDomain(AgentToolDO row) {
         AgentTool binding = new AgentTool();
         binding.setId(row.getId());
@@ -72,6 +88,7 @@ public class AgentToolRepositoryImpl implements AgentToolRepository {
 
     private AgentToolDO toDo(AgentTool binding) {
         AgentToolDO row = new AgentToolDO();
+        row.setId(binding.getId());
         row.setAgentId(binding.getAgentId());
         row.setVersionId(binding.getVersionId());
         row.setToolId(binding.getToolId());

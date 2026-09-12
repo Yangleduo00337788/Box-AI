@@ -59,6 +59,15 @@ public class AgentKnowledgeRepositoryImpl implements AgentKnowledgeRepository {
         return count == null ? 0 : count.intValue();
     }
 
+    @Override
+    public List<Long> listDistinctAgentIdsByKnowledgeBaseId(Long knowledgeBaseId) {
+        return mapper.selectListByQuery(QueryWrapper.create().eq("knowledge_base_id", knowledgeBaseId))
+                .stream()
+                .map(AgentKnowledgeDO::getAgentId)
+                .distinct()
+                .toList();
+    }
+
     private AgentKnowledge toDomain(AgentKnowledgeDO row) {
         AgentKnowledge binding = new AgentKnowledge();
         binding.setId(row.getId());

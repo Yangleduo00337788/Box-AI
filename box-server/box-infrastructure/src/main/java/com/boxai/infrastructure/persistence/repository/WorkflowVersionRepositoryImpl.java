@@ -68,6 +68,17 @@ public class WorkflowVersionRepositoryImpl implements WorkflowVersionRepository 
         mapper.deleteByQuery(QueryWrapper.create().eq("workflow_id", workflowId));
     }
 
+    @Override
+    public int countSubWorkflowReferences(Long workflowId, Long workspaceId) {
+        String pattern = "%\"workflowId\":" + workflowId + "%";
+        Long count = mapper.selectCountByQuery(
+                QueryWrapper.create()
+                        .eq("workspace_id", workspaceId)
+                        .ne("workflow_id", workflowId)
+                        .like("definition", pattern));
+        return count == null ? 0 : count.intValue();
+    }
+
     private WorkflowVersion toDomain(WorkflowVersionDO row) {
         WorkflowVersion version = new WorkflowVersion();
         version.setId(row.getId());

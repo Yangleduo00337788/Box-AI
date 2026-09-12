@@ -8,6 +8,7 @@ import com.boxai.agent.api.BindAgentKnowledgeRequest;
 import com.boxai.agent.api.BindAgentMcpRequest;
 import com.boxai.agent.api.BindAgentSubAgentRequest;
 import com.boxai.agent.api.BindAgentToolRequest;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.agent.Agent;
@@ -70,7 +71,7 @@ public class AgentBindingApplicationService {
     }
 
     public List<AgentKnowledgeBindingVO> listKnowledge(Long agentId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         return agentKnowledgeRepository.listByVersionId(draft.getId()).stream().map(this::toKnowledgeVO).toList();
@@ -78,7 +79,7 @@ public class AgentBindingApplicationService {
 
     @Transactional
     public AgentKnowledgeBindingVO bindKnowledge(Long agentId, BindAgentKnowledgeRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         var kb = knowledgeBaseRepository.findById(request.knowledgeBaseId())
@@ -106,7 +107,7 @@ public class AgentBindingApplicationService {
 
     @Transactional
     public void unbindKnowledge(Long agentId, Long knowledgeBaseId) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         AgentKnowledge binding = agentKnowledgeRepository.findByVersionAndKnowledgeBase(draft.getId(), knowledgeBaseId)
@@ -119,7 +120,7 @@ public class AgentBindingApplicationService {
     }
 
     public List<AgentToolBindingVO> listTools(Long agentId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         return agentToolRepository.listByVersionId(draft.getId()).stream().map(this::toToolVO).toList();
@@ -127,7 +128,7 @@ public class AgentBindingApplicationService {
 
     @Transactional
     public AgentToolBindingVO bindTool(Long agentId, BindAgentToolRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         var tool = toolRepository.findById(request.toolId())
@@ -152,8 +153,26 @@ public class AgentBindingApplicationService {
     }
 
     @Transactional
+    public AgentToolBindingVO updateTool(Long agentId, Long toolId, com.boxai.agent.api.UpdateAgentToolRequest request) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
+        Agent agent = requireAgent(agentId);
+        AgentVersion draft = requireDraft(agent);
+        AgentTool binding = agentToolRepository.findByVersionAndTool(draft.getId(), toolId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TOOL_NOT_FOUND, "绑定关系不存在"));
+        if (request.enabled() != null) {
+            binding.setEnabled(request.enabled());
+        }
+        if (request.requireConfirmation() != null) {
+            binding.setRequireConfirmation(request.requireConfirmation());
+        }
+        agentToolRepository.update(binding);
+        refreshToolEnabled(draft);
+        return toToolVO(binding);
+    }
+
+    @Transactional
     public void unbindTool(Long agentId, Long toolId) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         AgentTool binding = agentToolRepository.findByVersionAndTool(draft.getId(), toolId)
@@ -163,7 +182,7 @@ public class AgentBindingApplicationService {
     }
 
     public List<AgentMcpBindingVO> listMcp(Long agentId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         return agentMcpRepository.listByVersionId(draft.getId()).stream().map(this::toMcpVO).toList();
@@ -171,7 +190,7 @@ public class AgentBindingApplicationService {
 
     @Transactional
     public AgentMcpBindingVO bindMcp(Long agentId, BindAgentMcpRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         McpServer server = mcpServerRepository.findById(request.mcpServerId())
@@ -194,7 +213,7 @@ public class AgentBindingApplicationService {
     }
 
     public List<AgentSubAgentBindingVO> listSubAgents(Long agentId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         return agentSubAgentRepository.listByVersionId(draft.getId()).stream().map(this::toSubAgentVO).toList();
@@ -202,7 +221,7 @@ public class AgentBindingApplicationService {
 
     @Transactional
     public AgentSubAgentBindingVO bindSubAgent(Long agentId, BindAgentSubAgentRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         if (agent.getId().equals(request.subAgentId())) {
@@ -230,7 +249,7 @@ public class AgentBindingApplicationService {
 
     @Transactional
     public void unbindSubAgent(Long agentId, Long subAgentId) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         AgentSubAgent binding = agentSubAgentRepository.findByVersionAndSubAgent(draft.getId(), subAgentId)
@@ -241,7 +260,7 @@ public class AgentBindingApplicationService {
 
     @Transactional
     public void unbindMcp(Long agentId, Long mcpServerId) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = requireDraft(agent);
         AgentMcp binding = agentMcpRepository.findByVersionAndMcpServer(draft.getId(), mcpServerId)

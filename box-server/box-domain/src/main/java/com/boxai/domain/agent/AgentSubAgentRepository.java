@@ -14,4 +14,6 @@ public interface AgentSubAgentRepository {
     List<AgentSubAgent> listByVersionId(Long versionId);
 
     int countBySubAgentId(Long subAgentId);
+
+    List<Long> listParentAgentIdsBySubAgentId(Long subAgentId);
 }

@@ -4,6 +4,7 @@ import com.boxai.agent.api.AgentVersionCompareVO;
 import com.boxai.agent.api.AgentVersionDiffVO;
 import com.boxai.agent.api.AgentVersionVO;
 import com.boxai.agent.api.CreateAgentVersionRequest;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.agent.Agent;
@@ -54,7 +55,7 @@ public class AgentVersionApplicationService {
     }
 
     public List<AgentVersionVO> list(Long agentId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = agentVersionRepository.findLatestDraft(agentId).orElse(null);
         return agentVersionRepository.listByAgentId(agentId).stream()
@@ -63,7 +64,7 @@ public class AgentVersionApplicationService {
     }
 
     public AgentVersionCompareVO compare(Long agentId, Long baseVersionId, Long targetVersionId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         requireAgent(agentId);
         AgentVersion base = requireVersion(agentId, baseVersionId);
         AgentVersion target = requireVersion(agentId, targetVersionId);
@@ -90,7 +91,7 @@ public class AgentVersionApplicationService {
 
     @Transactional
     public AgentVersionVO createSnapshot(Long agentId, CreateAgentVersionRequest request) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion source = resolveSourceVersion(agentId, request == null ? null : request.sourceVersionId());
         int nextNo = agentVersionRepository.maxVersionNo(agentId) + 1;
@@ -104,7 +105,7 @@ public class AgentVersionApplicationService {
 
     @Transactional
     public void restore(Long agentId, Long versionId) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         if ("PUBLISHED".equals(agent.getStatus())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请先取消发布后再恢复版本");
@@ -121,7 +122,7 @@ public class AgentVersionApplicationService {
 
     @Transactional
     public AgentVersionVO archive(Long agentId, Long versionId) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         Agent agent = requireAgent(agentId);
         AgentVersion version = requireVersion(agentId, versionId);
         AgentVersion draft = requireDraft(agent);

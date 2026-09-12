@@ -1,7 +1,12 @@
 package com.boxai.agent.application;
 
 import com.boxai.agent.api.AgentPublishVO;
+import com.boxai.common.constant.AuditActions;
+import com.boxai.common.constant.AuditResourceTypes;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.constant.PublishResourceTypes;
+import com.boxai.security.audit.AuditLogService;
+import com.boxai.security.notification.NotificationPublisher;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.agent.Agent;
@@ -25,21 +30,27 @@ public class AgentPublishApplicationService {
     private final AgentBindingApplicationService agentBindingApplicationService;
     private final PublishRepository publishRepository;
     private final WorkspacePermissionService workspacePermissionService;
+    private final AuditLogService auditLogService;
+    private final NotificationPublisher notificationPublisher;
 
     public AgentPublishApplicationService(AgentRepository agentRepository,
                                           AgentVersionRepository agentVersionRepository,
                                           AgentBindingApplicationService agentBindingApplicationService,
                                           PublishRepository publishRepository,
-                                          WorkspacePermissionService workspacePermissionService) {
+                                          WorkspacePermissionService workspacePermissionService,
+                                          AuditLogService auditLogService,
+                                          NotificationPublisher notificationPublisher) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.agentBindingApplicationService = agentBindingApplicationService;
         this.publishRepository = publishRepository;
         this.workspacePermissionService = workspacePermissionService;
+        this.auditLogService = auditLogService;
+        this.notificationPublisher = notificationPublisher;
     }
 
     public AgentPublishVO getPublishStatus(Long agentId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(agentId);
         if (agent.getPublishedVersionId() == null) {
             return new AgentPublishVO(agent.getId(), agent.getStatus(), null, null, null, null);
@@ -57,7 +68,7 @@ public class AgentPublishApplicationService {
 
     @Transactional
     public AgentPublishVO publish(Long agentId) {
-        workspacePermissionService.requirePermission("agent:publish");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_PUBLISH);
         Agent agent = requireAgent(agentId);
         AgentVersion draft = agentVersionRepository.findLatestDraft(agent.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "智能体草稿版本不存在"));
@@ -91,18 +102,38 @@ public class AgentPublishApplicationService {
         publish.setPublishedAt(LocalDateTime.now());
         publishRepository.save(publish);
 
+        auditLogService.recordSuccess(
+                AuditActions.AGENT_PUBLISH,
+                AuditResourceTypes.AGENT,
+                agent.getId(),
+                agent.getName(),
+                "versionId=" + draft.getId());
+        Long userId = WorkspaceContext.require().userId();
+        notificationPublisher.publish(
+                userId,
+                agent.getWorkspaceId(),
+                "智能体已发布",
+                "「" + agent.getName() + "」已发布，可通过对话与开放 API 使用。",
+                "AGENT",
+                "/agents/" + agent.getId() + "/builder");
         return getPublishStatus(agentId);
     }
 
     @Transactional
     public AgentPublishVO unpublish(Long agentId) {
-        workspacePermissionService.requirePermission("agent:publish");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_PUBLISH);
         Agent agent = requireAgent(agentId);
         agent.setPublishedVersionId(null);
         agent.setStatus("DRAFT");
         agent.setUpdatedBy(WorkspaceContext.require().userId());
         agentRepository.update(agent);
         publishRepository.revokeByResource(PublishResourceTypes.AGENT, agent.getId());
+        auditLogService.recordSuccess(
+                AuditActions.AGENT_UNPUBLISH,
+                AuditResourceTypes.AGENT,
+                agent.getId(),
+                agent.getName(),
+                null);
         return getPublishStatus(agentId);
     }
 

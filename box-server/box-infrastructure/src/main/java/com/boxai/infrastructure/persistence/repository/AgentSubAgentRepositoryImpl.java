@@ -64,6 +64,15 @@ public class AgentSubAgentRepositoryImpl implements AgentSubAgentRepository {
         return count == null ? 0 : count.intValue();
     }
 
+    @Override
+    public List<Long> listParentAgentIdsBySubAgentId(Long subAgentId) {
+        return mapper.selectListByQuery(QueryWrapper.create().eq("sub_agent_id", subAgentId))
+                .stream()
+                .map(AgentSubAgentDO::getAgentId)
+                .distinct()
+                .toList();
+    }
+
     private AgentSubAgent toDomain(AgentSubAgentDO row) {
         AgentSubAgent binding = new AgentSubAgent();
         binding.setId(row.getId());

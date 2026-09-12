@@ -14,4 +14,6 @@ public interface AgentKnowledgeRepository {
     List<AgentKnowledge> listByVersionId(Long versionId);
 
     int countByKnowledgeBaseId(Long knowledgeBaseId);
+
+    List<Long> listDistinctAgentIdsByKnowledgeBaseId(Long knowledgeBaseId);
 }

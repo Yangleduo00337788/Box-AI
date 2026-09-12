@@ -4,6 +4,7 @@ import com.boxai.agent.api.AgentLongTermMemoryVO;
 import com.boxai.ai.ChatModelGateway;
 import com.boxai.ai.EmbeddingModelGateway;
 import com.boxai.ai.ModelRuntimeConfig;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.agent.Agent;
@@ -135,7 +136,7 @@ public class AgentLongTermMemoryApplicationService {
     }
 
     public List<AgentLongTermMemoryVO> list(Long agentId) {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         requireAgent(agentId);
         Long userId = WorkspaceContext.require().userId();
         return memoryRepository.listByAgentAndUser(agentId, userId).stream()
@@ -145,7 +146,7 @@ public class AgentLongTermMemoryApplicationService {
 
     @Transactional
     public void delete(Long agentId, Long memoryId) {
-        workspacePermissionService.requirePermission("agent:update");
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
         requireAgent(agentId);
         Long userId = WorkspaceContext.require().userId();
         AgentLongTermMemory memory = memoryRepository.findById(memoryId)

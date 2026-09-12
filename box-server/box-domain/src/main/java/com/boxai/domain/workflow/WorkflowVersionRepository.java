@@ -15,4 +15,6 @@ public interface WorkflowVersionRepository {
     Optional<Integer> findMaxVersionNo(Long workflowId);
 
     void deleteByWorkflowId(Long workflowId);
+
+    int countSubWorkflowReferences(Long workflowId, Long workspaceId);
 }

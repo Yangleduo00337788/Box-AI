@@ -1,7 +1,9 @@
 package com.boxai.bootstrap.web;
 
 import com.boxai.common.exception.BusinessException;
+import com.boxai.common.exception.DependencyConflictException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.common.result.DependencyConflictData;
 import com.boxai.common.result.Result;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -36,6 +38,12 @@ public class GlobalExceptionHandler {
 
     public GlobalExceptionHandler(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    @ExceptionHandler(DependencyConflictException.class)
+    public void handleDependencyConflict(DependencyConflictException e, HttpServletResponse response) throws IOException {
+        writeJson(response, HttpStatus.CONFLICT,
+                new Result<>(e.getCode(), e.getMessage(), new DependencyConflictData(e.getDependencies())));
     }
 
     @ExceptionHandler(BusinessException.class)
@@ -76,10 +84,19 @@ public class GlobalExceptionHandler {
         if (code == ErrorCode.NOT_FOUND) {
             return HttpStatus.NOT_FOUND;
         }
+        if (code == ErrorCode.CONFLICT) {
+            return HttpStatus.CONFLICT;
+        }
+        if (code == ErrorCode.TOO_MANY_REQUESTS) {
+            return HttpStatus.TOO_MANY_REQUESTS;
+        }
+        if (code == ErrorCode.OAUTH_NOT_CONFIGURED) {
+            return HttpStatus.NOT_IMPLEMENTED;
+        }
         return HttpStatus.BAD_REQUEST;
     }
 
-    private void writeJson(HttpServletResponse response, HttpStatus status, Result<Void> body) throws IOException {
+    private void writeJson(HttpServletResponse response, HttpStatus status, Result<?> body) throws IOException {
         if (response.isCommitted()) {
             return;
         }

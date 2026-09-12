@@ -1,6 +1,10 @@
 package com.boxai.workspace.application;
 
+import com.boxai.common.constant.AuditActions;
+import com.boxai.common.constant.AuditResourceTypes;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.constant.RoleCodes;
+import com.boxai.security.audit.AuditLogService;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.notification.Notification;
@@ -30,23 +34,25 @@ public class WorkspaceMemberApplicationService {
     private final UserRepository userRepository;
     private final WorkspacePermissionService workspacePermissionService;
     private final NotificationRepository notificationRepository;
+    private final AuditLogService auditLogService;
 
     public WorkspaceMemberApplicationService(WorkspaceRepository workspaceRepository,
                                              RoleRepository roleRepository,
                                              UserRepository userRepository,
                                              WorkspacePermissionService workspacePermissionService,
-                                             NotificationRepository notificationRepository) {
+                                             NotificationRepository notificationRepository,
+                                             AuditLogService auditLogService) {
         this.workspaceRepository = workspaceRepository;
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.workspacePermissionService = workspacePermissionService;
         this.notificationRepository = notificationRepository;
+        this.auditLogService = auditLogService;
     }
 
     public List<WorkspaceMemberVO> listCurrentWorkspaceMembers() {
-        workspacePermissionService.requirePermission("agent:read");
+        workspacePermissionService.requirePermission(PermissionCodes.MEMBER_MANAGE);
         Long workspaceId = WorkspaceContext.require().workspaceId();
-        requireWorkspaceAdmin();
         return workspaceRepository.listMembersByWorkspaceId(workspaceId).stream()
                 .map(this::toVo)
                 .toList();
@@ -54,7 +60,7 @@ public class WorkspaceMemberApplicationService {
 
     @Transactional
     public WorkspaceMemberVO invite(InviteWorkspaceMemberRequest request) {
-        requireWorkspaceAdmin();
+        workspacePermissionService.requirePermission(PermissionCodes.MEMBER_MANAGE);
         Long workspaceId = WorkspaceContext.require().workspaceId();
         User user = userRepository.findByEmail(request.email().trim().toLowerCase(Locale.ROOT))
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在，请先注册"));
@@ -70,6 +76,12 @@ public class WorkspaceMemberApplicationService {
         workspaceRepository.addMember(member);
         member.setRoleCode(role.getRoleCode());
         notifyWorkspaceInvite(workspaceId, user.getId());
+        auditLogService.recordSuccess(
+                AuditActions.MEMBER_INVITE,
+                AuditResourceTypes.MEMBER,
+                user.getId(),
+                user.getEmail(),
+                "role=" + role.getRoleCode());
         return toVo(member);
     }
 
@@ -87,7 +99,7 @@ public class WorkspaceMemberApplicationService {
 
     @Transactional
     public WorkspaceMemberVO updateRole(Long userId, UpdateWorkspaceMemberRoleRequest request) {
-        requireWorkspaceAdmin();
+        workspacePermissionService.requirePermission(PermissionCodes.MEMBER_MANAGE);
         Long workspaceId = WorkspaceContext.require().workspaceId();
         WorkspaceMember member = workspaceRepository.findMember(workspaceId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "工作空间成员不存在"));
@@ -95,12 +107,18 @@ public class WorkspaceMemberApplicationService {
         member.setRoleId(role.getId());
         member.setRoleCode(role.getRoleCode());
         workspaceRepository.updateMember(member);
+        auditLogService.recordSuccess(
+                AuditActions.MEMBER_ROLE_UPDATE,
+                AuditResourceTypes.MEMBER,
+                userId,
+                String.valueOf(userId),
+                "role=" + role.getRoleCode());
         return toVo(member);
     }
 
     @Transactional
     public void remove(Long userId) {
-        requireWorkspaceAdmin();
+        workspacePermissionService.requirePermission(PermissionCodes.MEMBER_MANAGE);
         Long workspaceId = WorkspaceContext.require().workspaceId();
         Long operatorId = WorkspaceContext.require().userId();
         if (operatorId.equals(userId)) {
@@ -109,13 +127,12 @@ public class WorkspaceMemberApplicationService {
         workspaceRepository.findMember(workspaceId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "工作空间成员不存在"));
         workspaceRepository.removeMember(workspaceId, userId);
-    }
-
-    private void requireWorkspaceAdmin() {
-        String roleCode = WorkspaceContext.require().roleCode();
-        if (!RoleCodes.TENANT_ADMIN.equals(roleCode)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "需要工作空间管理员权限");
-        }
+        auditLogService.recordSuccess(
+                AuditActions.MEMBER_REMOVE,
+                AuditResourceTypes.MEMBER,
+                userId,
+                String.valueOf(userId),
+                null);
     }
 
     private Role resolveRole(Long workspaceId, String roleCode) {

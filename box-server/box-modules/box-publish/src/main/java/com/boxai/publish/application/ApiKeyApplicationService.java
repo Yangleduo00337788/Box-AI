@@ -1,7 +1,11 @@
 package com.boxai.publish.application;
 
+import com.boxai.common.constant.AuditActions;
+import com.boxai.common.constant.AuditResourceTypes;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.security.audit.AuditLogService;
 import com.boxai.domain.apikey.ApiKey;
 import com.boxai.domain.apikey.ApiKeyRepository;
 import com.boxai.infrastructure.redis.RedisService;
@@ -28,27 +32,30 @@ public class ApiKeyApplicationService {
     private final ApiKeyHasher apiKeyHasher;
     private final RedisService redisService;
     private final WorkspacePermissionService workspacePermissionService;
+    private final AuditLogService auditLogService;
 
     public ApiKeyApplicationService(ApiKeyRepository apiKeyRepository,
                                     ApiKeyGenerator apiKeyGenerator,
                                     ApiKeyHasher apiKeyHasher,
                                     RedisService redisService,
-                                    WorkspacePermissionService workspacePermissionService) {
+                                    WorkspacePermissionService workspacePermissionService,
+                                    AuditLogService auditLogService) {
         this.apiKeyRepository = apiKeyRepository;
         this.apiKeyGenerator = apiKeyGenerator;
         this.apiKeyHasher = apiKeyHasher;
         this.redisService = redisService;
         this.workspacePermissionService = workspacePermissionService;
+        this.auditLogService = auditLogService;
     }
 
     public List<ApiKeyVO> list() {
-        workspacePermissionService.requirePermission("agent:publish");
+        workspacePermissionService.requirePermission(PermissionCodes.API_KEY_MANAGE);
         return apiKeyRepository.listByWorkspace(workspaceId()).stream().map(this::toVO).toList();
     }
 
     @Transactional
     public CreateApiKeyResponse create(CreateApiKeyRequest request) {
-        workspacePermissionService.requirePermission("agent:publish");
+        workspacePermissionService.requirePermission(PermissionCodes.API_KEY_MANAGE);
         String rawKey = apiKeyGenerator.generate();
         ApiKey apiKey = new ApiKey();
         apiKey.setWorkspaceId(workspaceId());
@@ -59,30 +66,48 @@ public class ApiKeyApplicationService {
         apiKey.setCreatedBy(WorkspaceContext.require().userId());
         apiKeyRepository.save(apiKey);
         cache(apiKey);
+        auditLogService.recordSuccess(
+                AuditActions.API_KEY_CREATE,
+                AuditResourceTypes.API_KEY,
+                apiKey.getId(),
+                apiKey.getName(),
+                apiKey.getKeyPrefix());
         return new CreateApiKeyResponse(apiKey.getId(), apiKey.getName(), rawKey);
     }
 
     @Transactional
     public void delete(Long id) {
-        workspacePermissionService.requirePermission("agent:publish");
+        workspacePermissionService.requirePermission(PermissionCodes.API_KEY_MANAGE);
         ApiKey apiKey = requireApiKey(id);
         apiKeyRepository.delete(apiKey.getId());
         evictCache(apiKey.getKeyHash());
+        auditLogService.recordSuccess(
+                AuditActions.API_KEY_DELETE,
+                AuditResourceTypes.API_KEY,
+                id,
+                apiKey.getName(),
+                apiKey.getKeyPrefix());
     }
 
     @Transactional
     public ApiKeyVO disable(Long id) {
-        workspacePermissionService.requirePermission("agent:publish");
+        workspacePermissionService.requirePermission(PermissionCodes.API_KEY_MANAGE);
         ApiKey apiKey = requireApiKey(id);
         apiKey.setStatus(0);
         apiKeyRepository.update(apiKey);
         evictCache(apiKey.getKeyHash());
+        auditLogService.recordSuccess(
+                AuditActions.API_KEY_DISABLE,
+                AuditResourceTypes.API_KEY,
+                id,
+                apiKey.getName(),
+                apiKey.getKeyPrefix());
         return toVO(apiKey);
     }
 
     @Transactional
     public ApiKeyVO enable(Long id) {
-        workspacePermissionService.requirePermission("agent:publish");
+        workspacePermissionService.requirePermission(PermissionCodes.API_KEY_MANAGE);
         ApiKey apiKey = requireApiKey(id);
         apiKey.setStatus(1);
         apiKeyRepository.update(apiKey);
@@ -92,6 +117,7 @@ public class ApiKeyApplicationService {
 
     @Transactional
     public CreateApiKeyResponse rotate(Long id) {
+        workspacePermissionService.requirePermission(PermissionCodes.API_KEY_MANAGE);
         ApiKey apiKey = requireApiKey(id);
         evictCache(apiKey.getKeyHash());
         String rawKey = apiKeyGenerator.generate();
@@ -100,6 +126,12 @@ public class ApiKeyApplicationService {
         apiKey.setStatus(1);
         apiKeyRepository.update(apiKey);
         cache(apiKey);
+        auditLogService.recordSuccess(
+                AuditActions.API_KEY_ROTATE,
+                AuditResourceTypes.API_KEY,
+                apiKey.getId(),
+                apiKey.getName(),
+                apiKey.getKeyPrefix());
         return new CreateApiKeyResponse(apiKey.getId(), apiKey.getName(), rawKey);
     }
 

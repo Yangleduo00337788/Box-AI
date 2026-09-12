@@ -2,6 +2,7 @@ package com.boxai.workspace.controller;
 
 import com.boxai.common.result.Result;
 import com.boxai.security.context.SecurityContexts;
+import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.workspace.api.CreateWorkspaceRequest;
 import com.boxai.workspace.api.WorkspaceDetailVO;
 import com.boxai.workspace.application.WorkspaceApplicationService;
@@ -19,9 +20,12 @@ import java.util.List;
 public class WorkspaceController {
 
     private final WorkspaceApplicationService workspaceApplicationService;
+    private final WorkspacePermissionService workspacePermissionService;
 
-    public WorkspaceController(WorkspaceApplicationService workspaceApplicationService) {
+    public WorkspaceController(WorkspaceApplicationService workspaceApplicationService,
+                               WorkspacePermissionService workspacePermissionService) {
         this.workspaceApplicationService = workspaceApplicationService;
+        this.workspacePermissionService = workspacePermissionService;
     }
 
     @GetMapping
@@ -32,5 +36,10 @@ public class WorkspaceController {
     @PostMapping
     public Result<WorkspaceDetailVO> create(@Valid @RequestBody CreateWorkspaceRequest request) {
         return Result.success(workspaceApplicationService.create(SecurityContexts.currentUser(), request));
+    }
+
+    @GetMapping("/current-permissions")
+    public Result<List<String>> currentPermissions() {
+        return Result.success(workspacePermissionService.listCurrentPermissionCodes());
     }
 }

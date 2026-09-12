@@ -4,6 +4,7 @@ package com.boxai.agent.application;
 
 import com.boxai.agent.api.plugin.PluginCatalogVO;
 
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 
 import com.boxai.common.exception.ErrorCode;
@@ -80,7 +81,7 @@ public class PluginMarketApplicationService {
 
     public List<PluginCatalogVO> list(String category) {
 
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
 
         pluginCategoryApplicationService.requireActiveCategory(category);
 
@@ -106,7 +107,7 @@ public class PluginMarketApplicationService {
 
     public void install(Long pluginId) {
 
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_CREATE);
 
         PluginCatalog plugin = requireListedPlugin(pluginId);
 
@@ -152,7 +153,7 @@ public class PluginMarketApplicationService {
 
     public void uninstall(Long pluginId) {
 
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_CREATE);
 
         requireListedPlugin(pluginId);
 

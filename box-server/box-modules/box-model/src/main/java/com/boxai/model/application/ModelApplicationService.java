@@ -2,6 +2,7 @@ package com.boxai.model.application;
 
 import com.boxai.ai.ChatModelGateway;
 import com.boxai.ai.ModelRuntimeConfig;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.crypto.SecretCipher;
@@ -54,13 +55,13 @@ public class ModelApplicationService {
     }
 
     public List<ProviderVO> listProviders() {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         return providerRepository.listByWorkspace(workspaceId()).stream().map(this::toProviderVO).toList();
     }
 
     @Transactional
     public ProviderVO createProvider(CreateProviderRequest request) {
-        workspacePermissionService.requirePermission("model:create");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_CREATE);
         ModelProvider provider = new ModelProvider();
         provider.setWorkspaceId(workspaceId());
         provider.setProviderCode(request.providerCode().trim().toLowerCase(Locale.ROOT));
@@ -75,7 +76,7 @@ public class ModelApplicationService {
 
     @Transactional
     public ProviderVO updateProvider(Long id, CreateProviderRequest request) {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         ModelProvider provider = requireProvider(id);
         provider.setProviderCode(request.providerCode().trim().toLowerCase(Locale.ROOT));
         provider.setProviderName(request.providerName().trim());
@@ -88,13 +89,13 @@ public class ModelApplicationService {
 
     @Transactional
     public void deleteProvider(Long id) {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         requireProvider(id);
         providerRepository.delete(id);
     }
 
     public List<ModelVO> listModels() {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         List<ModelProvider> providers = providerRepository.listByWorkspace(workspaceId());
         Map<Long, ModelProvider> providerMap = providers.stream()
                 .collect(Collectors.toMap(ModelProvider::getId, Function.identity()));
@@ -106,7 +107,7 @@ public class ModelApplicationService {
 
     @Transactional
     public ModelVO createModel(CreateModelRequest request) {
-        workspacePermissionService.requirePermission("model:create");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_CREATE);
         ModelProvider provider = requireProvider(request.providerId());
         ModelDefinition model = new ModelDefinition();
         model.setProviderId(provider.getId());
@@ -124,7 +125,7 @@ public class ModelApplicationService {
 
     @Transactional
     public ModelVO updateModel(Long id, CreateModelRequest request) {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         ModelDefinition model = definitionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MODEL_NOT_FOUND, "模型不存在"));
         ModelProvider provider = requireProvider(model.getProviderId());
@@ -141,7 +142,7 @@ public class ModelApplicationService {
 
     @Transactional
     public void deleteModel(Long id) {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         ModelDefinition model = definitionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MODEL_NOT_FOUND, "模型不存在"));
         requireProvider(model.getProviderId());
@@ -149,7 +150,7 @@ public class ModelApplicationService {
     }
 
     public List<CredentialVO> listCredentials() {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         List<ModelProvider> providers = providerRepository.listByWorkspace(workspaceId());
         Map<Long, ModelProvider> providerMap = providers.stream()
                 .collect(Collectors.toMap(ModelProvider::getId, Function.identity()));
@@ -160,7 +161,7 @@ public class ModelApplicationService {
 
     @Transactional
     public CredentialVO createCredential(CreateCredentialRequest request) {
-        workspacePermissionService.requirePermission("model:create");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_CREATE);
         ModelProvider provider = requireProvider(request.providerId());
         ModelCredential credential = new ModelCredential();
         credential.setWorkspaceId(workspaceId());
@@ -174,7 +175,7 @@ public class ModelApplicationService {
 
     @Transactional
     public void deleteCredential(Long id) {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         ModelCredential credential = credentialRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CREDENTIAL_NOT_FOUND, "密钥不存在"));
         if (!workspaceId().equals(credential.getWorkspaceId())) {
@@ -184,7 +185,7 @@ public class ModelApplicationService {
     }
 
     public TestChatVO testChat(Long modelId, String message) {
-        workspacePermissionService.requirePermission("model:update");
+        workspacePermissionService.requirePermission(PermissionCodes.MODEL_UPDATE);
         ModelDefinition model = definitionRepository.findById(modelId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MODEL_NOT_FOUND, "模型不存在"));
         ModelProvider provider = requireProvider(model.getProviderId());

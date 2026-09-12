@@ -1,5 +1,6 @@
 package com.boxai.workflow.application;
 
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.workflow.Workflow;
@@ -7,6 +8,7 @@ import com.boxai.domain.workflow.WorkflowRepository;
 import com.boxai.domain.workflow.WorkflowVersion;
 import com.boxai.domain.workflow.WorkflowVersionRepository;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.guard.ResourceDeleteGuard;
 import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.workflow.api.CreateWorkflowRequest;
 import com.boxai.workflow.api.UpdateWorkflowDefinitionRequest;
@@ -25,32 +27,35 @@ public class WorkflowApplicationService {
     private final WorkflowVersionRepository workflowVersionRepository;
     private final WorkflowDefinitionValidator workflowDefinitionValidator;
     private final WorkspacePermissionService workspacePermissionService;
+    private final ResourceDeleteGuard resourceDeleteGuard;
 
     public WorkflowApplicationService(WorkflowRepository workflowRepository,
                                       WorkflowVersionRepository workflowVersionRepository,
                                       WorkflowDefinitionValidator workflowDefinitionValidator,
-                                      WorkspacePermissionService workspacePermissionService) {
+                                      WorkspacePermissionService workspacePermissionService,
+                                      ResourceDeleteGuard resourceDeleteGuard) {
         this.workflowRepository = workflowRepository;
         this.workflowVersionRepository = workflowVersionRepository;
         this.workflowDefinitionValidator = workflowDefinitionValidator;
         this.workspacePermissionService = workspacePermissionService;
+        this.resourceDeleteGuard = resourceDeleteGuard;
     }
 
     public List<WorkflowVO> list() {
-        workspacePermissionService.requirePermission("workflow:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_READ);
         return workflowRepository.listByWorkspace(workspaceId()).stream()
                 .map(workflow -> toVO(workflow, false))
                 .toList();
     }
 
     public WorkflowVO detail(Long id) {
-        workspacePermissionService.requirePermission("workflow:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_READ);
         return toVO(requireWorkflow(id), true);
     }
 
     @Transactional
     public WorkflowVO create(CreateWorkflowRequest request) {
-        workspacePermissionService.requirePermission("workflow:create");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_CREATE);
         Long userId = WorkspaceContext.require().userId();
         Workflow workflow = new Workflow();
         workflow.setWorkspaceId(workspaceId());
@@ -76,7 +81,7 @@ public class WorkflowApplicationService {
 
     @Transactional
     public WorkflowVO update(Long id, UpdateWorkflowRequest request) {
-        workspacePermissionService.requirePermission("workflow:update");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_UPDATE);
         Workflow workflow = requireWorkflow(id);
         workflow.setName(request.name().trim());
         workflow.setDescription(trimToNull(request.description()));
@@ -86,7 +91,7 @@ public class WorkflowApplicationService {
 
     @Transactional
     public WorkflowVO updateDefinition(Long id, UpdateWorkflowDefinitionRequest request) {
-        workspacePermissionService.requirePermission("workflow:update");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_UPDATE);
         Workflow workflow = requireWorkflow(id);
         WorkflowVersion draft = requireDraft(workflow);
         String definitionJson = workflowDefinitionValidator.normalizeDefinition(request.definitionJson());
@@ -97,16 +102,17 @@ public class WorkflowApplicationService {
     }
 
     public WorkflowValidateVO validate(Long id) {
-        workspacePermissionService.requirePermission("workflow:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_READ);
         Workflow workflow = requireWorkflow(id);
         WorkflowVersion draft = requireDraft(workflow);
-        return workflowDefinitionValidator.validate(draft.getDefinitionJson());
+        return workflowDefinitionValidator.validate(draft.getDefinitionJson(), workspaceId());
     }
 
     @Transactional
     public void delete(Long id) {
-        workspacePermissionService.requirePermission("workflow:update");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_DELETE);
         Workflow workflow = requireWorkflow(id);
+        resourceDeleteGuard.assertWorkflowDeletable(workflow);
         workflowVersionRepository.deleteByWorkflowId(workflow.getId());
         workflowRepository.delete(workflow.getId());
     }

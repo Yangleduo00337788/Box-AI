@@ -8,6 +8,7 @@ import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.security.context.LoginUser;
 import com.boxai.security.context.SecurityContexts;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.logging.LoggingContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,7 @@ public class WorkspaceInterceptor implements HandlerInterceptor {
             Object userId = request.getAttribute(RequestAttributes.API_KEY_USER_ID);
             if (workspaceId instanceof Long wsId && userId instanceof Long uid) {
                 WorkspaceContext.set(new WorkspaceContext(wsId, uid, null, "API_KEY"));
+                syncLoggingContext(wsId, uid);
             }
             return true;
         }
@@ -58,7 +60,13 @@ public class WorkspaceInterceptor implements HandlerInterceptor {
             throw new BusinessException(ErrorCode.WORKSPACE_ACCESS_DENIED, "工作空间成员已禁用");
         }
         WorkspaceContext.set(new WorkspaceContext(workspaceId, user.userId(), member.getRoleId(), member.getRoleCode()));
+        syncLoggingContext(workspaceId, user.userId());
         return true;
+    }
+
+    private void syncLoggingContext(Long workspaceId, Long userId) {
+        LoggingContext.setWorkspaceId(workspaceId);
+        LoggingContext.setUserId(userId);
     }
 
     @Override

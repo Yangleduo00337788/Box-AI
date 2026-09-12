@@ -7,6 +7,8 @@ public interface AgentToolRepository {
 
     AgentTool save(AgentTool binding);
 
+    void update(AgentTool binding);
+
     void delete(Long id);
 
     Optional<AgentTool> findByVersionAndTool(Long versionId, Long toolId);
@@ -14,4 +16,6 @@ public interface AgentToolRepository {
     List<AgentTool> listByVersionId(Long versionId);
 
     int countByToolId(Long toolId);
+
+    List<Long> listDistinctAgentIdsByToolId(Long toolId);
 }

@@ -1,5 +1,6 @@
 package com.boxai.workflow.application;
 
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.constant.PublishResourceTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
@@ -44,7 +45,7 @@ public class WorkflowPublishApplicationService {
     }
 
     public WorkflowPublishVO getPublishStatus(Long workflowId) {
-        workspacePermissionService.requirePermission("workflow:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_READ);
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         if (workflow.getPublishedVersionId() == null) {
             return new WorkflowPublishVO(workflow.getId(), workflow.getStatus(), null, null, null, null, null, null);
@@ -64,10 +65,11 @@ public class WorkflowPublishApplicationService {
 
     @Transactional
     public WorkflowPublishVO publish(Long workflowId) {
-        workspacePermissionService.requirePermission("workflow:update");
+        workspacePermissionService.requirePermission(PermissionCodes.WORKFLOW_UPDATE);
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         WorkflowVersion draft = workflowApplicationService.requireDraft(workflow);
-        WorkflowValidateVO validation = workflowDefinitionValidator.validate(draft.getDefinitionJson());
+        WorkflowValidateVO validation = workflowDefinitionValidator.validate(
+                draft.getDefinitionJson(), WorkspaceContext.require().workspaceId());
         if (!validation.valid()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, String.join("；", validation.errors()));
         }
