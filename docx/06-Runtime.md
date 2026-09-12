@@ -1136,76 +1136,63 @@ POST + SSE
 
 ---
 
-三十三、SSE 数据格式
+三十三、SSE 数据格式（当前实现）
 
-例如：
+**实现类**：`com.boxai.agent.api.ChatStreamEvent`  
+**发送方**：`com.boxai.agent.chat.AgentChatExecutor`  
+**入口**：`POST /api/v1/agents/{id}/chat`（`stream=true`）、`POST /api/v1/conversations/{id}/messages`、`POST /api/v1/published/agents/{id}/chat`
 
-event: message_start
-data: {"messageId":"msg_001"}
+每条 SSE 帧为 `data: {json}\n\n`，`json` 字段：
 
-然后：
+| type | content | message | executionId | 说明 |
+|------|---------|---------|---------------|------|
+| `citations` | RAG 引用 JSON 数组 | — | — | 流开始前推送 |
+| `delta` | 文本片段 | — | — | 模型回答增量 |
+| `tool.start` | Tool payload JSON | — | — | 工具开始执行 |
+| `tool.delta` | Tool payload JSON | — | — | 工具输出增量 |
+| `tool.end` | Tool payload JSON | — | — | 工具结束（含 status） |
+| `done` | — | — | 可选 | 流结束 |
+| `error` | — | 错误信息 | — | 失败 |
 
-event: token
-data: {"content":"你好"}
+Tool payload 示例：
 
-继续：
-
-event: token
-data: {"content":"，我是"}
-
-继续：
-
-event: token
-data: {"content":"Box"}
-
-最后：
-
-event: message_end
-data: {"messageId":"msg_001"}
-
-如果报错：
-
-event: error
-data: {
-  "code":"MODEL_ERROR",
-  "message":"模型调用失败"
+```json
+{
+  "toolKey": "get_weather",
+  "arguments": { "city": "上海" },
+  "output": "{...}",
+  "status": "SUCCEEDED"
 }
+```
+
+`delta` 示例：
+
+```json
+{"type":"delta","content":"你好"}
+```
+
+`done` 示例：
+
+```json
+{"type":"done","executionId":12345}
+```
 
 ---
 
-三十四、统一 StreamEvent
+三十四、统一 StreamEvent（设计目标 vs 当前代码）
 
-public class StreamEvent {
+**设计目标**（远期统一事件模型）仍保留 `StreamEvent` + `StreamEventType` 枚举（`MESSAGE_START`、`TOKEN`、`TOOL_CALL` 等）。
 
-    private String eventId;
+**V1 已落地**：上表 `ChatStreamEvent` record，类型字符串为 `delta` / `citations` / `tool.start` / `tool.delta` / `tool.end` / `done` / `error`。前端解析见 `box-web/src/api/chatStream.ts`。
 
-    private StreamEventType type;
+**Agent Runtime 主类（代码）**：
 
-    private Object data;
-
-    private Long timestamp;
-}
-
-枚举：
-
-public enum StreamEventType {
-
-    MESSAGE_START,
-
-    TOKEN,
-
-    THINKING,
-
-    TOOL_CALL,
-
-    TOOL_RESULT,
-
-    CITATION,
-
-    MESSAGE_END,
-
-    ERROR
-}
+| 文档名 | 实际类 / 模块 |
+|--------|----------------|
+| AgentExecutionService | `AgentChatExecutor` + `AgentChatPreparer`（`box-modules/box-agent`） |
+| ToolService | `AgentToolRuntimeService` |
+| TraceService | `ExecutionRecorder`（`box-trace`） |
+| KnowledgeService | `KnowledgeSearchService`（`box-knowledge`） |
 
 ---
 

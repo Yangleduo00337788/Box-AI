@@ -289,8 +289,6 @@ box-server
 │
 ├── box-infrastructure
 │
-├── box-api
-│
 ├── box-domain
 │
 ├── box-application
@@ -308,7 +306,7 @@ box-server
     ├── box-runtime
     ├── box-publish
     ├── box-trace
-    └── box-analytics
+    └── box-analytics（`AnalyticsController` · `/api/v1/analytics/overview|trends`）
 
 ---
 
@@ -2085,15 +2083,16 @@ Content-Type: text/event-stream
 
 五十一、Docker Compose
 
-V1 开发环境：
+V1 开发环境（**当前仓库 `docker-compose.yml` 仅起基础设施**）：
 
 box
 │
 ├── mysql
 ├── redis
 ├── elasticsearch
-├── minio
-└── box-server
+└── minio
+
+**应用本地启动**：`box-server`（`BoxApplication`）、`box-web`（`npm run dev`）。将 `box-server` 纳入 Compose 为可选后续项（见 `10-Gaps.md` B-18）。
 
 不加入：
 
@@ -2104,7 +2103,7 @@ Kubernetes
 
 开发阶段尽量保持：
 
-5 个核心基础设施
+4 个核心基础设施 + 本地应用进程
 
 ---
 
@@ -2112,23 +2111,14 @@ Kubernetes
 
 box-network
 
-服务：
+Compose 内服务：
 
 mysql:3306
 redis:6379
 elasticsearch:9200
 minio:9000
-box-server:8080
 
-前端：
-
-box-web
-
-通过：
-
-Nginx
-
-统一入口。
+本地开发时 `box-server` 默认 `localhost:8080`，`box-web` 经 Vite 代理 `/api` 至后端；生产可经 Nginx 统一入口。
 
 ---
 

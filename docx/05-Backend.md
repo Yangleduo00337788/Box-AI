@@ -57,7 +57,7 @@ box-server
     ├── box-runtime
     ├── box-publish
     ├── box-trace
-    └── box-analytics
+    └── box-analytics（工作空间统计：`/api/v1/analytics/*`）
 
 ---
 

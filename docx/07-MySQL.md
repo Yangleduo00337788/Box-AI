@@ -1930,39 +1930,21 @@ OLAP
 
 五十五、Flyway 数据库版本
 
-建议：
+代码库实际路径：
 
-db/migration
+`box-server/box-bootstrap/src/main/resources/db/migration/`
 
-结构：
+当前已发布版本：**V1–V24**（完整列表见 `09-Progress.md` § Flyway 迁移）。
 
-V1__init.sql
+近期增量：
 
-V2__create_user.sql
+- V22 — `audit_log` 审计日志
+- V23 — RBAC 权限码补齐
+- V24 — `execution.request_id`（Request ID 全链路）
 
-V3__create_workspace.sql
+早期规划示例（仅供参考，与合并后的实际文件名不完全一致）：
 
-V4__create_rbac.sql
-
-V5__create_agent.sql
-
-V6__create_model.sql
-
-V7__create_knowledge.sql
-
-V8__create_tool.sql
-
-V9__create_workflow.sql
-
-V10__create_conversation.sql
-
-V11__create_runtime.sql
-
-V12__create_trace.sql
-
-V13__create_publish.sql
-
-V14__create_audit.sql
+V1__init → V13__mcp_server → … → V21__notification
 
 实际开发时可以进一步合并，但不要直接手动修改已经执行过的 Flyway migration。
 
