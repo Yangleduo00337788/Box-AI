@@ -6,10 +6,13 @@ import com.boxai.knowledge.api.KnowledgeBaseVO;
 import com.boxai.knowledge.api.KnowledgeDocumentVO;
 import com.boxai.knowledge.api.KnowledgeSearchHitVO;
 import com.boxai.knowledge.api.KnowledgeSearchRequest;
+import com.boxai.knowledge.api.KnowledgeTestAnswerRequest;
+import com.boxai.knowledge.api.KnowledgeTestAnswerVO;
 import com.boxai.knowledge.api.UpdateKnowledgeBaseRequest;
 import com.boxai.knowledge.application.KnowledgeBaseApplicationService;
 import com.boxai.knowledge.application.KnowledgeDocumentApplicationService;
 import com.boxai.knowledge.application.KnowledgeSearchService;
+import com.boxai.knowledge.application.KnowledgeTestAnswerService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,13 +34,16 @@ public class KnowledgeBaseController {
     private final KnowledgeBaseApplicationService knowledgeBaseApplicationService;
     private final KnowledgeDocumentApplicationService knowledgeDocumentApplicationService;
     private final KnowledgeSearchService knowledgeSearchService;
+    private final KnowledgeTestAnswerService knowledgeTestAnswerService;
 
     public KnowledgeBaseController(KnowledgeBaseApplicationService knowledgeBaseApplicationService,
                                    KnowledgeDocumentApplicationService knowledgeDocumentApplicationService,
-                                   KnowledgeSearchService knowledgeSearchService) {
+                                   KnowledgeSearchService knowledgeSearchService,
+                                   KnowledgeTestAnswerService knowledgeTestAnswerService) {
         this.knowledgeBaseApplicationService = knowledgeBaseApplicationService;
         this.knowledgeDocumentApplicationService = knowledgeDocumentApplicationService;
         this.knowledgeSearchService = knowledgeSearchService;
+        this.knowledgeTestAnswerService = knowledgeTestAnswerService;
     }
 
     @GetMapping
@@ -82,5 +88,11 @@ public class KnowledgeBaseController {
     public Result<List<KnowledgeSearchHitVO>> search(@PathVariable Long id,
                                                     @Valid @RequestBody KnowledgeSearchRequest request) {
         return Result.success(knowledgeSearchService.search(id, request));
+    }
+
+    @PostMapping("/{id}/test-answer")
+    public Result<KnowledgeTestAnswerVO> testAnswer(@PathVariable Long id,
+                                                    @Valid @RequestBody KnowledgeTestAnswerRequest request) {
+        return Result.success(knowledgeTestAnswerService.testAnswer(id, request));
     }
 }

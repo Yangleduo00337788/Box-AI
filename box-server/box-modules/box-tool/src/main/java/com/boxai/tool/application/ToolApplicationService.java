@@ -1,7 +1,13 @@
 package com.boxai.tool.application;
 
+import com.boxai.common.constant.AuditActions;
+import com.boxai.common.constant.AuditResourceTypes;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.security.audit.AuditLogService;
+import com.boxai.security.guard.ResourceDeleteGuard;
+import com.boxai.security.ratelimit.RateLimitService;
 import com.boxai.common.security.SsrfGuard;
 import com.boxai.domain.agent.AgentToolRepository;
 import com.boxai.domain.crypto.SecretCipher;
@@ -43,6 +49,9 @@ public class ToolApplicationService {
     private final AgentToolRepository agentToolRepository;
     private final WorkspacePermissionService workspacePermissionService;
     private final SecretCipher secretCipher;
+    private final AuditLogService auditLogService;
+    private final ResourceDeleteGuard resourceDeleteGuard;
+    private final RateLimitService rateLimitService;
 
     public ToolApplicationService(ToolRepository toolRepository,
                                   ToolHttpConfigRepository toolHttpConfigRepository,
@@ -51,7 +60,10 @@ public class ToolApplicationService {
                                   ToolExecutionService toolExecutionService,
                                   AgentToolRepository agentToolRepository,
                                   WorkspacePermissionService workspacePermissionService,
-                                  SecretCipher secretCipher) {
+                                  SecretCipher secretCipher,
+                                  AuditLogService auditLogService,
+                                  ResourceDeleteGuard resourceDeleteGuard,
+                                  RateLimitService rateLimitService) {
         this.toolRepository = toolRepository;
         this.toolHttpConfigRepository = toolHttpConfigRepository;
         this.toolDatabaseConfigRepository = toolDatabaseConfigRepository;
@@ -60,21 +72,24 @@ public class ToolApplicationService {
         this.agentToolRepository = agentToolRepository;
         this.workspacePermissionService = workspacePermissionService;
         this.secretCipher = secretCipher;
+        this.auditLogService = auditLogService;
+        this.resourceDeleteGuard = resourceDeleteGuard;
+        this.rateLimitService = rateLimitService;
     }
 
     public List<ToolVO> list() {
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
         return toolRepository.listByWorkspace(workspaceId()).stream().map(this::toVO).toList();
     }
 
     public ToolVO detail(Long id) {
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
         return toVO(requireTool(id));
     }
 
     @Transactional
     public ToolVO create(CreateToolRequest request) {
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_CREATE);
         Long userId = WorkspaceContext.require().userId();
         Tool tool = new Tool();
         tool.setWorkspaceId(workspaceId());
@@ -88,12 +103,18 @@ public class ToolApplicationService {
         tool.setCreatedBy(userId);
         toolRepository.save(tool);
         saveTypeConfig(tool.getId(), request.type(), request.httpConfig(), request.databaseConfig(), request.functionConfig());
+        auditLogService.recordSuccess(
+                AuditActions.TOOL_CREATE,
+                AuditResourceTypes.TOOL,
+                tool.getId(),
+                tool.getName(),
+                tool.getType());
         return toVO(tool);
     }
 
     @Transactional
     public ToolVO update(Long id, UpdateToolRequest request) {
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_UPDATE);
         Tool tool = requireTool(id);
         tool.setName(request.name().trim());
         tool.setDescription(trimToNull(request.description()));
@@ -115,19 +136,26 @@ public class ToolApplicationService {
 
     @Transactional
     public void delete(Long id) {
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_DELETE);
         Tool tool = requireTool(id);
-        int bindingCount = agentToolRepository.countByToolId(tool.getId());
-        if (bindingCount > 0) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST,
-                    "该工具已被 " + bindingCount + " 个智能体绑定，请先解除绑定后再删除");
-        }
+        resourceDeleteGuard.assertToolDeletable(tool);
         clearTypeConfigs(id);
         toolRepository.delete(id);
+        auditLogService.recordSuccess(
+                AuditActions.TOOL_DELETE,
+                AuditResourceTypes.TOOL,
+                id,
+                tool.getName(),
+                tool.getType());
     }
 
     public ToolTestResultVO test(Long id, ToolTestRequest request) {
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
+        rateLimitService.assertAllowed(
+                "tool-exec",
+                String.valueOf(workspaceId()),
+                30,
+                java.time.Duration.ofMinutes(1));
         Tool tool = requireTool(id);
         String sql = request == null ? null : request.sql();
         Map<String, Object> arguments = request == null ? Map.of() : request.arguments();

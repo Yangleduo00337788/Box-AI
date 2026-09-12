@@ -94,7 +94,7 @@ public class KnowledgeChunkIndexingService {
         }
     }
 
-    private ModelRuntimeConfig resolveEmbeddingConfig(KnowledgeBase knowledgeBase) {
+    public ModelRuntimeConfig resolveEmbeddingConfig(KnowledgeBase knowledgeBase) {
         Long modelId = knowledgeBase.getEmbeddingModelId();
         if (modelId == null) {
             modelId = platformModelApplicationService.findFirstRunnableModelId().orElse(null);
@@ -105,5 +105,19 @@ public class KnowledgeChunkIndexingService {
         ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(modelId);
         ModelRuntimeConfig chatConfig = resolved.runtimeConfig();
         return new ModelRuntimeConfig(chatConfig.baseUrl(), chatConfig.apiKey(), defaultEmbeddingModel);
+    }
+
+    public ModelRuntimeConfig resolveRerankConfig(KnowledgeBase knowledgeBase) {
+        Long modelId = knowledgeBase.getRerankModelId();
+        if (modelId == null) {
+            return null;
+        }
+        try {
+            ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(modelId);
+            return resolved.runtimeConfig();
+        } catch (Exception e) {
+            log.warn("Rerank model unavailable for knowledge base {}: {}", knowledgeBase.getId(), e.getMessage());
+            return null;
+        }
     }
 }

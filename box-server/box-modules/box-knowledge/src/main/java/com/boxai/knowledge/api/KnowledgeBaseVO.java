@@ -7,6 +7,8 @@ public record KnowledgeBaseVO(
         String name,
         String description,
         String icon,
+        Long embeddingModelId,
+        Long rerankModelId,
         Integer documentCount,
         Long chunkCount,
         String status,

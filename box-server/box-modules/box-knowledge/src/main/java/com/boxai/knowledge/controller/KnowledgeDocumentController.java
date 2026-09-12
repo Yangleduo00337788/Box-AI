@@ -7,6 +7,7 @@ import com.boxai.knowledge.application.KnowledgeDocumentApplicationService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,6 +31,11 @@ public class KnowledgeDocumentController {
     @GetMapping("/{id}/chunks")
     public Result<List<KnowledgeChunkVO>> listChunks(@PathVariable Long id) {
         return Result.success(knowledgeDocumentApplicationService.listChunks(id));
+    }
+
+    @PostMapping("/{id}/retry")
+    public Result<KnowledgeDocumentVO> retry(@PathVariable Long id) {
+        return Result.success(knowledgeDocumentApplicationService.retry(id));
     }
 
     @DeleteMapping("/{id}")

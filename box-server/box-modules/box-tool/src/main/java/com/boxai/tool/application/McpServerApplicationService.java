@@ -1,11 +1,13 @@
 package com.boxai.tool.application;
 
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.common.security.SsrfGuard;
 import com.boxai.domain.mcp.McpServer;
 import com.boxai.domain.mcp.McpServerRepository;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.notification.NotificationPublisher;
 import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.tool.api.CreateMcpServerRequest;
 import com.boxai.tool.api.McpServerVO;
@@ -23,28 +25,31 @@ public class McpServerApplicationService {
     private final McpServerRepository mcpServerRepository;
     private final WorkspacePermissionService workspacePermissionService;
     private final McpProtocolClient mcpProtocolClient;
+    private final NotificationPublisher notificationPublisher;
 
     public McpServerApplicationService(McpServerRepository mcpServerRepository,
                                        WorkspacePermissionService workspacePermissionService,
-                                       McpProtocolClient mcpProtocolClient) {
+                                       McpProtocolClient mcpProtocolClient,
+                                       NotificationPublisher notificationPublisher) {
         this.mcpServerRepository = mcpServerRepository;
         this.workspacePermissionService = workspacePermissionService;
         this.mcpProtocolClient = mcpProtocolClient;
+        this.notificationPublisher = notificationPublisher;
     }
 
     public List<McpServerVO> list() {
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
         return mcpServerRepository.listByWorkspace(workspaceId()).stream().map(this::toVO).toList();
     }
 
     public McpServerVO detail(Long id) {
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
         return toVO(requireServer(id));
     }
 
     @Transactional
     public McpServerVO create(CreateMcpServerRequest request) {
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_CREATE);
         Long userId = WorkspaceContext.require().userId();
         McpServer server = new McpServer();
         server.setWorkspaceId(workspaceId());
@@ -64,7 +69,7 @@ public class McpServerApplicationService {
 
     @Transactional
     public McpServerVO update(Long id, UpdateMcpServerRequest request) {
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_UPDATE);
         McpServer server = requireServer(id);
         server.setName(request.name().trim());
         server.setDescription(trimToNull(request.description()));
@@ -81,14 +86,14 @@ public class McpServerApplicationService {
 
     @Transactional
     public void delete(Long id) {
-        workspacePermissionService.requirePermission("tool:create");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_DELETE);
         requireServer(id);
         mcpServerRepository.delete(id);
     }
 
     @Transactional
     public McpServerVO sync(Long id) {
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
         McpServer server = requireServer(id);
         try {
             List<McpProtocolClient.McpToolDescriptor> tools = mcpProtocolClient.listTools(server);
@@ -97,9 +102,12 @@ public class McpServerApplicationService {
             mcpServerRepository.update(server);
             return toVO(server);
         } catch (BusinessException e) {
+            notifyMcpSyncFailed(server, e.getMessage());
             throw e;
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.EXECUTION_FAILED, "MCP 同步失败: " + e.getMessage());
+            String message = "MCP 同步失败: " + e.getMessage();
+            notifyMcpSyncFailed(server, message);
+            throw new BusinessException(ErrorCode.EXECUTION_FAILED, message);
         }
     }
 
@@ -126,6 +134,16 @@ public class McpServerApplicationService {
                 server.getLastSyncAt(),
                 server.getCreatedAt(),
                 server.getUpdatedAt());
+    }
+
+    private void notifyMcpSyncFailed(McpServer server, String message) {
+        notificationPublisher.publish(
+                WorkspaceContext.require().userId(),
+                server.getWorkspaceId(),
+                "MCP 同步失败",
+                "MCP Server「" + server.getName() + "」同步失败：" + message,
+                "MCP",
+                "/mcp");
     }
 
     private Long workspaceId() {

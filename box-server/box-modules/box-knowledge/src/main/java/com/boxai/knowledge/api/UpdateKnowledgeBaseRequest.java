@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 public record UpdateKnowledgeBaseRequest(
         @NotBlank @Size(max = 128) String name,
         @Size(max = 512) String description,
-        @Size(max = 512) String icon
+        @Size(max = 512) String icon,
+        Long embeddingModelId,
+        Long rerankModelId
 ) {
 }
