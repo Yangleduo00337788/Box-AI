@@ -20,7 +20,7 @@
         <section class="help-dialog__section">
           <h3 class="help-dialog__title">常用入口</h3>
           <div class="help-dialog__links">
-            <t-button variant="outline" @click="go('/agents')">管理智能体</t-button>
+            <t-button variant="outline" @click="go('/chat')">开始对话</t-button>
             <t-button variant="outline" @click="go('/models')">配置模型</t-button>
             <t-button variant="outline" @click="go('/settings/profile')">账号设置</t-button>
           </div>

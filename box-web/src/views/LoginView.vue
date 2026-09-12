@@ -41,7 +41,10 @@
       </t-form-item>
       <div class="form-options">
         <t-checkbox v-model="remember">记住账号</t-checkbox>
-        <router-link class="form-link" :to="registerLink">注册新账号</router-link>
+        <div class="form-links">
+          <router-link class="form-link" to="/forgot-password">忘记密码</router-link>
+          <router-link class="form-link" :to="registerLink">注册新账号</router-link>
+        </div>
       </div>
       <t-form-item>
         <t-button theme="primary" type="submit" block size="large" shape="round" :loading="loading">
@@ -172,6 +175,12 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+}
+
+.form-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .form-link {

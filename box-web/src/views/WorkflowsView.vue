@@ -1,6 +1,11 @@
 <template>
   <div>
-    <page-header title="工作流" desc="可视化编排 Agent 工作流，支持调试与发布">
+    <page-header
+      title="工作流"
+      desc="可视化编排 Agent 工作流，支持调试与发布"
+      :back-to="backTo"
+      :back-label="backLabel"
+    >
       <template #actions>
         <t-button theme="primary" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
@@ -20,7 +25,7 @@
           <div class="card__meta">v{{ item.draftVersionNo ?? 1 }}</div>
         </article>
       </div>
-      <t-empty v-else description="还没有工作流" />
+      <resource-manage-empty v-else category="workflows" @create="openCreate" />
     </t-loading>
 
     <t-dialog v-model:visible="dialogVisible" header="新建工作流" :footer="false" width="480px">
@@ -37,7 +42,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
+import { useResourceManageBack } from '@/composables/useResourceManageBack'
 import { createWorkflow, listWorkflows, type WorkflowVO } from '@/api/workflow'
+
+const { backTo, backLabel } = useResourceManageBack('workflows')
 
 const router = useRouter()
 const loading = ref(false)

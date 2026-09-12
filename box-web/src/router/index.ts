@@ -15,6 +15,16 @@ const router = createRouter({
       meta: { public: true, title: '注册' },
     },
     {
+      path: '/forgot-password',
+      component: () => import('@/views/ForgotPasswordView.vue'),
+      meta: { public: true, title: '忘记密码' },
+    },
+    {
+      path: '/embed/agents/:id',
+      component: () => import('@/views/EmbedAgentView.vue'),
+      meta: { public: true, title: '智能体对话' },
+    },
+    {
       path: '/',
       component: () => import('@/layouts/AppLayout.vue'),
       children: [
@@ -36,7 +46,7 @@ const router = createRouter({
           component: () => import('@/views/ChatView.vue'),
           meta: { title: '新任务' },
         },
-        { path: 'agents', component: () => import('@/views/AgentsView.vue'), meta: { title: '智能体' } },
+        { path: 'agents', redirect: '/chat' },
         { path: 'agents/:id/builder', name: 'agent-builder', component: () => import('@/views/AgentBuilderView.vue'), meta: { title: 'Agent Builder' } },
         { path: 'workflows', component: () => import('@/views/WorkflowsView.vue'), meta: { title: '工作流' } },
         {
@@ -54,6 +64,7 @@ const router = createRouter({
         { path: 'market', component: () => import('@/views/MarketView.vue'), meta: { title: '市场' } },
         { path: 'analytics', component: () => import('@/views/AnalyticsView.vue'), meta: { title: '分析' } },
         { path: 'executions', component: () => import('@/views/ExecutionsView.vue'), meta: { title: '执行记录' } },
+        { path: 'debug', component: () => import('@/views/DebugConsoleView.vue'), meta: { title: 'Debug Console' } },
         {
           path: 'settings',
           component: () => import('@/layouts/SettingsLayout.vue'),
@@ -64,7 +75,9 @@ const router = createRouter({
             { path: 'general', component: () => import('@/views/settings/SettingsGeneralView.vue'), meta: { title: '通用设置' } },
             { path: 'security', component: () => import('@/views/settings/SettingsSecurityView.vue'), meta: { title: '账号与安全' } },
             { path: 'api-keys', component: () => import('@/views/settings/SettingsApiKeysView.vue'), meta: { title: 'API 密钥' } },
+            { path: 'roles', component: () => import('@/views/settings/SettingsRolesView.vue'), meta: { title: '角色与权限' } },
             { path: 'quota', component: () => import('@/views/settings/SettingsQuotaView.vue'), meta: { title: '额度管理' } },
+            { path: 'billing', component: () => import('@/views/settings/SettingsBillingView.vue'), meta: { title: '账单概览' } },
             { path: 'capacity', component: () => import('@/views/settings/SettingsCapacityView.vue'), meta: { title: '容量管理' } },
             { path: 'about', component: () => import('@/views/settings/SettingsAboutView.vue'), meta: { title: '关于盒子' } },
             { path: 'legal', component: () => import('@/views/settings/SettingsLegalView.vue'), meta: { title: '隐私与协议' } },

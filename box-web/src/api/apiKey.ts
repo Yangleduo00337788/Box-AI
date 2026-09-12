@@ -35,3 +35,7 @@ export function disableApiKey(id: number) {
 export function enableApiKey(id: number) {
   return http.post<Result<ApiKeyVO>>(`/api-keys/${id}/enable`)
 }
+
+export function rotateApiKey(id: number) {
+  return http.post<Result<CreateApiKeyResponse>>(`/api-keys/${id}/rotate`)
+}

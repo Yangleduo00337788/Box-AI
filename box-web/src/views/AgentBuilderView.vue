@@ -2,7 +2,7 @@
   <div class="builder">
     <header class="builder-header">
       <div class="builder-header__left">
-        <t-button variant="text" shape="square" @click="router.push('/agents')">
+        <t-button variant="text" shape="square" @click="router.push('/chat')">
           <template #icon><t-icon name="chevron-left" /></template>
         </t-button>
         <div class="builder-header__meta">
@@ -12,8 +12,12 @@
         <t-tag v-if="agent" :theme="agent.status === 'PUBLISHED' ? 'success' : 'default'" variant="light" size="small">
           {{ statusLabel(agent.status) }}
         </t-tag>
+        <t-tag v-if="agent" variant="outline" size="small">v{{ agent.draftVersion ?? 1 }} Draft</t-tag>
       </div>
-      <t-tag v-if="displayModelName" variant="outline" size="small">{{ displayModelName }}</t-tag>
+      <t-space>
+        <t-button variant="outline" size="small" @click="openVersions">版本</t-button>
+        <t-tag v-if="displayModelName" variant="outline" size="small">{{ displayModelName }}</t-tag>
+      </t-space>
     </header>
 
     <t-loading :loading="loading" size="small" class="builder-body">
@@ -58,10 +62,10 @@
             <p class="config-panel__desc">定义智能体的系统提示词与角色设定</p>
             <t-form label-align="top">
               <t-form-item label="System Prompt">
-                <t-textarea
+                <MonacoEditor
                   v-model="promptForm.systemPrompt"
-                  placeholder="例如：你是一位专业的助手，擅长…"
-                  :autosize="{ minRows: 12, maxRows: 24 }"
+                  language="markdown"
+                  height="420px"
                 />
               </t-form-item>
               <t-form-item>
@@ -132,7 +136,7 @@
 
           <div v-else-if="activeTab === 'memory'" class="config-panel">
             <h2 class="config-panel__title">记忆</h2>
-            <p class="config-panel__desc">控制对话是否携带历史消息（会话记忆窗口）</p>
+            <p class="config-panel__desc">会话记忆控制当前对话上下文；长期记忆跨会话保存用户信息并在后续对话中检索引用。</p>
             <t-form label-align="top">
               <t-form-item label="启用会话记忆">
                 <t-switch v-model="memoryForm.memoryEnabled" />
@@ -146,10 +150,28 @@
                   theme="column"
                 />
               </t-form-item>
+              <t-form-item label="启用长期记忆">
+                <t-switch v-model="memoryForm.longTermMemoryEnabled" />
+              </t-form-item>
               <t-form-item>
                 <t-button theme="primary" :loading="savingMemory" @click="saveMemory">保存记忆配置</t-button>
               </t-form-item>
             </t-form>
+            <template v-if="memoryForm.longTermMemoryEnabled">
+              <h3 class="config-subtitle">已保存的长期记忆</h3>
+              <t-table
+                row-key="id"
+                :data="longTermMemories"
+                :columns="longTermMemoryColumns"
+                size="small"
+                :loading="loadingLongTermMemories"
+                style="margin-top: 12px"
+              >
+                <template #op="{ row }">
+                  <t-button variant="text" theme="danger" @click="removeLongTermMemory(row.id)">删除</t-button>
+                </template>
+              </t-table>
+            </template>
           </div>
 
           <div v-else-if="activeTab === 'tools'" class="config-panel">
@@ -188,6 +210,61 @@
                 <t-button variant="text" theme="danger" @click="unbindMcp(row.mcpServerId)">解除</t-button>
               </template>
             </t-table>
+
+            <h3 class="config-subtitle">子智能体</h3>
+            <p class="config-panel__desc">绑定其他 Agent 后，主 Agent 可通过 Tool Calling 委派子任务</p>
+            <t-select
+              v-model="selectedSubAgentId"
+              :options="subAgentOptions"
+              placeholder="选择要绑定的子智能体"
+              clearable
+              style="margin-bottom: 12px"
+            />
+            <t-button theme="primary" :loading="bindingSubAgent" @click="bindSubAgent">绑定子智能体</t-button>
+            <t-table row-key="id" :data="subAgentBindings" :columns="subAgentColumns" size="small" style="margin-top: 16px">
+              <template #op="{ row }">
+                <t-button variant="text" theme="danger" @click="unbindSubAgent(row.subAgentId)">解除</t-button>
+              </template>
+            </t-table>
+          </div>
+
+          <div v-else-if="activeTab === 'variables'" class="config-panel">
+            <h2 class="config-panel__title">变量</h2>
+            <p class="config-panel__desc">定义可在 Prompt 中引用的自定义变量（JSON 数组）</p>
+            <t-textarea
+              v-model="configForm.variablesJson"
+              :autosize="{ minRows: 10, maxRows: 20 }"
+              placeholder='[{"name":"user_name","type":"string","defaultValue":"","description":""}]'
+            />
+            <t-button theme="primary" :loading="savingConfig" style="margin-top: 12px" @click="saveConfig">
+              保存变量
+            </t-button>
+          </div>
+
+          <div v-else-if="activeTab === 'advanced'" class="config-panel">
+            <h2 class="config-panel__title">高级</h2>
+            <p class="config-panel__desc">运行时限制与高级参数</p>
+            <t-form label-align="top">
+              <t-form-item label="最大 Tool 调用次数">
+                <t-input-number v-model="configForm.maxToolCalls" :min="0" :max="50" theme="column" />
+              </t-form-item>
+              <t-form-item label="最大执行时间 (ms)">
+                <t-input-number v-model="configForm.maxExecutionTimeMs" :min="1000" :max="600000" theme="column" />
+              </t-form-item>
+              <t-form-item>
+                <t-button theme="primary" :loading="savingConfig" @click="saveConfig">保存高级配置</t-button>
+              </t-form-item>
+            </t-form>
+          </div>
+
+          <div v-else-if="activeTab === 'debug'" class="config-panel">
+            <h2 class="config-panel__title">调试</h2>
+            <p class="config-panel__desc">使用右侧预览面板进行 SSE 对话测试；完整执行记录可在执行记录页查看 Trace。</p>
+            <t-space>
+              <t-button variant="outline" @click="router.push('/debug')">打开 Debug Console</t-button>
+              <t-button variant="outline" @click="router.push('/executions')">查看执行记录</t-button>
+              <t-button variant="outline" @click="activeTab = 'overview'">返回概览</t-button>
+            </t-space>
           </div>
 
           <div v-else-if="activeTab === 'publish'" class="config-panel">
@@ -204,16 +281,41 @@
             </t-space>
 
             <section v-if="agent.status === 'PUBLISHED'" class="publish-api">
-              <h3 class="config-subtitle">开放 API</h3>
+              <h3 class="config-subtitle">集成方式</h3>
               <t-alert
                 theme="info"
-                message="在「设置 → API 密钥」创建密钥后，使用 Bearer Token 调用下方接口。"
+                message="在「设置 → API 密钥」创建密钥后，使用 Bearer Token 调用开放 API，或嵌入 Web Chat。"
               />
-              <div class="api-snippet">
-                <p><strong>POST</strong> <code>/api/v1/published/agents/{{ agentId }}/chat</code></p>
-                <pre>{{ publishApiExample }}</pre>
-              </div>
-              <t-button variant="outline" @click="router.push('/settings/api-keys')">管理 API 密钥</t-button>
+              <t-tabs v-model="publishTab" class="publish-tabs">
+                <t-tab-panel value="api" label="API">
+                  <div class="api-snippet">
+                    <p><strong>POST</strong> <code>{{ publishEndpoint }}</code></p>
+                    <pre>{{ publishApiExample }}</pre>
+                  </div>
+                </t-tab-panel>
+                <t-tab-panel value="embed" label="Embed">
+                  <div class="api-snippet">
+                    <p>Web Chat URL</p>
+                    <pre>{{ publishChatUrl }}</pre>
+                    <p style="margin-top: 12px">Embed Code</p>
+                    <pre>{{ publishEmbedCode }}</pre>
+                  </div>
+                </t-tab-panel>
+                <t-tab-panel value="sdk" label="SDK">
+                  <t-radio-group v-model="sdkLang" variant="default-filled" size="small" style="margin-bottom: 12px">
+                    <t-radio-button value="javascript">JavaScript</t-radio-button>
+                    <t-radio-button value="python">Python</t-radio-button>
+                    <t-radio-button value="curl">cURL</t-radio-button>
+                  </t-radio-group>
+                  <div class="api-snippet">
+                    <pre>{{ publishSdkExample }}</pre>
+                  </div>
+                </t-tab-panel>
+              </t-tabs>
+              <t-space style="margin-top: 12px">
+                <t-button variant="outline" @click="router.push('/settings/api-keys')">管理 API 密钥</t-button>
+                <t-button variant="outline" @click="copyPublishSnippet">复制当前示例</t-button>
+              </t-space>
             </section>
           </div>
         </section>
@@ -243,6 +345,12 @@
               >
                 {{ item.content || (chatting && item.role === 'assistant' ? '思考中…' : '') }}
               </div>
+              <div v-if="item.citations?.length" class="preview-citations">
+                <span class="preview-citations__label">引用</span>
+                <div v-for="cite in item.citations" :key="cite.index" class="preview-citation">
+                  [{{ cite.index }}] {{ cite.documentName }}
+                </div>
+              </div>
             </div>
           </div>
           <div class="preview-input">
@@ -253,46 +361,142 @@
               :disabled="chatting"
               @keydown="onChatKeydown"
             />
-            <t-button theme="primary" :loading="chatting" :disabled="chatting || !chatInput.trim()" @click="sendChat">
+            <t-button v-if="chatting" variant="outline" @click="stopChat">停止</t-button>
+            <t-button
+              v-else
+              theme="primary"
+              :disabled="!chatInput.trim()"
+              @click="sendChat"
+            >
               发送
             </t-button>
           </div>
         </aside>
       </div>
     </t-loading>
+
+    <t-drawer v-model:visible="versionsVisible" header="版本历史" size="520px">
+      <t-space style="margin-bottom: 16px">
+        <t-button theme="primary" size="small" :loading="versionLoading" @click="createVersionSnapshot">
+          创建版本快照
+        </t-button>
+        <t-button variant="outline" size="small" :disabled="!compareBaseId || !compareTargetId" @click="runCompare">
+          对比选中版本
+        </t-button>
+      </t-space>
+      <t-table
+        row-key="id"
+        :data="versions"
+        :columns="versionColumns"
+        :loading="versionLoading"
+        bordered
+        stripe
+        size="small"
+      >
+        <template #select="{ row }">
+          <t-checkbox
+            :checked="compareBaseId === row.id"
+            @change="(checked: boolean) => { compareBaseId = checked ? row.id : undefined }"
+          />
+          <t-checkbox
+            :checked="compareTargetId === row.id"
+            style="margin-left: 8px"
+            @change="(checked: boolean) => { compareTargetId = checked ? row.id : undefined }"
+          />
+        </template>
+        <template #status="{ row }">
+          <t-tag size="small" variant="light">{{ versionStatusLabel(row) }}</t-tag>
+        </template>
+        <template #op="{ row }">
+          <t-space>
+            <t-button
+              v-if="!row.currentDraft"
+              variant="text"
+              size="small"
+              @click="restoreVersion(row.id)"
+            >
+              恢复
+            </t-button>
+            <t-button
+              v-if="!row.currentDraft && !row.published && row.status !== 'ARCHIVED'"
+              variant="text"
+              theme="warning"
+              size="small"
+              @click="archiveVersion(row.id)"
+            >
+              归档
+            </t-button>
+          </t-space>
+        </template>
+      </t-table>
+    </t-drawer>
+
+    <t-dialog v-model:visible="compareVisible" header="版本对比" width="720px" :footer="false">
+      <t-table
+        row-key="field"
+        :data="compareResult"
+        :columns="compareColumns"
+        bordered
+        stripe
+        size="small"
+      >
+        <template #changed="{ row }">
+          <t-tag :theme="row.changed ? 'warning' : 'success'" size="small" variant="light">
+            {{ row.changed ? '已变更' : '相同' }}
+          </t-tag>
+        </template>
+      </t-table>
+    </t-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { MessagePlugin } from 'tdesign-vue-next'
-import type { FormProps } from 'tdesign-vue-next'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
+import type { FormProps, PrimaryTableCol } from 'tdesign-vue-next'
+import MonacoEditor from '@/components/MonacoEditor.vue'
 import { extractApiError } from '@/api/apiError'
 import {
+  archiveAgentVersion,
   bindAgentKnowledge,
   bindAgentMcp,
+  bindAgentSubAgent,
   bindAgentTool,
   chatAgent,
   chatAgentStream,
+  compareAgentVersions,
+  createAgentVersion,
   getAgent,
   getAgentPublishStatus,
   listAgentKnowledge,
   listAgentMcp,
+  listAgentLongTermMemories,
+  listAgentSubAgents,
   listAgentTools,
+  listAgentVersions,
+  listAgents,
+  deleteAgentLongTermMemory,
   publishAgent,
+  restoreAgentVersion,
   unbindAgentKnowledge,
   unbindAgentMcp,
+  unbindAgentSubAgent,
   unbindAgentTool,
   unpublishAgent,
   updateAgent,
+  updateAgentConfig,
   updateAgentMemory,
   updateAgentModel,
   updateAgentPrompt,
   type AgentKnowledgeBindingVO,
+  type AgentLongTermMemoryVO,
   type AgentMcpBindingVO,
   type AgentPublishVO,
+  type AgentSubAgentBindingVO,
   type AgentToolBindingVO,
+  type AgentVersionDiffVO,
+  type AgentVersionVO,
   type AgentVO,
 } from '@/api/agent'
 import { listKnowledgeBases, type KnowledgeBaseVO } from '@/api/knowledge'
@@ -309,6 +513,7 @@ import type { ModelSource } from '@/api/agent'
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  citations?: Array<{ index: number; documentName: string; content: string }>
 }
 
 const route = useRoute()
@@ -337,6 +542,9 @@ const navItems = [
   { value: 'memory', label: '记忆', icon: 'time' },
   { value: 'knowledge', label: '知识库', icon: 'book' },
   { value: 'tools', label: '工具', icon: 'tools' },
+  { value: 'variables', label: '变量', icon: 'data' },
+  { value: 'advanced', label: '高级', icon: 'setting' },
+  { value: 'debug', label: '调试', icon: 'bug' },
   { value: 'publish', label: '发布', icon: 'upload' },
 ]
 
@@ -346,15 +554,46 @@ const mcpServers = ref<McpServerVO[]>([])
 const knowledgeBindings = ref<AgentKnowledgeBindingVO[]>([])
 const toolBindings = ref<AgentToolBindingVO[]>([])
 const mcpBindings = ref<AgentMcpBindingVO[]>([])
+const subAgentBindings = ref<AgentSubAgentBindingVO[]>([])
+const allAgents = ref<AgentVO[]>([])
 const publishInfo = ref<AgentPublishVO | null>(null)
 const selectedKnowledgeId = ref<number | undefined>()
 const selectedToolId = ref<number | undefined>()
 const selectedMcpId = ref<number | undefined>()
+const selectedSubAgentId = ref<number | undefined>()
 const bindingKnowledge = ref(false)
 const bindingTool = ref(false)
 const bindingMcp = ref(false)
+const bindingSubAgent = ref(false)
 const savingMemory = ref(false)
+const savingConfig = ref(false)
 const publishing = ref(false)
+const publishTab = ref<'api' | 'embed' | 'sdk'>('api')
+const sdkLang = ref<'javascript' | 'python' | 'curl'>('javascript')
+const versionsVisible = ref(false)
+const versionLoading = ref(false)
+const versions = ref<AgentVersionVO[]>([])
+const compareBaseId = ref<number | undefined>()
+const compareTargetId = ref<number | undefined>()
+const compareVisible = ref(false)
+const compareResult = ref<AgentVersionDiffVO[]>([])
+let streamAbortController: AbortController | null = null
+const stoppedByUser = ref(false)
+
+const versionColumns: PrimaryTableCol<AgentVersionVO>[] = [
+  { colKey: 'select', title: '对比', width: 90 },
+  { colKey: 'versionName', title: '版本', width: 80 },
+  { colKey: 'status', title: '状态', width: 100 },
+  { colKey: 'updatedAt', title: '更新时间', width: 160 },
+  { colKey: 'op', title: '操作', width: 140 },
+]
+
+const compareColumns: PrimaryTableCol<AgentVersionDiffVO>[] = [
+  { colKey: 'label', title: '字段', width: 140 },
+  { colKey: 'baseValue', title: '基准版本', ellipsis: true },
+  { colKey: 'targetValue', title: '目标版本', ellipsis: true },
+  { colKey: 'changed', title: '差异', width: 90 },
+]
 
 const knowledgeOptions = computed(() =>
   knowledgeBases.value.map((item) => ({ label: item.name, value: item.id })),
@@ -363,13 +602,64 @@ const toolOptions = computed(() => tools.value.map((item) => ({ label: `${item.n
 const mcpOptions = computed(() =>
   mcpServers.value.map((item) => ({ label: `${item.name} (${item.serverKey})`, value: item.id })),
 )
+const subAgentOptions = computed(() =>
+  allAgents.value
+    .filter((item) => item.id !== agentId.value)
+    .filter((item) => !subAgentBindings.value.some((binding) => binding.subAgentId === item.id))
+    .map((item) => ({ label: item.name, value: item.id })),
+)
+const publishEndpoint = computed(() => `/api/v1/published/agents/${agentId.value}/chat`)
+const publishChatUrl = computed(() => {
+  const title = encodeURIComponent(agent.value?.name || 'Box Agent')
+  return `${window.location.origin}/embed/agents/${agentId.value}?apiKey=YOUR_API_KEY&title=${title}`
+})
+const publishEmbedCode = computed(
+  () => `<iframe
+  src="${publishChatUrl.value}"
+  width="100%"
+  height="600"
+  frameborder="0"
+  allow="clipboard-write"
+></iframe>`,
+)
 const publishApiExample = computed(
   () => `curl -X POST \\
   -H "Authorization: Bearer ax_live_你的密钥" \\
   -H "Content-Type: application/json" \\
   -d '{"message":"你好","stream":false}' \\
-  /api/v1/published/agents/${agentId.value}/chat`,
+  ${publishEndpoint.value}`,
 )
+const publishJsExample = computed(
+  () => `const response = await fetch('${publishEndpoint.value}', {
+  method: 'POST',
+  headers: {
+    Authorization: 'Bearer ax_live_你的密钥',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ message: '你好', stream: false }),
+});
+const result = await response.json();
+console.log(result.data.content);`,
+)
+const publishPythonExample = computed(
+  () => `import requests
+
+response = requests.post(
+    '${publishEndpoint.value}',
+    headers={'Authorization': 'Bearer ax_live_你的密钥'},
+    json={'message': '你好', 'stream': False},
+)
+print(response.json()['data']['content'])`,
+)
+const publishSdkExample = computed(() => {
+  if (sdkLang.value === 'python') {
+    return publishPythonExample.value
+  }
+  if (sdkLang.value === 'curl') {
+    return publishApiExample.value
+  }
+  return publishJsExample.value
+})
 const knowledgeColumns = [
   { colKey: 'knowledgeBaseId', title: '知识库 ID' },
   { colKey: 'topK', title: 'Top K', width: 80 },
@@ -384,6 +674,12 @@ const mcpColumns = [
   { colKey: 'mcpServerName', title: 'MCP Server' },
   { colKey: 'serverKey', title: 'Key', width: 120 },
   { colKey: 'tools', title: '工具数', width: 80 },
+  { colKey: 'op', title: '操作', width: 100 },
+]
+const subAgentColumns = [
+  { colKey: 'subAgentName', title: '子智能体' },
+  { colKey: 'subAgentId', title: 'ID', width: 80 },
+  { colKey: 'enabled', title: '启用', width: 80 },
   { colKey: 'op', title: '操作', width: 100 },
 ]
 
@@ -401,7 +697,25 @@ const modelForm = reactive({
 const memoryForm = reactive({
   memoryEnabled: true,
   memoryWindowSize: 20,
+  longTermMemoryEnabled: false,
 })
+const longTermMemories = ref<AgentLongTermMemoryVO[]>([])
+const loadingLongTermMemories = ref(false)
+const longTermMemoryColumns: PrimaryTableCol<AgentLongTermMemoryVO>[] = [
+  { colKey: 'content', title: '记忆内容', ellipsis: true },
+  { colKey: 'createdAt', title: '创建时间', width: 180 },
+  { colKey: 'op', title: '操作', width: 80 },
+]
+const configForm = reactive({
+  variablesJson: '[]',
+  maxToolCalls: 10,
+  maxExecutionTimeMs: 120000,
+})
+
+interface AgentConfigPayload {
+  variables?: unknown[]
+  advanced?: { maxToolCalls?: number; maxExecutionTimeMs?: number }
+}
 
 const overviewRules: FormProps['rules'] = {
   name: [{ required: true, message: '请输入名称' }],
@@ -444,6 +758,87 @@ function statusLabel(status: string) {
   return '草稿'
 }
 
+function versionStatusLabel(row: AgentVersionVO) {
+  if (row.currentDraft) return '当前草稿'
+  if (row.published) return '已发布'
+  if (row.status === 'ARCHIVED') return '已归档'
+  return row.status
+}
+
+async function loadVersions() {
+  versionLoading.value = true
+  try {
+    const { data } = await listAgentVersions(agentId.value)
+    versions.value = data.data || []
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '加载版本失败'))
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+async function openVersions() {
+  versionsVisible.value = true
+  compareBaseId.value = undefined
+  compareTargetId.value = undefined
+  await loadVersions()
+}
+
+async function createVersionSnapshot() {
+  versionLoading.value = true
+  try {
+    await createAgentVersion(agentId.value)
+    MessagePlugin.success('版本快照已创建')
+    await loadVersions()
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '创建版本失败'))
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+async function runCompare() {
+  if (!compareBaseId.value || !compareTargetId.value) return
+  try {
+    const { data } = await compareAgentVersions(agentId.value, compareBaseId.value, compareTargetId.value)
+    compareResult.value = data.data?.diffs || []
+    compareVisible.value = true
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '对比失败'))
+  }
+}
+
+function restoreVersion(versionId: number) {
+  const dialog = DialogPlugin.confirm({
+    header: '恢复版本',
+    body: '将把选中版本覆盖当前草稿，是否继续？',
+    onConfirm: async () => {
+      try {
+        await restoreAgentVersion(agentId.value, versionId)
+        MessagePlugin.success('版本已恢复')
+        versionsVisible.value = false
+        await loadAgent()
+        dialog.destroy()
+      } catch (error) {
+        MessagePlugin.error(extractApiError(error, '恢复失败'))
+      }
+    },
+  })
+}
+
+async function archiveVersion(versionId: number) {
+  versionLoading.value = true
+  try {
+    await archiveAgentVersion(agentId.value, versionId)
+    MessagePlugin.success('版本已归档')
+    await loadVersions()
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '归档失败'))
+  } finally {
+    versionLoading.value = false
+  }
+}
+
 function applyAgent(data: AgentVO) {
   agent.value = data
   overviewForm.name = data.name
@@ -458,6 +853,79 @@ function applyAgent(data: AgentVO) {
   modelForm.streamEnabled = data.streamEnabled ?? true
   memoryForm.memoryEnabled = data.memoryEnabled ?? true
   memoryForm.memoryWindowSize = data.memoryWindowSize ?? 20
+  memoryForm.longTermMemoryEnabled = data.longTermMemoryEnabled ?? false
+  applyConfigJson(data.configJson)
+  if (memoryForm.longTermMemoryEnabled) {
+    loadLongTermMemories()
+  } else {
+    longTermMemories.value = []
+  }
+}
+
+function applyConfigJson(raw?: string) {
+  if (!raw) {
+    configForm.variablesJson = '[]'
+    configForm.maxToolCalls = 10
+    configForm.maxExecutionTimeMs = 120000
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw) as AgentConfigPayload
+    configForm.variablesJson = JSON.stringify(parsed.variables || [], null, 2)
+    configForm.maxToolCalls = parsed.advanced?.maxToolCalls ?? 10
+    configForm.maxExecutionTimeMs = parsed.advanced?.maxExecutionTimeMs ?? 120000
+  } catch {
+    configForm.variablesJson = '[]'
+  }
+}
+
+function buildConfigJson() {
+  let variables: unknown[] = []
+  try {
+    variables = JSON.parse(configForm.variablesJson || '[]')
+    if (!Array.isArray(variables)) {
+      throw new Error('variables must be array')
+    }
+  } catch {
+    throw new Error('变量 JSON 格式无效，请使用数组格式')
+  }
+  return JSON.stringify({
+    variables,
+    advanced: {
+      maxToolCalls: configForm.maxToolCalls,
+      maxExecutionTimeMs: configForm.maxExecutionTimeMs,
+    },
+  })
+}
+
+async function saveConfig() {
+  savingConfig.value = true
+  try {
+    const configJson = buildConfigJson()
+    const { data } = await updateAgentConfig(agentId.value, { configJson })
+    if (data.data) applyAgent(data.data)
+    MessagePlugin.success('配置已保存')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '保存失败'))
+  } finally {
+    savingConfig.value = false
+  }
+}
+
+function stopChat() {
+  stoppedByUser.value = true
+  streamAbortController?.abort()
+}
+
+function beginStream() {
+  stoppedByUser.value = false
+  streamAbortController?.abort()
+  streamAbortController = new AbortController()
+  return streamAbortController
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 function parseMcpToolCount(catalog?: string) {
@@ -481,9 +949,11 @@ async function loadAgent() {
       { data: kbRes },
       { data: toolRes },
       { data: mcpRes },
+      { data: agentsRes },
       { data: bindKbRes },
       { data: bindToolRes },
       { data: bindMcpRes },
+      { data: bindSubAgentRes },
       { data: publishRes },
     ] = await Promise.all([
       getAgent(agentId.value),
@@ -493,9 +963,11 @@ async function loadAgent() {
       listKnowledgeBases(),
       listTools(),
       listMcpServers(),
+      listAgents(),
       listAgentKnowledge(agentId.value),
       listAgentTools(agentId.value),
       listAgentMcp(agentId.value),
+      listAgentSubAgents(agentId.value),
       getAgentPublishStatus(agentId.value),
     ])
     models.value = modelRes.data || []
@@ -504,9 +976,11 @@ async function loadAgent() {
     knowledgeBases.value = kbRes.data || []
     tools.value = toolRes.data || []
     mcpServers.value = mcpRes.data || []
+    allAgents.value = agentsRes.data || []
     knowledgeBindings.value = bindKbRes.data || []
     toolBindings.value = bindToolRes.data || []
     mcpBindings.value = bindMcpRes.data || []
+    subAgentBindings.value = bindSubAgentRes.data || []
     publishInfo.value = publishRes.data || null
     if (agentRes.data) {
       applyAgent(agentRes.data)
@@ -570,17 +1044,77 @@ async function unbindMcp(mcpServerId: number) {
   mcpBindings.value = mcpBindings.value.filter((item) => item.mcpServerId !== mcpServerId)
 }
 
+async function bindSubAgent() {
+  if (!selectedSubAgentId.value) return
+  bindingSubAgent.value = true
+  try {
+    await bindAgentSubAgent(agentId.value, { subAgentId: selectedSubAgentId.value, enabled: true })
+    const { data } = await listAgentSubAgents(agentId.value)
+    subAgentBindings.value = data.data || []
+    selectedSubAgentId.value = undefined
+    MessagePlugin.success('子智能体已绑定')
+  } finally {
+    bindingSubAgent.value = false
+  }
+}
+
+async function unbindSubAgent(subAgentId: number) {
+  await unbindAgentSubAgent(agentId.value, subAgentId)
+  subAgentBindings.value = subAgentBindings.value.filter((item) => item.subAgentId !== subAgentId)
+}
+
+async function loadLongTermMemories() {
+  if (!memoryForm.longTermMemoryEnabled) {
+    longTermMemories.value = []
+    return
+  }
+  loadingLongTermMemories.value = true
+  try {
+    const { data } = await listAgentLongTermMemories(agentId.value)
+    longTermMemories.value = data.data || []
+  } finally {
+    loadingLongTermMemories.value = false
+  }
+}
+
 async function saveMemory() {
   savingMemory.value = true
   try {
     const { data } = await updateAgentMemory(agentId.value, {
       memoryEnabled: memoryForm.memoryEnabled,
       memoryWindowSize: memoryForm.memoryWindowSize,
+      longTermMemoryEnabled: memoryForm.longTermMemoryEnabled,
     })
     if (data.data) applyAgent(data.data)
+    if (memoryForm.longTermMemoryEnabled) {
+      await loadLongTermMemories()
+    } else {
+      longTermMemories.value = []
+    }
     MessagePlugin.success('记忆配置已保存')
   } finally {
     savingMemory.value = false
+  }
+}
+
+async function removeLongTermMemory(memoryId: number) {
+  await deleteAgentLongTermMemory(agentId.value, memoryId)
+  longTermMemories.value = longTermMemories.value.filter((item) => item.id !== memoryId)
+  MessagePlugin.success('记忆已删除')
+}
+
+async function copyPublishSnippet() {
+  const text =
+    publishTab.value === 'embed'
+      ? publishEmbedCode.value
+      : publishTab.value === 'sdk'
+        ? publishSdkExample.value
+        : publishApiExample.value
+  try {
+    await navigator.clipboard.writeText(text)
+    MessagePlugin.success('已复制到剪贴板')
+  } catch {
+    MessagePlugin.warning('复制失败，请手动复制')
   }
 }
 
@@ -675,14 +1209,25 @@ async function scrollChatToBottom() {
   }
 }
 
+function buildServerHistory() {
+  return messages.value
+    .filter((item) => item.content?.trim())
+    .map((item) => ({
+      role: item.role === 'user' ? 'USER' as const : 'ASSISTANT' as const,
+      content: item.content,
+    }))
+}
+
 async function sendChat() {
   const text = chatInput.value.trim()
   if (!text || chatting.value) return
+  const history = buildServerHistory()
   messages.value.push({ role: 'user', content: text })
   chatInput.value = ''
   await scrollChatToBottom()
   chatting.value = true
   const useStream = modelForm.streamEnabled !== false
+  const controller = beginStream()
   let assistantIndex = -1
   try {
     if (useStream) {
@@ -692,22 +1237,49 @@ async function sendChat() {
       await chatAgentStream(agentId.value, text, (delta) => {
         messages.value[assistantIndex].content += delta
         scrollChatToBottom()
+      }, history, {
+        signal: controller.signal,
+        onCitations: (citations) => {
+          messages.value[assistantIndex].citations = citations.map((item) => ({
+            index: item.index,
+            documentName: item.documentName,
+            content: item.content,
+          }))
+        },
       })
-      if (!messages.value[assistantIndex].content) {
+      if (stoppedByUser.value && !messages.value[assistantIndex].content) {
+        messages.value[assistantIndex].content = '（已停止生成）'
+      } else if (!messages.value[assistantIndex].content) {
         messages.value[assistantIndex].content = '（无回复）'
       }
     } else {
-      const { data } = await chatAgent(agentId.value, text)
-      messages.value.push({ role: 'assistant', content: data.data?.content || '（无回复）' })
+      const { data } = await chatAgent(agentId.value, text, history)
+      const citations = data.data?.citations?.map((item) => ({
+        index: item.index,
+        documentName: item.documentName,
+        content: item.content,
+      }))
+      messages.value.push({
+        role: 'assistant',
+        content: data.data?.content || '（无回复）',
+        citations,
+      })
       await scrollChatToBottom()
     }
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '对话失败'))
-    if (useStream && assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
-      messages.value.splice(assistantIndex, 1)
+    if (isAbortError(error)) {
+      if (useStream && assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+        messages.value[assistantIndex].content = '（已停止生成）'
+      }
+    } else {
+      MessagePlugin.error(extractApiError(error, '对话失败'))
+      if (useStream && assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+        messages.value.splice(assistantIndex, 1)
+      }
     }
   } finally {
     chatting.value = false
+    streamAbortController = null
   }
 }
 
@@ -726,6 +1298,12 @@ watch(
     }
   },
 )
+
+watch(activeTab, (tab) => {
+  if (tab === 'memory' && memoryForm.longTermMemoryEnabled) {
+    loadLongTermMemories()
+  }
+})
 
 onMounted(loadAgent)
 </script>
@@ -862,6 +1440,10 @@ onMounted(loadAgent)
   margin-top: 24px;
 }
 
+.publish-tabs {
+  margin-top: 12px;
+}
+
 .api-snippet {
   margin: 12px 0 16px;
   padding: 12px;
@@ -958,6 +1540,24 @@ onMounted(loadAgent)
 
 .preview-message__content--loading {
   color: var(--box-muted);
+}
+
+.preview-citations {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--box-border);
+  font-size: 12px;
+  color: var(--box-muted);
+}
+
+.preview-citations__label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.preview-citation {
+  line-height: 1.5;
 }
 
 .preview-input {

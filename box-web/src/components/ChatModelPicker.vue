@@ -4,10 +4,17 @@
     trigger="click"
     placement="top-right"
     :show-arrow="false"
+    :disabled="disabled"
     overlay-class-name="model-picker-overlay"
     :overlay-inner-style="{ padding: '0', borderRadius: '12px' }"
   >
-    <button type="button" class="model-picker__trigger">
+    <button
+      type="button"
+      class="model-picker__trigger"
+      data-testid="chat-model-picker"
+      :class="{ 'model-picker__trigger--disabled': disabled }"
+      :disabled="disabled"
+    >
       <span>{{ currentLabel }}</span>
       <t-icon name="chevron-down" size="16px" />
     </button>
@@ -97,10 +104,14 @@ import { useRouter } from 'vue-router'
 import type { PlatformModelVO } from '@/api/platform'
 import { getAvatarColor } from '@/utils/format'
 
-const props = defineProps<{
-  modelValue: string
-  models: PlatformModelVO[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    models: PlatformModelVO[]
+    disabled?: boolean
+  }>(),
+  { disabled: false },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -212,6 +223,14 @@ function goCustom() {
 .model-picker__trigger:hover {
   background: var(--box-hover);
   color: var(--box-ink);
+}
+
+.model-picker__trigger--disabled,
+.model-picker__trigger--disabled:hover {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: transparent;
+  color: var(--box-muted);
 }
 </style>
 

@@ -1,6 +1,11 @@
 <template>
   <div>
-    <page-header title="工具" desc="配置 HTTP 工具，绑定到 Agent 后支持 Tool Calling">
+    <page-header
+      title="工具"
+      desc="配置 HTTP 工具，绑定到 Agent 后支持 Tool Calling"
+      :back-to="backTo"
+      :back-label="backLabel"
+    >
       <template #actions>
         <t-button theme="primary" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
@@ -10,8 +15,7 @@
     </page-header>
 
     <t-loading :loading="loading" size="small">
-      <t-table row-key="id" :data="items" :columns="columns" :bordered="true" stripe hover>
-        <template #empty><t-empty description="暂无工具" /></template>
+      <t-table v-if="items.length" row-key="id" :data="items" :columns="columns" :bordered="true" stripe hover>
         <template #op="{ row }">
           <t-space>
             <t-button variant="text" theme="primary" :loading="testingId === row.id" @click="runTest(row.id)">测试</t-button>
@@ -19,6 +23,7 @@
           </t-space>
         </template>
       </t-table>
+      <resource-manage-empty v-else category="tools" @create="openCreate" />
     </t-loading>
 
     <t-dialog v-model:visible="dialogVisible" header="新建 HTTP 工具" :footer="false" width="560px">
@@ -40,7 +45,11 @@
 import { ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
+import { useResourceManageBack } from '@/composables/useResourceManageBack'
 import { createTool, deleteTool, listTools, testTool, type ToolVO } from '@/api/tool'
+
+const { backTo, backLabel } = useResourceManageBack('tools')
 
 const loading = ref(false)
 const saving = ref(false)

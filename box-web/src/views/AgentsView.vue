@@ -37,14 +37,26 @@
           </div>
           <div class="agent-card__footer">
             <span class="agent-card__time">{{ formatTime(item.updatedAt) }}</span>
-            <t-button
-              theme="danger"
-              variant="text"
-              size="small"
-              @click.stop="removeAgent(item)"
-            >
-              删除
-            </t-button>
+            <t-space size="small">
+              <t-button variant="text" size="small" @click.stop="duplicateAgentItem(item)">复制</t-button>
+              <t-button
+                v-if="item.status !== 'ARCHIVED'"
+                variant="text"
+                theme="warning"
+                size="small"
+                @click.stop="archiveAgentItem(item)"
+              >
+                归档
+              </t-button>
+              <t-button
+                theme="danger"
+                variant="text"
+                size="small"
+                @click.stop="removeAgent(item)"
+              >
+                删除
+              </t-button>
+            </t-space>
           </div>
         </article>
       </div>
@@ -103,12 +115,18 @@ import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import {
+  archiveAgent,
   createAgent,
   deleteAgent,
+  duplicateAgent,
   listAgents,
   type AgentVO,
 } from '@/api/agent'
+import { extractApiError } from '@/api/apiError'
+import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
+
+const { openCreateAgentDialog } = useCreateAgentDialog()
 
 const router = useRouter()
 
@@ -183,10 +201,7 @@ function openBuilder(item: AgentVO) {
 }
 
 function openCreate() {
-  form.name = ''
-  form.description = ''
-  form.platformModelId = platformModelOptions.value[0]?.value
-  dialogVisible.value = true
+  openCreateAgentDialog()
 }
 
 const submitForm: FormProps['onSubmit'] = async ({ validateResult }) => {
@@ -209,6 +224,37 @@ const submitForm: FormProps['onSubmit'] = async ({ validateResult }) => {
   } finally {
     saving.value = false
   }
+}
+
+async function duplicateAgentItem(item: AgentVO) {
+  try {
+    const { data } = await duplicateAgent(item.id)
+    MessagePlugin.success('已创建副本')
+    if (data.data?.id) {
+      router.push(`/agents/${data.data.id}/builder`)
+    } else {
+      await loadAgents()
+    }
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '复制失败'))
+  }
+}
+
+function archiveAgentItem(item: AgentVO) {
+  const dialog = DialogPlugin.confirm({
+    header: '归档智能体',
+    body: `确定归档「${item.name}」吗？归档后将取消发布。`,
+    onConfirm: async () => {
+      try {
+        await archiveAgent(item.id)
+        MessagePlugin.success('已归档')
+        await loadAgents()
+        dialog.destroy()
+      } catch (error) {
+        MessagePlugin.error(extractApiError(error, '归档失败'))
+      }
+    },
+  })
 }
 
 function removeAgent(item: AgentVO) {

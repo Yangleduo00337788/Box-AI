@@ -39,6 +39,7 @@
               禁用
             </t-button>
             <t-button v-else variant="text" theme="primary" @click="toggleKey(row.id, true)">启用</t-button>
+            <t-button variant="text" @click="rotateKey(row.id)">轮换</t-button>
             <t-button variant="text" theme="danger" @click="removeKey(row.id)">删除</t-button>
           </t-space>
         </template>
@@ -90,6 +91,7 @@ import {
   disableApiKey,
   enableApiKey,
   listApiKeys,
+  rotateApiKey,
   type ApiKeyVO,
 } from '@/api/apiKey'
 
@@ -107,7 +109,7 @@ const columns: PrimaryTableCol<ApiKeyVO>[] = [
   { colKey: 'status', title: '状态', width: 90 },
   { colKey: 'lastUsedAt', title: '最近使用', width: 180 },
   { colKey: 'createdAt', title: '创建时间', width: 180 },
-  { colKey: 'op', title: '操作', width: 160 },
+  { colKey: 'op', title: '操作', width: 220 },
 ]
 
 async function loadKeys() {
@@ -167,6 +169,18 @@ async function toggleKey(id: number, enable: boolean) {
     MessagePlugin.success(enable ? '已启用' : '已禁用')
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '操作失败'))
+  }
+}
+
+async function rotateKey(id: number) {
+  try {
+    const { data } = await rotateApiKey(id)
+    createdSecret.value = data.data?.apiKey || ''
+    secretVisible.value = true
+    await loadKeys()
+    MessagePlugin.success('密钥已轮换，请更新集成配置')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '轮换失败'))
   }
 }
 

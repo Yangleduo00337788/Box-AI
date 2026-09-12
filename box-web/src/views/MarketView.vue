@@ -1,6 +1,10 @@
 <template>
   <div>
-    <page-header title="智能体市场" desc="选用平台模板，一键启用到你的工作空间" />
+    <page-header title="智能体市场" desc="选用平台模板，一键启用到你的工作空间">
+      <template #actions>
+        <t-button variant="outline" @click="router.push('/plugin-market')">插件市场</t-button>
+      </template>
+    </page-header>
 
     <t-loading :loading="loading" size="small">
       <div v-if="templates.length" class="market-grid">

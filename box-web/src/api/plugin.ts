@@ -14,6 +14,9 @@ export interface PluginCatalogVO {
   description?: string
   installCount?: number
   installed: boolean
+  resourceType?: string
+  resourceId?: number
+  targetPath?: string
 }
 
 export function fetchPluginCategories() {

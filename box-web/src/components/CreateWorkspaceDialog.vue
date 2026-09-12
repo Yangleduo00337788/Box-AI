@@ -21,6 +21,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
+import { extractApiError } from '@/api/apiError'
 import { createWorkspace } from '@/api/workspace'
 import { useAuthStore } from '@/stores/auth'
 
@@ -55,7 +56,7 @@ async function submit() {
     MessagePlugin.success('工作空间已创建')
     emit('created')
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '创建失败')
+    MessagePlugin.error(extractApiError(error, '创建失败'))
   } finally {
     creating.value = false
   }

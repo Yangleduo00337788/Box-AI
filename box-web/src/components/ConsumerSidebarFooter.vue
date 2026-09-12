@@ -38,6 +38,10 @@
                 <t-icon name="setting" />
                 <span>设置</span>
               </button>
+              <button v-if="isEnterprise" type="button" class="user-menu__item" @click="go('/team')">
+                <t-icon name="usergroup" />
+                <span>团队</span>
+              </button>
             </div>
 
             <div class="user-menu__section">
@@ -73,10 +77,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import CreateWorkspaceDialog from '@/components/CreateWorkspaceDialog.vue'
 import HelpFeedbackDialog from '@/components/HelpFeedbackDialog.vue'
+import { useAuthStore } from '@/stores/auth'
 
 defineProps<{
   collapsed?: boolean
@@ -90,6 +95,8 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const auth = useAuthStore()
+const isEnterprise = computed(() => auth.tenant?.tenantType === 'ENTERPRISE')
 
 const menuVisible = ref(false)
 const workspaceDialogVisible = ref(false)

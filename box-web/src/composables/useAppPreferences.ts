@@ -23,6 +23,7 @@ function resolveTheme(mode: ThemeMode) {
 function applyTheme(mode: ThemeMode) {
   const resolved = resolveTheme(mode)
   document.documentElement.dataset.boxTheme = resolved
+  document.documentElement.setAttribute('theme-mode', resolved)
   document.documentElement.style.colorScheme = resolved
 }
 

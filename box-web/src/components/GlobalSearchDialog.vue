@@ -12,7 +12,7 @@
     <t-input
       ref="inputRef"
       v-model="keyword"
-      placeholder="搜索智能体、对话、插件…"
+      placeholder="搜索智能体、对话、工作流、知识库、工具…"
       clearable
       autofocus
       @keydown.down.prevent="moveSelection(1)"
@@ -112,6 +112,9 @@ function typeLabel(type: string) {
     AGENT: '智能体',
     CONVERSATION: '对话',
     PLUGIN: '插件',
+    WORKFLOW: '工作流',
+    KNOWLEDGE: '知识库',
+    TOOL: '工具',
   }
   return map[type] || type
 }
@@ -120,6 +123,9 @@ function iconForType(type: string) {
   if (type === 'AGENT') return 'gesture-applause'
   if (type === 'CONVERSATION') return 'chat'
   if (type === 'PLUGIN') return 'shop'
+  if (type === 'WORKFLOW') return 'tree-square-dot-vertical'
+  if (type === 'KNOWLEDGE') return 'book'
+  if (type === 'TOOL') return 'tools'
   return 'search'
 }
 

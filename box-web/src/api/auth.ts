@@ -25,10 +25,23 @@ export interface TenantSummaryVO {
 export interface RegisterRequest {
   email: string
   password: string
+  verificationCode: string
   nickname?: string
   accountType: 'PERSONAL' | 'ENTERPRISE'
   companyName?: string
   contactEmail?: string
+}
+
+export type VerificationCodePurpose = 'REGISTER' | 'RESET_PASSWORD'
+
+export interface SendVerificationCodeResponse {
+  devCode?: string | null
+}
+
+export interface ResetPasswordRequest {
+  email: string
+  verificationCode: string
+  newPassword: string
 }
 
 export interface WorkspaceVO {
@@ -52,6 +65,14 @@ export function login(account: string, password: string, accountType: 'PERSONAL'
 
 export function register(payload: RegisterRequest) {
   return http.post<Result<AuthVO>>('/auth/register', payload)
+}
+
+export function sendVerificationCode(email: string, purpose: VerificationCodePurpose) {
+  return http.post<Result<SendVerificationCodeResponse>>('/auth/verification-code', { email, purpose })
+}
+
+export function resetPassword(payload: ResetPasswordRequest) {
+  return http.post<Result<null>>('/auth/password/reset', payload)
 }
 
 export function fetchMe() {

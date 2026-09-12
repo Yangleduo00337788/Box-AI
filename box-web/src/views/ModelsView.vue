@@ -2,111 +2,99 @@
   <div>
     <page-header
       title="模型"
-      desc="默认使用平台模型池（走平台密钥、扣配额）；企业版可启用自带密钥（BYOK）"
+      desc="管理工作空间自定义模型（BYOK）；对话中的平台模型在聊天页选择"
     />
 
     <t-card :bordered="true" hover-shadow class="models-card">
-      <t-tabs v-model="tab">
-        <t-tab-panel value="platform" label="平台模型" />
-        <t-tab-panel v-if="byokEnabled" value="providers" label="服务商（BYOK）" />
-        <t-tab-panel v-if="byokEnabled" value="models" label="模型（BYOK）" />
-        <t-tab-panel v-if="byokEnabled" value="keys" label="API 密钥（BYOK）" />
-      </t-tabs>
+      <t-alert
+        v-if="!byokEnabled"
+        theme="info"
+        title="暂未启用自定义模型"
+        message="当前工作空间使用平台模型池。升级企业专业版后可配置自带密钥（BYOK）与自定义模型。"
+        class="byok-hint"
+      />
 
-      <div class="tab-body">
-        <t-alert
-          v-if="tab === 'platform' && !byokEnabled"
-          theme="info"
-          title="默认使用平台模型"
-          message="自带密钥（BYOK）为企业专业版能力，升级套餐后可自行配置 API Key。"
-          class="byok-hint"
-        />
-        <t-table
-          v-if="tab === 'platform'"
-          row-key="id"
-          :data="platformModels"
-          :columns="platformColumns"
-          :bordered="true"
-          stripe
-          hover
-        >
-          <template #empty>
-            <t-empty description="平台暂未开放模型，请联系管理员" />
-          </template>
-        </t-table>
+      <template v-else>
+        <t-tabs v-model="tab">
+          <t-tab-panel value="providers" label="服务商" />
+          <t-tab-panel value="models" label="自定义模型" />
+          <t-tab-panel value="keys" label="API 密钥" />
+        </t-tabs>
 
-        <div v-if="tab === 'providers'" class="toolbar">
-          <t-button theme="primary" @click="openProvider">
-            <template #icon><t-icon name="add" /></template>
-            新建服务商
-          </t-button>
+        <div class="tab-body">
+          <div v-if="tab === 'providers'" class="toolbar">
+            <t-button theme="primary" @click="openProvider">
+              <template #icon><t-icon name="add" /></template>
+              新建服务商
+            </t-button>
+          </div>
+          <t-table
+            v-if="tab === 'providers'"
+            row-key="id"
+            :data="providers"
+            :columns="providerColumns"
+            :bordered="true"
+            stripe
+            hover
+          >
+            <template #empty>
+              <t-empty description="暂无服务商，请先创建" />
+            </template>
+            <template #op="{ row }">
+              <t-button theme="danger" variant="text" @click="removeProvider(row.id)">删除</t-button>
+            </template>
+          </t-table>
+
+          <div v-if="tab === 'models'" class="toolbar">
+            <t-button theme="primary" @click="openModel">
+              <template #icon><t-icon name="add" /></template>
+              新建自定义模型
+            </t-button>
+          </div>
+          <t-table
+            v-if="tab === 'models'"
+            row-key="id"
+            :data="models"
+            :columns="modelColumns"
+            :bordered="true"
+            stripe
+            hover
+          >
+            <template #empty>
+              <t-empty description="暂无自定义模型，请先创建服务商与模型" />
+            </template>
+            <template #op="{ row }">
+              <t-space>
+                <t-button variant="text" theme="primary" @click="openTest(row)">测试</t-button>
+                <t-button theme="danger" variant="text" @click="removeModel(row.id)">删除</t-button>
+              </t-space>
+            </template>
+          </t-table>
+
+          <div v-if="tab === 'keys'" class="toolbar">
+            <t-button theme="primary" @click="openKey">
+              <template #icon><t-icon name="add" /></template>
+              新增密钥
+            </t-button>
+          </div>
+          <t-table
+            v-if="tab === 'keys'"
+            row-key="id"
+            :data="credentials"
+            :columns="keyColumns"
+            :bordered="true"
+            stripe
+            hover
+          >
+            <template #empty>
+              <t-empty description="暂无密钥，请先添加" />
+            </template>
+            <template #op="{ row }">
+              <t-button theme="danger" variant="text" @click="removeKey(row.id)">删除</t-button>
+            </template>
+          </t-table>
         </div>
-        <t-table
-          v-if="tab === 'providers'"
-          row-key="id"
-          :data="providers"
-          :columns="providerColumns"
-          :bordered="true"
-          stripe
-          hover
-        >
-          <template #empty>
-            <t-empty description="暂无服务商，请先创建" />
-          </template>
-          <template #op="{ row }">
-            <t-button theme="danger" variant="text" @click="removeProvider(row.id)">删除</t-button>
-          </template>
-        </t-table>
-
-        <div v-if="tab === 'models'" class="toolbar">
-          <t-button theme="primary" @click="openModel">
-            <template #icon><t-icon name="add" /></template>
-            新建模型
-          </t-button>
-        </div>
-        <t-table
-          v-if="tab === 'models'"
-          row-key="id"
-          :data="models"
-          :columns="modelColumns"
-          :bordered="true"
-          stripe
-          hover
-        >
-          <template #empty>
-            <t-empty description="暂无模型，请先创建" />
-          </template>
-          <template #op="{ row }">
-            <t-space>
-              <t-button variant="text" theme="primary" @click="openTest(row)">测试</t-button>
-              <t-button theme="danger" variant="text" @click="removeModel(row.id)">删除</t-button>
-            </t-space>
-          </template>
-        </t-table>
-
-        <div v-if="tab === 'keys'" class="toolbar">
-          <t-button theme="primary" @click="openKey">
-            <template #icon><t-icon name="add" /></template>
-            新增密钥
-          </t-button>
-        </div>
-        <t-table
-          v-if="tab === 'keys'"
-          row-key="id"
-          :data="credentials"
-          :columns="keyColumns"
-          :bordered="true"
-          stripe
-          hover
-        >
-          <template #empty>
-            <t-empty description="暂无密钥，请先添加" />
-          </template>
-          <template #op="{ row }">
-            <t-button theme="danger" variant="text" @click="removeKey(row.id)">删除</t-button>
-          </template>
-        </t-table>
-      </div>
+      </template>
     </t-card>
   </div>
 
@@ -130,7 +118,7 @@
     </t-form>
   </t-dialog>
 
-  <t-dialog v-model:visible="modelVisible" header="新建模型" :footer="false" width="520px">
+  <t-dialog v-model:visible="modelVisible" header="新建自定义模型" :footer="false" width="520px">
     <t-form :data="modelForm" :rules="modelRules" label-align="top" @submit="submitModel">
       <t-form-item label="所属服务商" name="providerId">
         <t-select v-model="modelForm.providerId" :options="providerOptions" placeholder="请选择服务商" />
@@ -206,11 +194,10 @@ import {
   type ModelVO,
   type ProviderVO,
 } from '@/api/model'
-import { fetchPlatformCapabilities, listPlatformModels, type PlatformModelVO } from '@/api/platform'
+import { fetchPlatformCapabilities } from '@/api/platform'
 
-const tab = ref('platform')
+const tab = ref('models')
 const byokEnabled = ref(false)
-const platformModels = ref<PlatformModelVO[]>([])
 const saving = ref(false)
 const testing = ref(false)
 const providers = ref<ProviderVO[]>([])
@@ -263,14 +250,6 @@ const providerOptions = computed(() =>
   providers.value.map((item) => ({ label: item.providerName, value: item.id })),
 )
 
-const platformColumns: PrimaryTableCol[] = [
-  { colKey: 'modelName', title: '名称', width: 180 },
-  { colKey: 'modelCode', title: '编码', width: 180 },
-  { colKey: 'providerName', title: '服务商', width: 140 },
-  { colKey: 'contextWindow', title: '上下文', width: 100 },
-  { colKey: 'maxOutputTokens', title: '最大输出', width: 100 },
-]
-
 const providerColumns: PrimaryTableCol[] = [
   { colKey: 'providerName', title: '名称', width: 160 },
   { colKey: 'providerCode', title: '编码', width: 140 },
@@ -292,16 +271,9 @@ const keyColumns: PrimaryTableCol[] = [
   { colKey: 'op', title: '操作', width: 100, fixed: 'right' },
 ]
 
-async function loadPlatform() {
-  const [{ data: modelRes }, { data: capRes }] = await Promise.all([
-    listPlatformModels(),
-    fetchPlatformCapabilities(),
-  ])
-  platformModels.value = modelRes.data || []
-  byokEnabled.value = capRes.data?.byokEnabled === true
-  if (!byokEnabled.value && tab.value !== 'platform') {
-    tab.value = 'platform'
-  }
+async function loadCapabilities() {
+  const { data } = await fetchPlatformCapabilities()
+  byokEnabled.value = data.data?.byokEnabled === true
 }
 
 async function loadByok() {
@@ -312,7 +284,7 @@ async function loadByok() {
 }
 
 async function loadAll() {
-  await loadPlatform()
+  await loadCapabilities()
   if (byokEnabled.value) {
     await loadByok()
   }
@@ -446,7 +418,7 @@ onMounted(loadAll)
 }
 
 .byok-hint {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .toolbar {

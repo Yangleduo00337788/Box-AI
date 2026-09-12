@@ -10,11 +10,19 @@ export interface WorkflowNodeData {
 export const PALETTE_ITEMS = [
   { type: 'Start', label: '开始', icon: 'play-circle-stroke' },
   { type: 'LLM', label: 'LLM', icon: 'cpu' },
+  { type: 'Agent', label: 'Agent', icon: 'user-talk' },
+  { type: 'Knowledge', label: '知识库', icon: 'book' },
   { type: 'HTTP', label: 'HTTP', icon: 'internet' },
+  { type: 'Webhook', label: 'Webhook', icon: 'link' },
+  { type: 'SubWorkflow', label: '子工作流', icon: 'tree-square-dot' },
+  { type: 'Tool', label: '工具', icon: 'tools' },
   { type: 'Condition', label: '条件', icon: 'chart-bubble' },
   { type: 'Delay', label: '延迟', icon: 'time' },
   { type: 'Variable', label: '变量', icon: 'data' },
   { type: 'Template', label: '模板', icon: 'file-1' },
+  { type: 'Loop', label: '循环', icon: 'refresh' },
+  { type: 'Code', label: '代码', icon: 'code' },
+  { type: 'Parallel', label: '并行', icon: 'fork' },
   { type: 'Output', label: '输出', icon: 'logout' },
 ] as const
 
@@ -113,12 +121,43 @@ export function createFlowNode(type: string, label: string, position: { x: numbe
   if (type === 'LLM') {
     config.prompt = '{{input.message}}'
   }
+  if (type === 'Agent') {
+    config.message = '{{input.message}}'
+    config.outputVariable = 'agentResult'
+  }
   if (type === 'Delay') {
     config.delayMs = 1000
   }
   if (type === 'HTTP') {
     config.method = 'GET'
     config.url = 'https://'
+  }
+  if (type === 'Webhook') {
+    config.url = 'https://'
+    config.payload = '{{input}}'
+    config.eventType = 'workflow.event'
+  }
+  if (type === 'SubWorkflow') {
+    config.outputVariable = 'subWorkflowResult'
+  }
+  if (type === 'Loop') {
+    config.mode = 'FOREACH'
+    config.itemsVariable = 'items'
+    config.itemVariable = 'loopItem'
+    config.indexVariable = 'loopIndex'
+    config.outputVariable = 'loopResults'
+    config.maxIterations = 100
+  }
+  if (type === 'Code') {
+    config.functionName = 'execute'
+    config.outputVariable = 'codeResult'
+    config.code = 'function execute(args) {\n  return args.input;\n}'
+  }
+  if (type === 'Parallel') {
+    config.outputVariable = 'parallelResults'
+    config.tasks = [
+      { type: 'TEMPLATE', template: '{{input}}' },
+    ]
   }
   return {
     id,

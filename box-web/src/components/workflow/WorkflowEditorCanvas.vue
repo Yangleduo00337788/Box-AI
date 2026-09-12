@@ -41,7 +41,7 @@
         @node-drag-stop="onNodeDragStop"
         @pane-click="onPaneClick"
       >
-        <Background pattern-color="rgba(0,0,0,0.08)" :gap="24" />
+        <Background pattern-color="var(--box-canvas-grid, rgba(0,0,0,0.08))" :gap="24" />
         <Controls />
         <MiniMap pannable zoomable />
       </VueFlow>
@@ -78,6 +78,23 @@
           <t-input :value="(selectedNode.data as WorkflowNodeData).nodeType" disabled />
         </t-form-item>
 
+        <template v-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Agent'">
+          <t-form-item label="智能体">
+            <t-select
+              v-model="inspector.agentId"
+              :options="agentOptions"
+              placeholder="选择 Agent"
+              clearable
+            />
+          </t-form-item>
+          <t-form-item label="用户消息模板">
+            <t-textarea v-model="inspector.agentMessage" :autosize="{ minRows: 2, maxRows: 6 }" />
+          </t-form-item>
+          <t-form-item label="输出变量名">
+            <t-input v-model="inspector.agentOutputVariable" />
+          </t-form-item>
+        </template>
+
         <template v-if="(selectedNode.data as WorkflowNodeData).nodeType === 'LLM'">
           <t-form-item label="平台模型">
             <t-select
@@ -95,12 +112,116 @@
           </t-form-item>
         </template>
 
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Knowledge'">
+          <t-form-item label="知识库">
+            <t-select
+              v-model="inspector.knowledgeBaseId"
+              :options="knowledgeBaseOptions"
+              placeholder="选择知识库"
+              clearable
+            />
+          </t-form-item>
+          <t-form-item label="检索问题">
+            <t-textarea v-model="inspector.knowledgeQuery" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="{{input.message}}" />
+          </t-form-item>
+          <t-form-item label="Top K">
+            <t-input-number v-model="inspector.knowledgeTopK" :min="1" :max="20" theme="column" />
+          </t-form-item>
+        </template>
+
         <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'HTTP'">
           <t-form-item label="Method">
             <t-select v-model="inspector.httpMethod" :options="httpMethods" />
           </t-form-item>
           <t-form-item label="URL">
             <t-input v-model="inspector.httpUrl" />
+          </t-form-item>
+        </template>
+
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'SubWorkflow'">
+          <t-form-item label="子工作流">
+            <t-select
+              v-model="inspector.subWorkflowId"
+              :options="subWorkflowOptions"
+              placeholder="选择工作流"
+              clearable
+            />
+          </t-form-item>
+          <t-form-item label="入参 JSON 模板（可选）">
+            <t-textarea
+              v-model="inspector.subWorkflowInputsJson"
+              placeholder='留空则继承当前变量，例如 {"input":{"message":"{{input.message}}"}}'
+              :autosize="{ minRows: 3, maxRows: 8 }"
+            />
+          </t-form-item>
+          <t-form-item label="输出变量名">
+            <t-input v-model="inspector.subWorkflowOutputVariable" />
+          </t-form-item>
+        </template>
+
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Webhook'">
+          <t-form-item label="URL">
+            <t-input v-model="inspector.webhookUrl" />
+          </t-form-item>
+          <t-form-item label="Payload 模板">
+            <t-textarea v-model="inspector.webhookPayload" :autosize="{ minRows: 3, maxRows: 8 }" />
+          </t-form-item>
+          <t-form-item label="签名密钥（可选）">
+            <t-input v-model="inspector.webhookSecret" type="password" />
+          </t-form-item>
+          <t-form-item label="事件类型">
+            <t-input v-model="inspector.webhookEventType" />
+          </t-form-item>
+        </template>
+
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Tool'">
+          <t-form-item label="工具来源">
+            <t-select v-model="inspector.toolSourceType" :options="toolSourceOptions" />
+          </t-form-item>
+          <template v-if="inspector.toolSourceType === 'HTTP'">
+            <t-form-item label="HTTP 工具">
+              <t-select
+                v-model="inspector.toolId"
+                :options="toolOptions"
+                placeholder="选择工具"
+                clearable
+              />
+            </t-form-item>
+            <t-form-item label="请求体模板">
+              <t-textarea
+                v-model="inspector.toolBodyTemplate"
+                :autosize="{ minRows: 2, maxRows: 6 }"
+                placeholder="可选，覆盖工具默认 body，支持 {{input.message}}"
+              />
+            </t-form-item>
+          </template>
+          <template v-else>
+            <t-form-item label="MCP Server">
+              <t-select
+                v-model="inspector.mcpServerId"
+                :options="mcpServerOptions"
+                placeholder="选择 MCP Server"
+                clearable
+              />
+            </t-form-item>
+            <t-form-item label="MCP 工具">
+              <t-select
+                v-model="inspector.mcpToolName"
+                :options="mcpToolOptions"
+                placeholder="选择工具"
+                clearable
+              />
+            </t-form-item>
+            <t-form-item label="参数 JSON">
+              <t-textarea
+                v-model="inspector.toolArgumentsJson"
+                :autosize="{ minRows: 2, maxRows: 6 }"
+                placeholder='{"query":"{{input.message}}"}'
+              />
+            </t-form-item>
+          </template>
+          <t-form-item label="输出变量">
+            <t-input v-model="inspector.toolOutputVariable" placeholder="toolResult" />
           </t-form-item>
         </template>
 
@@ -126,6 +247,43 @@
         <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Template'">
           <t-form-item label="模板内容">
             <t-textarea v-model="inspector.templateContent" :autosize="{ minRows: 4, maxRows: 8 }" />
+          </t-form-item>
+        </template>
+
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Loop'">
+          <t-form-item label="模式">
+            <t-select v-model="inspector.loopMode" :options="loopModeOptions" />
+          </t-form-item>
+          <t-form-item v-if="inspector.loopMode === 'FOREACH'" label="数组变量">
+            <t-input v-model="inspector.loopItemsVariable" />
+          </t-form-item>
+          <t-form-item v-if="inspector.loopMode === 'COUNT'" label="次数">
+            <t-input-number v-model="inspector.loopCount" :min="1" :max="100" theme="column" />
+          </t-form-item>
+          <t-form-item label="迭代脚本">
+            <t-textarea v-model="inspector.loopCode" :autosize="{ minRows: 4, maxRows: 10 }" />
+          </t-form-item>
+          <t-form-item label="最大迭代">
+            <t-input-number v-model="inspector.loopMaxIterations" :min="1" :max="100" theme="column" />
+          </t-form-item>
+        </template>
+
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Code'">
+          <t-form-item label="函数名">
+            <t-input v-model="inspector.codeFunctionName" />
+          </t-form-item>
+          <t-form-item label="脚本">
+            <t-textarea v-model="inspector.codeContent" :autosize="{ minRows: 6, maxRows: 12 }" />
+          </t-form-item>
+        </template>
+
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Parallel'">
+          <t-form-item label="任务 JSON">
+            <t-textarea
+              v-model="inspector.parallelTasksJson"
+              :autosize="{ minRows: 6, maxRows: 12 }"
+              placeholder='[{"type":"TEMPLATE","template":"Hi {{name}}"}]'
+            />
           </t-form-item>
         </template>
 
@@ -164,8 +322,12 @@ import {
   PALETTE_ITEMS,
   type WorkflowNodeData,
 } from '@/utils/workflowFlow'
-import type { WorkflowDefinition } from '@/api/workflow'
+import { listAgents, type AgentVO } from '@/api/agent'
+import { listWorkflows, type WorkflowDefinition, type WorkflowVO } from '@/api/workflow'
 import type { PlatformModelVO } from '@/api/platform'
+import { listKnowledgeBases } from '@/api/knowledge'
+import { listTools } from '@/api/tool'
+import { listMcpServers, type McpServerVO } from '@/api/mcp'
 import { useWorkflowEditorHistory } from '@/composables/useWorkflowEditorHistory'
 import { useWorkflowAutoSave } from '@/composables/useWorkflowAutoSave'
 
@@ -202,6 +364,9 @@ const defaultEdgeOptions = {
   focusable: true,
 }
 
+const knowledgeBaseOptions = ref<Array<{ label: string; value: number }>>([])
+const toolOptions = ref<Array<{ label: string; value: number }>>([])
+
 const platformModelOptions = computed(() =>
   props.platformModels
     .filter((item) => item.status === 1)
@@ -218,6 +383,12 @@ const conditionOperators = [
   { label: '包含', value: 'contains' },
   { label: '为空', value: 'empty' },
   { label: '不为空', value: 'not_empty' },
+]
+
+const loopModeOptions = [
+  { label: 'For Each', value: 'FOREACH' },
+  { label: 'Count', value: 'COUNT' },
+  { label: 'While', value: 'WHILE' },
 ]
 
 function nodeLabel(id: string) {
@@ -266,16 +437,86 @@ onConnect((connection: Connection) => {
 })
 
 const inspector = reactive({
+  agentId: undefined as number | undefined,
+  agentMessage: '{{input.message}}',
+  agentOutputVariable: 'agentResult',
   llmPlatformModelId: undefined as number | undefined,
   llmSystemPrompt: '',
   llmUserPrompt: '',
   httpMethod: 'GET',
   httpUrl: '',
+  webhookUrl: '',
+  webhookPayload: '{{input}}',
+  webhookSecret: '',
+  webhookEventType: 'workflow.event',
+  subWorkflowId: undefined as number | undefined,
+  subWorkflowInputsJson: '',
+  subWorkflowOutputVariable: 'subWorkflowResult',
   conditionVariable: '',
   conditionOperator: 'equals',
   conditionValue: '',
   delayMs: 1000,
   templateContent: '',
+  knowledgeBaseId: undefined as number | undefined,
+  knowledgeQuery: '{{input.message}}',
+  knowledgeTopK: 5,
+  toolSourceType: 'HTTP',
+  toolId: undefined as number | undefined,
+  toolBodyTemplate: '',
+  mcpServerId: undefined as number | undefined,
+  mcpToolName: '',
+  toolArgumentsJson: '{}',
+  toolOutputVariable: 'toolResult',
+  loopMode: 'FOREACH',
+  loopItemsVariable: 'items',
+  loopCount: 3,
+  loopCode: 'function execute(args) {\n  return args.loopItem;\n}',
+  loopMaxIterations: 100,
+  codeFunctionName: 'execute',
+  codeContent: 'function execute(args) {\n  return args.input;\n}',
+  parallelTasksJson: '[{"type":"TEMPLATE","template":"{{input}}"}]',
+})
+
+const toolSourceOptions = [
+  { label: 'HTTP 工具', value: 'HTTP' },
+  { label: 'MCP 工具', value: 'MCP' },
+]
+
+const mcpServers = ref<McpServerVO[]>([])
+const workflows = ref<WorkflowVO[]>([])
+const agents = ref<AgentVO[]>([])
+
+const agentOptions = computed(() =>
+  agents.value.map((item) => ({ label: item.name, value: item.id })),
+)
+
+const subWorkflowOptions = computed(() =>
+  workflows.value
+    .filter((item) => item.id !== props.workflowId)
+    .map((item) => ({ label: item.name, value: item.id })),
+)
+
+const mcpServerOptions = computed(() =>
+  mcpServers.value
+    .filter((item) => item.status === 1)
+    .map((item) => ({ label: item.name, value: item.id })),
+)
+
+const mcpToolOptions = computed(() => {
+  const server = mcpServers.value.find((item) => item.id === inspector.mcpServerId)
+  if (!server?.toolCatalogJson) return []
+  try {
+    const items = JSON.parse(server.toolCatalogJson) as Array<{ name?: string; description?: string }>
+    if (!Array.isArray(items)) return []
+    return items
+      .filter((item) => item.name)
+      .map((item) => ({
+        label: item.description ? `${item.name} — ${item.description}` : item.name!,
+        value: item.name!,
+      }))
+  } catch {
+    return []
+  }
 })
 
 function configOf(node: any): Record<string, unknown> {
@@ -287,31 +528,109 @@ function configOf(node: any): Record<string, unknown> {
 
 function syncInspectorFromNode(node: any) {
   const config = configOf(node)
+  inspector.agentId = config.agentId as number | undefined
+  inspector.agentMessage = String(config.message || '{{input.message}}')
+  inspector.agentOutputVariable = String(config.outputVariable || 'agentResult')
   inspector.llmPlatformModelId = config.platformModelId as number | undefined
   inspector.llmSystemPrompt = String(config.systemPrompt || '')
   inspector.llmUserPrompt = String(config.userPrompt || config.prompt || '')
   inspector.httpMethod = String(config.method || 'GET')
   inspector.httpUrl = String(config.url || '')
+  inspector.webhookUrl = String(config.url || '')
+  inspector.webhookPayload = String(config.payload || '{{input}}')
+  inspector.webhookSecret = String(config.secret || '')
+  inspector.webhookEventType = String(config.eventType || 'workflow.event')
+  inspector.subWorkflowId = config.workflowId as number | undefined
+  inspector.subWorkflowInputsJson = String(config.inputsJson || '')
+  inspector.subWorkflowOutputVariable = String(config.outputVariable || 'subWorkflowResult')
   inspector.conditionVariable = String(config.variable || '')
   inspector.conditionOperator = String(config.operator || 'equals')
   inspector.conditionValue = String(config.value || '')
   inspector.delayMs = Number(config.delayMs ?? 1000)
   inspector.templateContent = String(config.template || '')
+  inspector.knowledgeBaseId = config.knowledgeBaseId as number | undefined
+  inspector.knowledgeQuery = String(config.query || config.prompt || '{{input.message}}')
+  inspector.knowledgeTopK = Number(config.topK ?? 5)
+  inspector.toolSourceType = String(config.sourceType || 'HTTP')
+  inspector.toolId = config.toolId as number | undefined
+  inspector.toolBodyTemplate = String(config.bodyTemplate || '')
+  inspector.mcpServerId = config.mcpServerId as number | undefined
+  inspector.mcpToolName = String(config.mcpToolName || '')
+  inspector.toolArgumentsJson = String(config.argumentsJson || '{}')
+  inspector.toolOutputVariable = String(config.outputVariable || 'toolResult')
+  inspector.loopMode = String(config.mode || 'FOREACH')
+  inspector.loopItemsVariable = String(config.itemsVariable || 'items')
+  inspector.loopCount = Number(config.count ?? 3)
+  inspector.loopCode = String(config.code || 'function execute(args) {\n  return args.loopItem;\n}')
+  inspector.loopMaxIterations = Number(config.maxIterations ?? 100)
+  inspector.codeFunctionName = String(config.functionName || 'execute')
+  inspector.codeContent = String(config.code || 'function execute(args) {\n  return args.input;\n}')
+  inspector.parallelTasksJson = config.tasks
+    ? JSON.stringify(config.tasks, null, 2)
+    : String(config.tasksJson || '[{"type":"TEMPLATE","template":"{{input}}"}]')
 }
 
 function syncNodeFromInspector(node: any) {
   const config = configOf(node)
+  const nodeType = (node?.data as WorkflowNodeData | undefined)?.nodeType
+  if (nodeType === 'Agent') {
+    config.agentId = inspector.agentId
+    config.message = inspector.agentMessage
+    config.outputVariable = inspector.agentOutputVariable || 'agentResult'
+  }
   config.platformModelId = inspector.llmPlatformModelId
   config.systemPrompt = inspector.llmSystemPrompt
   config.userPrompt = inspector.llmUserPrompt
   config.prompt = inspector.llmUserPrompt
   config.method = inspector.httpMethod
-  config.url = inspector.httpUrl
+  if (nodeType === 'Webhook') {
+    config.url = inspector.webhookUrl
+    config.payload = inspector.webhookPayload
+    config.secret = inspector.webhookSecret || undefined
+    config.eventType = inspector.webhookEventType
+  } else if (nodeType === 'SubWorkflow') {
+    config.workflowId = inspector.subWorkflowId
+    config.inputsJson = inspector.subWorkflowInputsJson || undefined
+    config.outputVariable = inspector.subWorkflowOutputVariable || 'subWorkflowResult'
+  } else {
+    config.url = inspector.httpUrl
+  }
   config.variable = inspector.conditionVariable
   config.operator = inspector.conditionOperator
   config.value = inspector.conditionValue
   config.delayMs = inspector.delayMs
   config.template = inspector.templateContent
+  config.knowledgeBaseId = inspector.knowledgeBaseId
+  config.query = inspector.knowledgeQuery
+  config.topK = inspector.knowledgeTopK
+  config.sourceType = inspector.toolSourceType
+  config.toolId = inspector.toolId
+  config.bodyTemplate = inspector.toolBodyTemplate || undefined
+  config.mcpServerId = inspector.mcpServerId
+  config.mcpToolName = inspector.mcpToolName || undefined
+  config.argumentsJson = inspector.toolArgumentsJson || '{}'
+  config.outputVariable = inspector.toolOutputVariable || 'toolResult'
+  if (nodeType === 'Loop') {
+    config.mode = inspector.loopMode
+    config.itemsVariable = inspector.loopItemsVariable
+    config.count = inspector.loopCount
+    config.code = inspector.loopCode
+    config.maxIterations = inspector.loopMaxIterations
+    config.outputVariable = 'loopResults'
+  }
+  if (nodeType === 'Code') {
+    config.functionName = inspector.codeFunctionName || 'execute'
+    config.code = inspector.codeContent
+    config.outputVariable = 'codeResult'
+  }
+  if (nodeType === 'Parallel') {
+    try {
+      config.tasks = JSON.parse(inspector.parallelTasksJson || '[]')
+    } catch {
+      config.tasks = []
+    }
+    config.outputVariable = 'parallelResults'
+  }
 }
 
 watch(inspector, () => {
@@ -525,8 +844,46 @@ function onWindowKeyDown(event: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('keydown', onWindowKeyDown)
+  try {
+    const { data } = await listKnowledgeBases()
+    knowledgeBaseOptions.value = (data.data || []).map((item) => ({
+      label: item.name,
+      value: item.id,
+    }))
+  } catch {
+    knowledgeBaseOptions.value = []
+  }
+  try {
+    const { data } = await listTools()
+    toolOptions.value = (data.data || [])
+      .filter((item) => item.type === 'HTTP' && item.status === 1)
+      .map((item) => ({
+        label: item.name,
+        value: item.id,
+      }))
+  } catch {
+    toolOptions.value = []
+  }
+  try {
+    const { data } = await listMcpServers()
+    mcpServers.value = data.data || []
+  } catch {
+    mcpServers.value = []
+  }
+  try {
+    const { data } = await listWorkflows()
+    workflows.value = data.data || []
+  } catch {
+    workflows.value = []
+  }
+  try {
+    const { data } = await listAgents()
+    agents.value = data.data || []
+  } catch {
+    agents.value = []
+  }
 })
 
 onUnmounted(() => {

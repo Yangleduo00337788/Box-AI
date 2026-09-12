@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@monaco-editor/loader": "^1.7.0",
     "@vue-flow/background": "^1.3.2",
     "@vue-flow/controls": "^1.1.3",
     "@vue-flow/core": "^1.48.2",
     "@vue-flow/minimap": "^1.5.4",
     "axios": "^1.8.4",
+    "monaco-editor": "^0.52.2",
     "pinia": "^3.0.2",
     "tdesign-icons-vue-next": "^0.3.6",
     "tdesign-vue-next": "^1.11.5",

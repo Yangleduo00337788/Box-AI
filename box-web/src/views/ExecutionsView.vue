@@ -59,6 +59,17 @@
           <h3>错误</h3>
           <pre>{{ detail.errorMessage }}</pre>
         </section>
+        <section v-if="traceSpans.length" class="detail-block">
+          <h3>Trace 步骤</h3>
+          <div v-for="span in traceSpans" :key="span.spanId" class="trace-span">
+            <div class="trace-span__head">
+              <strong>{{ span.name }}</strong>
+              <t-tag size="small" variant="light">{{ span.spanType }}</t-tag>
+              <span>{{ span.durationMs ?? 0 }} ms</span>
+            </div>
+            <pre v-if="span.outputJson">{{ formatJson(span.outputJson) }}</pre>
+          </div>
+        </section>
       </template>
     </t-drawer>
   </div>
@@ -70,12 +81,13 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import { extractApiError } from '@/api/apiError'
-import { getExecution, listExecutions, type ExecutionVO } from '@/api/execution'
+import { getExecution, getExecutionTrace, listExecutions, type ExecutionVO, type TraceSpanVO } from '@/api/execution'
 
 const loading = ref(false)
 const executions = ref<ExecutionVO[]>([])
 const detailVisible = ref(false)
 const detail = ref<ExecutionVO | null>(null)
+const traceSpans = ref<TraceSpanVO[]>([])
 
 const columns: PrimaryTableCol<ExecutionVO>[] = [
   { colKey: 'executionNo', title: '编号', ellipsis: true, width: 180 },
@@ -87,7 +99,7 @@ const columns: PrimaryTableCol<ExecutionVO>[] = [
 ]
 
 function statusLabel(status: string) {
-  if (status === 'SUCCESS') return '成功'
+  if (status === 'SUCCESS' || status === 'SUCCEEDED') return '成功'
   if (status === 'FAILED') return '失败'
   if (status === 'RUNNING') return '运行中'
   return status
@@ -104,7 +116,7 @@ function formatJson(raw: string) {
 async function loadExecutions() {
   loading.value = true
   try {
-    const { data } = await listExecutions(100)
+    const { data } = await listExecutions({ limit: 100 })
     executions.value = data.data || []
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '加载执行记录失败'))
@@ -118,6 +130,13 @@ async function openDetail(context: { row: TableRowData }) {
   try {
     const { data } = await getExecution(row.id)
     detail.value = data.data || row
+    traceSpans.value = []
+    try {
+      const traceRes = await getExecutionTrace(row.id)
+      traceSpans.value = traceRes.data.data?.spans || []
+    } catch {
+      traceSpans.value = []
+    }
     detailVisible.value = true
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '加载详情失败'))
@@ -151,5 +170,20 @@ onMounted(loadExecutions)
 .detail-block--error pre {
   background: #fff1f0;
   border-color: #ffccc7;
+}
+
+.trace-span {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--box-border);
+  border-radius: 8px;
+}
+
+.trace-span__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
 }
 </style>

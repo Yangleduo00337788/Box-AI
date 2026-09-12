@@ -15,6 +15,58 @@
         <span class="sidebar-line__label">{{ item.label }}</span>
       </router-link>
 
+      <section class="sidebar-task-panel">
+        <div class="sidebar-task-panel__head">
+          <span class="sidebar-task-panel__title">对话历史</span>
+          <div class="sidebar-task-panel__tools">
+            <button
+              type="button"
+              class="sidebar-task-panel__tool"
+              :aria-label="conversationsExpanded ? '收起列表' : '展开列表'"
+              @click="toggleConversationsExpanded"
+            >
+              <t-icon :name="conversationsExpanded ? 'fullscreen-exit' : 'fullscreen'" />
+            </button>
+            <t-dropdown :options="conversationFilterOptions" trigger="click" @click="onConversationFilter">
+              <button type="button" class="sidebar-task-panel__tool" aria-label="筛选对话">
+                <t-icon name="filter" />
+              </button>
+            </t-dropdown>
+          </div>
+        </div>
+
+        <t-loading v-show="conversationsExpanded" :loading="conversationsLoading" size="small">
+          <nav v-if="displayConversations.length" class="sidebar-task-panel__list">
+            <div
+              v-for="conversation in displayConversations"
+              :key="conversation.id"
+              class="sidebar-task-row-wrap"
+              :class="{ 'sidebar-task-row-wrap--active': isConversationRowActive(conversation.id) }"
+            >
+              <button
+                type="button"
+                class="sidebar-task-row"
+                @click="openConversation(conversation)"
+              >
+                <t-icon name="folder" class="sidebar-task-row__icon" />
+                <span class="sidebar-task-row__label">{{ conversationLabel(conversation) }}</span>
+              </button>
+              <div class="sidebar-task-row__actions">
+                <button
+                  type="button"
+                  class="sidebar-task-row__action"
+                  :aria-label="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
+                  @click.stop="handleToggleConversationPin(conversation.id)"
+                >
+                  <t-icon name="pin" />
+                </button>
+              </div>
+            </div>
+          </nav>
+          <p v-else class="sidebar-task-panel__empty">暂无对话</p>
+        </t-loading>
+      </section>
+
       <template v-if="pinnedItems.length">
         <div class="sidebar-section-row">
           <button
@@ -75,7 +127,7 @@
           <span class="sidebar-line__icon">
             <t-icon name="robot" />
           </span>
-          <span class="sidebar-line__label">智能体</span>
+          <span class="sidebar-line__label">我的智能体</span>
         </button>
         <div class="sidebar-section-row__actions">
           <t-tooltip content="创建智能体" placement="top" theme="light" :show-arrow="false">
@@ -136,73 +188,7 @@
         </div>
       </t-loading>
 
-      <div class="sidebar-section-row">
-        <button
-          type="button"
-          class="sidebar-line sidebar-line--nav sidebar-line--section"
-          @click="onProjectsSectionClick"
-        >
-          <span class="sidebar-line__icon">
-            <t-icon name="folder" />
-          </span>
-          <span class="sidebar-line__label">项目</span>
-        </button>
-        <div class="sidebar-section-row__actions">
-          <t-tooltip content="创建项目" placement="top" theme="light" :show-arrow="false">
-            <button type="button" class="sidebar-section-row__btn" aria-label="创建项目" @click.stop="onCreateProject">
-              <t-icon name="add" />
-            </button>
-          </t-tooltip>
-          <button
-            type="button"
-            class="sidebar-section-row__btn"
-            :aria-label="projectsExpanded ? '折叠项目' : '展开项目'"
-            @click.stop="toggleProjectsExpanded"
-          >
-            <t-icon :name="projectsExpanded ? 'chevron-down' : 'chevron-right'" />
-          </button>
-        </div>
-      </div>
-
-      <div v-show="projectsExpanded" class="sidebar-group">
-        <div v-if="!auth.workspaces.length" class="sidebar-line sidebar-line--placeholder">
-          <span class="sidebar-line__placeholder">暂无项目</span>
-        </div>
-        <div v-else-if="unpinnedWorkspaces.length" class="sidebar-group__list">
-          <div
-            v-for="workspace in unpinnedWorkspaces"
-            :key="workspace.id"
-            class="sidebar-row-wrap"
-            :class="{ 'sidebar-row-wrap--active': isWorkspaceRowActive(workspace.id) }"
-          >
-            <button type="button" class="sidebar-line sidebar-line--item" @click="switchWorkspace(workspace.id)">
-              <span class="sidebar-line__icon">
-                <t-icon name="folder" />
-              </span>
-              <span class="sidebar-line__label">{{ workspace.name }}</span>
-              <span v-if="isWorkspaceActive(workspace.id)" class="sidebar-line__meta">当前</span>
-            </button>
-            <div class="sidebar-row__actions">
-              <button
-                type="button"
-                class="sidebar-row__action"
-                :aria-label="isWorkspacePinned(workspace.id) ? '取消置顶' : '置顶'"
-                @click.stop="handleToggleWorkspacePin(workspace.id)"
-              >
-                <t-icon name="pin" />
-              </button>
-              <t-dropdown :options="workspaceMenuOptions(workspace)" trigger="click" @click="onWorkspaceMenu">
-                <button type="button" class="sidebar-row__action" aria-label="更多" @click.stop>
-                  <t-icon name="more" />
-                </button>
-              </t-dropdown>
-            </div>
-          </div>
-        </div>
-      </div>
     </section>
-
-    <create-workspace-dialog v-model:visible="workspaceDialogVisible" @created="onWorkspaceCreated" />
   </div>
 </template>
 
@@ -213,15 +199,13 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import type { AgentVO } from '@/api/agent'
 import { useAgentSelection } from '@/composables/useAgentSelection'
+import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
 import { useSidebarPins } from '@/composables/useSidebarPins'
-import { useWorkspacePins } from '@/composables/useWorkspacePins'
-import CreateWorkspaceDialog from '@/components/CreateWorkspaceDialog.vue'
 import { formatRelativeTime, getAvatarColor } from '@/utils/format'
 import { resolveTIconName } from '@/utils/icon'
-import { useAuthStore } from '@/stores/auth'
 import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
-import type { WorkspaceVO } from '@/api/auth'
+import type { ConversationVO } from '@/api/conversation'
 
 defineProps<{
   active: string
@@ -229,23 +213,28 @@ defineProps<{
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
-const workspaceDialogVisible = ref(false)
-const { agents, loading: agentsLoading, selectedAgentId, refresh: refreshAgents, reloadSelection, selectAgent } = useAgentSelection()
-const { conversations, refresh: refreshConversations } = useConversationNav()
-const { pinnedAgentIds, pinnedConversationIds, isAgentPinned, toggleAgentPin, toggleConversationPin, refresh: refreshPins } = useSidebarPins()
-const { pinnedWorkspaceIds, isWorkspacePinned, toggleWorkspacePin, refresh: refreshWorkspacePins } = useWorkspacePins()
+const { agents, loading: agentsLoading, selectedAgentId, refresh: refreshAgents, selectAgent, selectAgentByConversation } = useAgentSelection()
+const { conversations, loading: conversationsLoading, refresh: refreshConversations } = useConversationNav()
+const { openCreateAgentDialog } = useCreateAgentDialog()
+const {
+  pinnedAgentIds,
+  isAgentPinned,
+  isConversationPinned,
+  toggleAgentPin,
+  toggleConversationPin,
+  refresh: refreshPins,
+} = useSidebarPins()
 
 const workbenchItems = CONSUMER_MENU_GROUPS[0]?.items ?? []
 const pinnedExpanded = ref(true)
+const conversationsExpanded = ref(false)
+const conversationFilter = ref<'all' | 'current-agent'>('all')
 const agentsExpanded = ref(true)
-const projectsExpanded = ref(false)
 
 type SidebarFocus =
   | { type: 'workbench'; path: string }
   | { type: 'agent'; id: number }
   | { type: 'conversation'; id: number }
-  | { type: 'workspace'; id: number }
 
 const sidebarFocus = ref<SidebarFocus>({ type: 'workbench', path: '/chat' })
 
@@ -261,10 +250,6 @@ function focusConversation(conversationId: number) {
   sidebarFocus.value = { type: 'conversation', id: conversationId }
 }
 
-function focusWorkspace(workspaceId: number) {
-  sidebarFocus.value = { type: 'workspace', id: workspaceId }
-}
-
 function isWorkbenchItemActive(value: string) {
   return sidebarFocus.value.type === 'workbench' && sidebarFocus.value.path === value
 }
@@ -277,10 +262,6 @@ function isConversationRowActive(conversationId: number) {
   return sidebarFocus.value.type === 'conversation' && sidebarFocus.value.id === conversationId
 }
 
-function isWorkspaceRowActive(workspaceId: number) {
-  return sidebarFocus.value.type === 'workspace' && sidebarFocus.value.id === workspaceId
-}
-
 function isPinnedItemActive(item: PinnedSidebarItem) {
   if (item.key.startsWith('conversation-')) {
     const id = Number(item.key.slice('conversation-'.length))
@@ -290,30 +271,27 @@ function isPinnedItemActive(item: PinnedSidebarItem) {
     const id = Number(item.key.slice('agent-'.length))
     return isAgentRowActive(id)
   }
-  if (item.key.startsWith('workspace-')) {
-    const id = Number(item.key.slice('workspace-'.length))
-    return isWorkspaceRowActive(id)
-  }
   return false
 }
 
 function onPinnedItemClick(item: PinnedSidebarItem) {
   if (item.key.startsWith('conversation-')) {
     const id = Number(item.key.slice('conversation-'.length))
-    focusConversation(id)
+    const conversation = conversations.value.find((row) => row.id === id)
+    if (conversation) {
+      openConversation(conversation)
+    }
     return
   }
   if (item.key.startsWith('agent-')) {
     const id = Number(item.key.slice('agent-'.length))
     focusAgent(id)
     item.onNavigate?.()
-    return
   }
-  if (item.key.startsWith('workspace-')) {
-    const id = Number(item.key.slice('workspace-'.length))
-    focusWorkspace(id)
-    item.onNavigate?.()
-  }
+}
+
+function toggleConversationsExpanded() {
+  conversationsExpanded.value = !conversationsExpanded.value
 }
 
 function onAgentsSectionClick() {
@@ -324,26 +302,27 @@ function toggleAgentsExpanded() {
   agentsExpanded.value = !agentsExpanded.value
 }
 
-function onProjectsSectionClick() {
-  projectsExpanded.value = !projectsExpanded.value
+function matchWorkbenchPath(path: string): string | null {
+  for (const item of workbenchItems) {
+    if (path === item.value) {
+      return item.value
+    }
+    if (item.value !== '/chat' && path.startsWith(`${item.value}/`)) {
+      return item.value
+    }
+  }
+  return null
 }
 
-function toggleProjectsExpanded() {
-  projectsExpanded.value = !projectsExpanded.value
-}
-
-function initSidebarFocusFromRoute() {
+function syncSidebarFocusFromRoute() {
   const path = route.path
-  if (path.startsWith('/plugin-market')) {
-    focusWorkbench('/plugin-market')
-    return
-  }
-  if (path.startsWith('/models')) {
-    focusWorkbench('/models')
-    return
-  }
   if (activeConversationId.value != null) {
     focusConversation(activeConversationId.value)
+    return
+  }
+  const workbench = matchWorkbenchPath(path)
+  if (workbench) {
+    focusWorkbench(workbench)
     return
   }
   if ((path === '/chat' || path.startsWith('/chat/')) && selectedAgentId.value != null) {
@@ -358,18 +337,7 @@ function initSidebarFocusFromRoute() {
 watch(
   () => route.fullPath,
   () => {
-    const path = route.path
-    if (path.startsWith('/plugin-market')) {
-      focusWorkbench('/plugin-market')
-      return
-    }
-    if (path.startsWith('/models')) {
-      focusWorkbench('/models')
-      return
-    }
-    if (activeConversationId.value != null) {
-      focusConversation(activeConversationId.value)
-    }
+    syncSidebarFocusFromRoute()
   },
 )
 
@@ -394,20 +362,6 @@ interface PinnedSidebarItem {
 const pinnedItems = computed<PinnedSidebarItem[]>(() => {
   const items: PinnedSidebarItem[] = []
 
-  for (const id of pinnedConversationIds.value) {
-    const conversation = conversations.value.find((item) => item.id === id)
-    if (!conversation) continue
-    items.push({
-      key: `conversation-${id}`,
-      label: conversation.title || conversation.agentName || '新会话',
-      avatarText: (conversation.agentName || '会').slice(0, 1),
-      color: getAvatarColor(conversation.agentName || '会话'),
-      meta: formatRelativeTime(conversation.lastMessageAt || conversation.updatedAt),
-      to: `/chat/${conversation.id}`,
-      onUnpin: () => handleToggleConversationPin(id),
-    })
-  }
-
   for (const id of pinnedAgentIds.value) {
     const agent = agents.value.find((item) => item.id === id)
     if (!agent) continue
@@ -423,36 +377,47 @@ const pinnedItems = computed<PinnedSidebarItem[]>(() => {
     })
   }
 
-  for (const id of pinnedWorkspaceIds.value) {
-    const workspace = auth.workspaces.find((item) => item.id === id)
-    if (!workspace) continue
-    items.push({
-      key: `workspace-${id}`,
-      label: workspace.name,
-      avatarText: workspace.name.slice(0, 1),
-      color: getAvatarColor(workspace.name),
-      meta: isWorkspaceActive(id) ? '当前' : '项目',
-      to: route.path,
-      onNavigate: () => switchWorkspace(id),
-      onUnpin: () => handleToggleWorkspacePin(id),
-    })
-  }
-
   return items
 })
+
+const conversationFilterOptions: DropdownOption[] = [
+  { content: '全部对话', value: 'all' },
+  { content: '当前智能体', value: 'current-agent' },
+]
+
+const sortedConversations = computed(() =>
+  [...conversations.value].sort((a, b) => {
+    const ta = new Date(a.lastMessageAt || a.updatedAt).getTime()
+    const tb = new Date(b.lastMessageAt || b.updatedAt).getTime()
+    return tb - ta
+  }),
+)
+
+const displayConversations = computed(() => {
+  if (conversationFilter.value === 'current-agent' && selectedAgentId.value != null) {
+    return sortedConversations.value.filter((item) => item.agentId === selectedAgentId.value)
+  }
+  return sortedConversations.value
+})
+
+function conversationLabel(conversation: ConversationVO) {
+  return conversation.title || conversation.agentName || '新会话'
+}
+
+function onConversationFilter(data: { value?: string | number }) {
+  const value = String(data?.value ?? '')
+  if (value === 'all' || value === 'current-agent') {
+    conversationFilter.value = value
+  }
+}
 
 const unpinnedAgents = computed(() => {
   const pinnedSet = new Set(pinnedAgentIds.value)
   return agents.value.filter((agent) => !pinnedSet.has(agent.id))
 })
 
-const unpinnedWorkspaces = computed(() => {
-  const pinnedSet = new Set(pinnedWorkspaceIds.value)
-  return auth.workspaces.filter((workspace) => !pinnedSet.has(workspace.id))
-})
-
 function goCreateAgent() {
-  router.push('/agents')
+  openCreateAgentDialog()
 }
 
 async function handleToggleAgentPin(agentId: number) {
@@ -475,12 +440,10 @@ async function handleToggleConversationPin(conversationId: number) {
   }
 }
 
-function handleToggleWorkspacePin(workspaceId: number) {
-  const wasPinned = isWorkspacePinned(workspaceId)
-  toggleWorkspacePin(workspaceId)
-  if (!wasPinned) {
-    pinnedExpanded.value = true
-  }
+function openConversation(conversation: ConversationVO) {
+  focusConversation(conversation.id)
+  selectAgentByConversation(conversation.agentId)
+  router.push(`/chat/${conversation.id}`)
 }
 
 function openAgent(agent: AgentVO) {
@@ -489,68 +452,12 @@ function openAgent(agent: AgentVO) {
   router.push('/chat')
 }
 
-function isWorkspaceActive(workspaceId: number) {
-  return auth.currentWorkspaceId === String(workspaceId)
-}
-
-async function switchWorkspace(workspaceId: number) {
-  focusWorkspace(workspaceId)
-  if (isWorkspaceActive(workspaceId)) return
-  auth.setWorkspace(workspaceId)
-  await reloadSelection()
-  await Promise.all([refreshAgents(), refreshConversations(), refreshPins()])
-  MessagePlugin.success('已切换工作空间')
-}
-
-function onCreateProject() {
-  workspaceDialogVisible.value = true
-}
-
-async function onWorkspaceCreated() {
-  refreshWorkspacePins()
-  await Promise.all([refreshAgents(), refreshConversations()])
-}
-
-function workspaceMenuOptions(workspace: WorkspaceVO): DropdownOption[] {
-  const options: DropdownOption[] = [
-    { content: '切换到此项目', value: `switch:${workspace.id}` },
-  ]
-  if (!isWorkspacePinned(workspace.id)) {
-    options.push({ content: '置顶', value: `pin:${workspace.id}` })
-  }
-  return options
-}
-
-function onWorkspaceMenu(data: { value?: string | number }) {
-  const value = String(data?.value ?? '')
-  if (value.startsWith('switch:')) {
-    const id = Number(value.split(':')[1])
-    if (Number.isFinite(id)) {
-      switchWorkspace(id)
-    }
-    return
-  }
-  if (value.startsWith('pin:')) {
-    const id = Number(value.split(':')[1])
-    if (Number.isFinite(id)) {
-      handleToggleWorkspacePin(id)
-    }
-  }
-}
-
 function agentMenuOptions(agent: AgentVO): DropdownOption[] {
-  return [
-    { content: '编辑配置', value: `builder:${agent.id}` },
-    { content: '管理全部', value: 'manage' },
-  ]
+  return [{ content: '编辑配置', value: `builder:${agent.id}` }]
 }
 
 function onAgentMenu(data: { value?: string | number }) {
   const value = String(data?.value ?? '')
-  if (value === 'manage') {
-    router.push('/agents')
-    return
-  }
   if (value.startsWith('builder:')) {
     const id = Number(value.split(':')[1])
     if (Number.isFinite(id)) {
@@ -560,9 +467,8 @@ function onAgentMenu(data: { value?: string | number }) {
 }
 
 onMounted(async () => {
-  refreshWorkspacePins()
   await Promise.all([refreshAgents(), refreshConversations(), refreshPins()])
-  initSidebarFocusFromRoute()
+  syncSidebarFocusFromRoute()
 })
 </script>
 
@@ -837,6 +743,165 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  width: 100%;
+}
+
+.sidebar-task-panel {
+  margin-top: 10px;
+  padding-top: 2px;
+}
+
+.sidebar-task-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 var(--sidebar-row-pad-x) 6px;
+}
+
+.sidebar-task-panel__title {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--box-muted);
+}
+
+.sidebar-task-panel__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.sidebar-task-panel__tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--box-muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.sidebar-task-panel__tool :deep(.t-icon) {
+  font-size: 14px;
+}
+
+.sidebar-task-panel__tool:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--box-ink);
+}
+
+.sidebar-task-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-task-panel__empty {
+  margin: 0;
+  padding: 8px var(--sidebar-row-pad-x) 4px;
+  padding-left: calc(var(--sidebar-row-pad-x) + var(--sidebar-icon-col) + var(--sidebar-col-gap));
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--box-muted);
+}
+
+.sidebar-task-row-wrap {
+  position: relative;
+  padding: 0 var(--sidebar-row-pad-x);
+  border-radius: 8px;
+}
+
+.sidebar-task-row-wrap:hover,
+.sidebar-task-row-wrap--active {
+  background: var(--sidebar-row-bg);
+}
+
+.sidebar-task-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sidebar-col-gap);
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  padding-right: 32px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-task-row__icon {
+  flex-shrink: 0;
+  width: var(--sidebar-icon-size);
+  font-size: 16px;
+  color: var(--box-muted);
+}
+
+.sidebar-task-row__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.sidebar-task-row__actions {
+  position: absolute;
+  right: var(--sidebar-row-pad-x);
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.sidebar-task-row-wrap:hover .sidebar-task-row__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-task-row__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--box-muted);
+  cursor: pointer;
+}
+
+.sidebar-task-row__action :deep(.t-icon) {
+  font-size: 14px;
+}
+
+.sidebar-task-row__action:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--box-ink);
+}
+
+.sidebar-task-panel :deep(.t-loading) {
+  display: block;
+  width: 100%;
+}
+
+.sidebar-task-panel :deep(.t-loading__parent) {
+  display: flex;
+  flex-direction: column;
   width: 100%;
 }
 </style>

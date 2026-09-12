@@ -25,6 +25,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { fetchQuota, type QuotaSnapshotVO } from '@/api/quota'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
 
 const loading = ref(false)
 const quota = ref<QuotaSnapshotVO | null>(null)
@@ -55,7 +58,7 @@ const capacityItems = computed(() => {
       label: '已加入工作空间',
       hint: '你当前可访问的工作空间',
       icon: 'layers',
-      value: String(q.usedWorkspaces),
+      value: String(auth.workspaces.length),
     },
   ]
 })

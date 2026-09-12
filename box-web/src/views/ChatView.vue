@@ -17,6 +17,7 @@
       <div class="composer">
         <t-textarea
           v-model="composerText"
+          data-testid="chat-composer-input"
           :placeholder="composerPlaceholder"
           :autosize="{ minRows: 2, maxRows: 8 }"
           class="composer__input"
@@ -45,7 +46,11 @@
             </t-tooltip>
           </div>
           <div class="composer__right">
-            <chat-model-picker v-model="selectedModelKey" :models="platformModels" />
+            <chat-model-picker
+              v-model="selectedModelKey"
+              :models="platformModels"
+              :disabled="!modelPickerEnabled"
+            />
             <t-tooltip :content="listening ? '停止语音输入' : '语音输入'" placement="top" theme="light" :show-arrow="false">
               <t-button
                 variant="text"
@@ -93,18 +98,32 @@
     </div>
 
     <div v-else class="chat-active">
+      <div class="chat-active__layout">
       <div class="chat-stage chat-stage--active">
       <div class="chat-active__header">
-        <t-dropdown v-if="selectedAgent" :options="agentOptions" trigger="click" @click="onAgentDropdown">
-          <button type="button" class="agent-pill agent-pill--compact">
-            <t-avatar size="22px" class="agent-pill__avatar" :style="{ background: agentAvatarColor }">
-              {{ selectedAgent.name.slice(0, 1) }}
-            </t-avatar>
-            <span>{{ selectedAgent.name }}</span>
-            <t-icon name="chevron-down" class="agent-pill__arrow" />
-          </button>
-        </t-dropdown>
-        <span v-if="activeConversationTitle" class="chat-active__title">{{ activeConversationTitle }}</span>
+        <div class="chat-active__header-main">
+          <t-dropdown v-if="selectedAgent" :options="agentOptions" trigger="click" @click="onAgentDropdown">
+            <button type="button" class="agent-pill agent-pill--compact">
+              <t-avatar size="22px" class="agent-pill__avatar" :style="{ background: agentAvatarColor }">
+                {{ selectedAgent.name.slice(0, 1) }}
+              </t-avatar>
+              <span>{{ selectedAgent.name }}</span>
+              <t-icon name="chevron-down" class="agent-pill__arrow" />
+            </button>
+          </t-dropdown>
+          <span v-if="activeConversationTitle" class="chat-active__title">{{ activeConversationTitle }}</span>
+        </div>
+        <t-tooltip :content="tracePanelOpen ? '收起 Trace' : '展开 Trace'" placement="left" theme="light" :show-arrow="false">
+          <t-button
+            variant="text"
+            shape="square"
+            size="small"
+            :class="{ 'trace-toggle--active': tracePanelOpen }"
+            @click="toggleTracePanel"
+          >
+            <template #icon><t-icon name="chart-bubble" /></template>
+          </t-button>
+        </t-tooltip>
       </div>
 
       <div ref="chatListRef" class="chat-messages">
@@ -114,11 +133,69 @@
           class="chat-message"
           :class="`chat-message--${item.role.toLowerCase()}`"
         >
-          <div class="chat-message__content" :class="{ 'chat-message__content--loading': isLoadingBubble(item, index) }">
-            <span v-if="isLoadingBubble(item, index)" class="typing-dots" aria-label="思考中">
-              <i /><i /><i />
-            </span>
-            <template v-else>{{ displayContent(item, index) }}</template>
+          <div class="chat-message__body">
+            <div class="chat-message__content" :class="{ 'chat-message__content--loading': isLoadingBubble(item, index) }">
+              <span v-if="isLoadingBubble(item, index)" class="typing-dots" aria-label="思考中">
+                <i /><i /><i />
+              </span>
+              <template v-else>{{ displayContent(item, index) }}</template>
+            </div>
+            <div v-if="messageCitations(item).length" class="chat-citations">
+              <span class="chat-citations__label">引用来源</span>
+              <div class="chat-citations__list">
+                <t-popup
+                  v-for="cite in messageCitations(item)"
+                  :key="cite.index"
+                  placement="top"
+                  trigger="hover"
+                  show-arrow
+                  destroy-on-close
+                >
+                  <template #content>
+                    <div class="chat-citation-popup">
+                      <div class="chat-citation-popup__title">{{ cite.documentName }}</div>
+                      <div class="chat-citation-popup__body">{{ cite.content }}</div>
+                    </div>
+                  </template>
+                  <button type="button" class="chat-citation-chip">
+                    [{{ cite.index }}] {{ cite.documentName }}
+                  </button>
+                </t-popup>
+              </div>
+            </div>
+            <div
+              v-if="canShowMessageActions(item, index)"
+              class="chat-message__actions"
+            >
+              <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
+                <t-button variant="text" shape="square" size="small" @click="copyMessage(item)">
+                  <template #icon><t-icon name="file-copy" /></template>
+                </t-button>
+              </t-tooltip>
+              <t-tooltip
+                v-if="canRegenerate(item, index)"
+                content="重新生成"
+                placement="top"
+                theme="light"
+                :show-arrow="false"
+              >
+                <t-button
+                  variant="text"
+                  shape="square"
+                  size="small"
+                  data-testid="chat-regenerate"
+                  :disabled="chatting"
+                  @click="regenerateReply(index)"
+                >
+                  <template #icon><t-icon name="refresh" /></template>
+                </t-button>
+              </t-tooltip>
+              <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false">
+                <t-button variant="text" shape="square" size="small" :disabled="chatting" @click="removeMessage(item, index)">
+                  <template #icon><t-icon name="delete" /></template>
+                </t-button>
+              </t-tooltip>
+            </div>
           </div>
         </div>
       </div>
@@ -126,6 +203,7 @@
       <div class="composer composer--bottom">
         <t-textarea
           v-model="composerText"
+          data-testid="chat-composer-input"
           placeholder="继续对话..."
           :autosize="{ minRows: 2, maxRows: 6 }"
           class="composer__input"
@@ -148,11 +226,24 @@
             </t-tooltip>
           </div>
           <div class="composer__right">
+            <chat-model-picker
+              v-model="selectedModelKey"
+              :models="platformModels"
+              :disabled="!modelPickerEnabled"
+            />
             <t-button
+              v-if="chatting"
+              variant="outline"
+              size="small"
+              @click="stopGeneration"
+            >
+              停止生成
+            </t-button>
+            <t-button
+              v-else
               class="composer__send"
               :class="{ 'composer__send--ready': canSendMessage }"
               shape="circle"
-              :loading="chatting"
               :disabled="!canSendMessage"
               @click="sendChat()"
             >
@@ -161,6 +252,30 @@
           </div>
         </div>
       </div>
+      </div>
+
+      <aside v-if="tracePanelOpen" class="chat-trace-panel">
+        <div class="chat-trace-panel__head">
+          <h3>执行 Trace</h3>
+          <span v-if="latestExecution?.durationMs" class="chat-trace-panel__meta">
+            {{ latestExecution.durationMs }} ms
+            <template v-if="latestExecution.totalTokens"> · {{ latestExecution.totalTokens }} tokens</template>
+          </span>
+        </div>
+        <t-loading :loading="traceLoading" size="small">
+          <div v-if="traceSpans.length" class="chat-trace-panel__list">
+            <div v-for="span in traceSpans" :key="span.spanId" class="trace-span">
+              <div class="trace-span__head">
+                <strong>{{ span.name }}</strong>
+                <t-tag size="small" variant="light">{{ span.spanType }}</t-tag>
+                <span>{{ span.durationMs ?? 0 }} ms</span>
+              </div>
+              <pre v-if="span.outputJson" class="trace-span__output">{{ formatTraceJson(span.outputJson) }}</pre>
+            </div>
+          </div>
+          <t-empty v-else description="暂无 Trace 数据" />
+        </t-loading>
+      </aside>
       </div>
     </div>
   </div>
@@ -177,19 +292,31 @@ import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { appPreferences } from '@/composables/useAppPreferences'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { useChatSuggestions } from '@/composables/useChatSuggestions'
+import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
 import { getAvatarColor } from '@/utils/format'
 import {
   createConversation,
+  deleteMessage,
   getConversation,
   listMessages,
+  regenerateMessageStream,
   sendMessageStream,
+  parseMessageCitations,
   type MessageVO,
 } from '@/api/conversation'
+import type { KnowledgeCitation } from '@/api/agent'
+import {
+  getExecutionTrace,
+  getLatestExecutionByConversation,
+  type ExecutionVO,
+  type TraceSpanVO,
+} from '@/api/execution'
 
 const route = useRoute()
 const router = useRouter()
 const { refresh: refreshConversations, conversations } = useConversationNav()
+const { openCreateAgentDialog } = useCreateAgentDialog()
 const { agents, selectedAgent, refresh: refreshAgents, selectAgent, selectAgentByConversation } = useAgentSelection()
 const { suggestions, loading: suggestionsLoading, refresh: refreshSuggestions } = useChatSuggestions()
 
@@ -215,9 +342,46 @@ interface BrowserSpeechRecognition {
 let speechRecognition: BrowserSpeechRecognition | null = null
 const selectedModelKey = ref('auto')
 const platformModels = ref<PlatformModelVO[]>([])
+
+const modelPickerEnabled = computed(() => {
+  const agent = selectedAgent.value
+  if (!agent) return false
+  return agent.modelSource !== 'BYOK'
+})
+
+function resolvePlatformModelId(): number | undefined {
+  if (!modelPickerEnabled.value || selectedModelKey.value === 'auto') {
+    return undefined
+  }
+  const id = Number(selectedModelKey.value)
+  return Number.isFinite(id) ? id : undefined
+}
+
+function syncModelPickerWithAgent() {
+  const agent = selectedAgent.value
+  if (!agent || agent.modelSource === 'BYOK') {
+    selectedModelKey.value = 'auto'
+    return
+  }
+  if (agent.platformModelId != null) {
+    selectedModelKey.value = String(agent.platformModelId)
+    return
+  }
+  selectedModelKey.value = 'auto'
+}
+
+watch(selectedAgent, () => {
+  syncModelPickerWithAgent()
+})
 const activeConversationTitle = ref('')
 /** 新会话首条消息发送中，避免路由切换时 loadMessages 覆盖乐观更新 */
 const suppressMessagesReload = ref(false)
+let streamAbortController: AbortController | null = null
+const stoppedByUser = ref(false)
+const tracePanelOpen = ref(false)
+const traceLoading = ref(false)
+const traceSpans = ref<TraceSpanVO[]>([])
+const latestExecution = ref<ExecutionVO | null>(null)
 
 const agentAvatarColor = computed(() => getAvatarColor(selectedAgent.value?.name || 'Box'))
 
@@ -253,6 +417,16 @@ const conversationId = computed(() => {
   return Number.isFinite(num) ? num : null
 })
 
+function messageCitations(item: MessageVO): KnowledgeCitation[] {
+  if (item.citations?.length) return item.citations
+  return parseMessageCitations(item.metadataJson)
+}
+
+function applyStreamCitations(index: number, citations: KnowledgeCitation[]) {
+  if (index < 0 || !citations.length) return
+  messages.value[index].citations = citations
+}
+
 function displayContent(item: MessageVO, index: number) {
   if (item.content) return item.content
   if (chatting.value && index === messages.value.length - 1 && item.role === 'ASSISTANT') {
@@ -263,6 +437,91 @@ function displayContent(item: MessageVO, index: number) {
 
 function isLoadingBubble(item: MessageVO, index: number) {
   return chatting.value && index === messages.value.length - 1 && item.role === 'ASSISTANT' && !item.content
+}
+
+function canShowMessageActions(item: MessageVO, index: number) {
+  if (isLoadingBubble(item, index)) return false
+  return Boolean(item.content?.trim())
+}
+
+function canRegenerate(item: MessageVO, index: number) {
+  return item.role === 'ASSISTANT' && index === messages.value.length - 1 && !chatting.value
+}
+
+function formatTraceJson(raw: string) {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
+}
+
+function toggleTracePanel() {
+  tracePanelOpen.value = !tracePanelOpen.value
+  if (tracePanelOpen.value && conversationId.value) {
+    loadLatestTrace(conversationId.value)
+  }
+}
+
+async function loadLatestTrace(convId: number, executionId?: number) {
+  traceLoading.value = true
+  try {
+    const { data } = await getLatestExecutionByConversation(convId)
+    latestExecution.value = data.data || null
+    const execId = executionId ?? data.data?.id
+    if (!execId) {
+      traceSpans.value = []
+      return
+    }
+    const traceRes = await getExecutionTrace(execId)
+    traceSpans.value = traceRes.data.data?.spans || []
+  } catch {
+    traceSpans.value = []
+  } finally {
+    traceLoading.value = false
+  }
+}
+
+async function copyMessage(item: MessageVO) {
+  if (!item.content?.trim()) return
+  try {
+    await navigator.clipboard.writeText(item.content)
+    MessagePlugin.success('已复制')
+  } catch {
+    MessagePlugin.error('复制失败')
+  }
+}
+
+async function removeMessage(item: MessageVO, index: number) {
+  if (chatting.value) return
+  const targetId = conversationId.value
+  if (!targetId) return
+  try {
+    if (item.id && item.id > 0) {
+      await deleteMessage(targetId, item.id)
+    }
+    messages.value.splice(index, 1)
+    MessagePlugin.success('消息已删除')
+    await refreshConversations()
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '删除失败'))
+  }
+}
+
+function stopGeneration() {
+  stoppedByUser.value = true
+  streamAbortController?.abort()
+}
+
+function beginStream() {
+  stoppedByUser.value = false
+  streamAbortController?.abort()
+  streamAbortController = new AbortController()
+  return streamAbortController
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 function onAgentDropdown(data: { value?: string | number }) {
@@ -294,7 +553,10 @@ async function loadConversationMeta(id: number) {
 
 async function loadMessages(id: number) {
   const { data } = await listMessages(id)
-  messages.value = data.data || []
+  messages.value = (data.data || []).map((item) => ({
+    ...item,
+    citations: parseMessageCitations(item.metadataJson),
+  }))
   await scrollChatToBottom()
 }
 
@@ -311,7 +573,7 @@ async function startNewChat(text: string) {
   const agentId = selectedAgent.value?.id
   if (!agentId) {
     MessagePlugin.warning('请先创建智能体')
-    router.push('/agents')
+    openCreateAgentDialog()
     return
   }
   try {
@@ -341,6 +603,7 @@ async function sendChat(id?: number, preset?: string) {
   chatting.value = true
   let assistantIndex = -1
   const usedPreset = Boolean(preset)
+  const controller = beginStream()
 
   messages.value.push({
     id: Date.now(),
@@ -370,24 +633,100 @@ async function sendChat(id?: number, preset?: string) {
     await sendMessageStream(targetId, text, (delta) => {
       messages.value[assistantIndex].content += delta
       scrollChatToBottom()
+    }, {
+      signal: controller.signal,
+      platformModelId: resolvePlatformModelId(),
+      onCitations: (citations) => applyStreamCitations(assistantIndex, citations),
+      onDone: (executionId) => {
+        if (tracePanelOpen.value) {
+          loadLatestTrace(targetId, executionId)
+        }
+      },
     })
 
-    if (!messages.value[assistantIndex]?.content) {
+    if (stoppedByUser.value) {
+      if (!messages.value[assistantIndex]?.content) {
+        messages.value[assistantIndex].content = '（已停止生成）'
+      }
+    } else if (!messages.value[assistantIndex]?.content) {
       messages.value[assistantIndex].content = '（无回复）'
     }
     await refreshConversations()
-    await loadMessages(targetId)
-  } catch (error) {
-    MessagePlugin.error(extractApiError(error, '发送失败'))
-    if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
-      messages.value.splice(assistantIndex, 1)
+    if (!stoppedByUser.value) {
+      await loadMessages(targetId)
     }
-    await loadMessages(targetId)
+  } catch (error) {
+    if (isAbortError(error)) {
+      if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+        messages.value[assistantIndex].content = '（已停止生成）'
+      }
+    } else {
+      MessagePlugin.error(extractApiError(error, '发送失败'))
+      if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+        messages.value.splice(assistantIndex, 1)
+      }
+      await loadMessages(targetId)
+    }
   } finally {
     chatting.value = false
+    streamAbortController = null
     if (usedPreset) {
       composerText.value = ''
     }
+  }
+}
+
+async function regenerateReply(index: number) {
+  const targetId = conversationId.value
+  if (!targetId || chatting.value) return
+  const item = messages.value[index]
+  if (!item || item.role !== 'ASSISTANT' || index !== messages.value.length - 1) return
+
+  chatting.value = true
+  const controller = beginStream()
+  item.content = ''
+  await scrollChatToBottom()
+
+  try {
+    await regenerateMessageStream(targetId, (delta) => {
+      messages.value[index].content += delta
+      scrollChatToBottom()
+    }, {
+      signal: controller.signal,
+      platformModelId: resolvePlatformModelId(),
+      onCitations: (citations) => {
+        messages.value[index].citations = citations
+      },
+      onDone: (executionId) => {
+        if (tracePanelOpen.value) {
+          loadLatestTrace(targetId, executionId)
+        }
+      },
+    })
+
+    if (stoppedByUser.value) {
+      if (!messages.value[index]?.content) {
+        messages.value[index].content = '（已停止生成）'
+      }
+    } else if (!messages.value[index]?.content) {
+      messages.value[index].content = '（无回复）'
+    }
+    await refreshConversations()
+    if (!stoppedByUser.value) {
+      await loadMessages(targetId)
+    }
+  } catch (error) {
+    if (isAbortError(error)) {
+      if (!messages.value[index]?.content) {
+        messages.value[index].content = '（已停止生成）'
+      }
+    } else {
+      MessagePlugin.error(extractApiError(error, '重新生成失败'))
+      await loadMessages(targetId)
+    }
+  } finally {
+    chatting.value = false
+    streamAbortController = null
   }
 }
 
@@ -484,10 +823,15 @@ watch(
       if (!suppressMessagesReload.value && !chatting.value) {
         await loadMessages(id)
       }
+      if (tracePanelOpen.value) {
+        await loadLatestTrace(id)
+      }
     } else {
       messages.value = []
       activeConversationTitle.value = ''
       composerText.value = ''
+      traceSpans.value = []
+      latestExecution.value = null
     }
   },
   { immediate: true },
@@ -505,6 +849,7 @@ watch(
 
 onMounted(async () => {
   await Promise.all([refreshAgents(), refreshSuggestions(), loadPlatformModels()])
+  syncModelPickerWithAgent()
 })
 </script>
 
@@ -762,14 +1107,95 @@ onMounted(async () => {
   width: 100%;
 }
 
+.chat-active__layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
 .chat-active__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 0 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chat-active__header-main {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 16px 0 0;
-  width: 100%;
-  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+}
+
+.trace-toggle--active {
+  color: var(--td-brand-color) !important;
+}
+
+.chat-trace-panel {
+  flex-shrink: 0;
+  width: 320px;
+  border-left: 1px solid var(--box-border);
+  padding: 16px;
+  overflow-y: auto;
+  background: #fafbfc;
+}
+
+.chat-trace-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.chat-trace-panel__head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chat-trace-panel__meta {
+  font-size: 12px;
+  color: var(--box-muted);
+}
+
+.chat-trace-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trace-span {
+  padding: 10px 12px;
+  border: 1px solid var(--box-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.trace-span__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.trace-span__output {
+  margin: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: #f7f8fa;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 .chat-active__title {
@@ -795,6 +1221,30 @@ onMounted(async () => {
 .chat-message {
   display: flex;
   max-width: 88%;
+}
+
+.chat-message__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.chat-message__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.chat-message:hover .chat-message__actions,
+.chat-message:focus-within .chat-message__actions {
+  opacity: 1;
+}
+
+.chat-message--user .chat-message__actions {
+  justify-content: flex-end;
 }
 
 .chat-message--user {
@@ -824,6 +1274,63 @@ onMounted(async () => {
   background: transparent;
   color: #1f2329;
   padding-left: 0;
+}
+
+.chat-citations {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chat-citations__label {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+}
+
+.chat-citations__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-citation-chip {
+  border: 1px solid var(--td-component-border);
+  background: var(--td-bg-color-container);
+  color: var(--td-text-color-primary);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-citation-chip:hover {
+  border-color: var(--td-brand-color);
+  color: var(--td-brand-color);
+}
+
+.chat-citation-popup {
+  max-width: 360px;
+}
+
+.chat-citation-popup__title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.chat-citation-popup__body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
 }
 
 .chat-message__content--loading {

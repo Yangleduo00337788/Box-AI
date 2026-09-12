@@ -2,8 +2,21 @@
   <div class="plugin-market">
     <page-header
       title="插件市场"
-      desc="按分类浏览工作流、知识库、工具与 MCP 插件，一键安装到你的工作空间"
-    />
+      desc="浏览模板并安装到工作空间；管理已有资源请点右侧按钮"
+    >
+      <template #actions>
+        <t-space>
+          <t-button
+            v-if="activeManagePath"
+            variant="outline"
+            @click="goManageMine"
+          >
+            {{ manageButtonLabel }}
+          </t-button>
+          <t-button variant="outline" @click="router.push('/market')">智能体市场</t-button>
+        </t-space>
+      </template>
+    </page-header>
 
     <t-loading :loading="categoriesLoading" size="small">
       <div v-if="categories.length" class="plugin-market__tabs" role="tablist" aria-label="插件分类">
@@ -22,12 +35,10 @@
       </div>
     </t-loading>
 
-    <div v-if="activeCategoryMeta" class="plugin-market__intro">
-      <h2 class="plugin-market__intro-title">{{ activeCategoryMeta.label }}</h2>
-      <p class="plugin-market__intro-desc">{{ activeCategoryMeta.desc }}</p>
-    </div>
+    <p v-if="activeCategoryMeta" class="plugin-market__category-desc">{{ activeCategoryMeta.desc }}</p>
 
     <t-loading :loading="loading" size="small">
+      <h2 v-if="plugins.length" class="plugin-market__section-title">推荐模板</h2>
       <div v-if="plugins.length" class="plugin-market__grid">
         <article v-for="item in plugins" :key="item.id" class="plugin-card">
           <div class="plugin-card__head">
@@ -35,15 +46,25 @@
           </div>
           <h3 class="plugin-card__title">{{ item.title }}</h3>
           <p class="plugin-card__desc">{{ item.description || '暂无描述' }}</p>
-          <t-button
-            variant="outline"
-            block
-            :loading="actingId === item.id"
-            :theme="item.installed ? 'default' : 'primary'"
-            @click="handleInstall(item)"
-          >
-            {{ item.installed ? '已安装' : '安装到工作空间' }}
-          </t-button>
+          <div class="plugin-card__actions">
+            <t-button
+              variant="outline"
+              block
+              :loading="actingId === item.id"
+              :theme="item.installed ? 'default' : 'primary'"
+              @click="handleInstall(item)"
+            >
+              {{ item.installed ? '移除' : '安装到工作空间' }}
+            </t-button>
+            <t-button
+              v-if="item.installed && item.targetPath"
+              variant="text"
+              block
+              @click="goToResource(item.targetPath!)"
+            >
+              前往使用
+            </t-button>
+          </div>
         </article>
       </div>
       <t-empty v-else description="该分类暂无插件" />
@@ -65,6 +86,7 @@ import {
   type PluginCategoryVO,
 } from '@/api/plugin'
 import { extractApiError } from '@/api/apiError'
+import { managePathForCategory } from '@/constants/resourceRoutes'
 
 const route = useRoute()
 const router = useRouter()
@@ -85,6 +107,20 @@ const activeCategory = computed(() => {
 const activeCategoryMeta = computed(() =>
   categories.value.find((item) => item.value === activeCategory.value),
 )
+
+const activeManagePath = computed(() => managePathForCategory(activeCategory.value))
+
+const manageButtonLabel = computed(() => {
+  const label = activeCategoryMeta.value?.label
+  if (!label) return '管理我的资源'
+  if (/^[A-Z]{2,}$/.test(label)) return `管理我的 ${label}`
+  return `管理我的${label}`
+})
+
+function goManageMine() {
+  const path = activeManagePath.value
+  if (path) router.push(path)
+}
 
 async function loadCategories() {
   categoriesLoading.value = true
@@ -129,6 +165,10 @@ async function loadPlugins() {
 function selectCategory(category: string) {
   if (category === activeCategory.value) return
   router.replace({ path: '/plugin-market', query: { category } })
+}
+
+function goToResource(path: string) {
+  router.push(path)
 }
 
 async function handleInstall(item: PluginCatalogVO) {
@@ -202,20 +242,16 @@ watch(
   font-weight: 500;
 }
 
-.plugin-market__intro {
-  margin-bottom: 20px;
-}
-
-.plugin-market__intro-title {
-  margin: 0 0 4px;
-  font: var(--td-font-title-small);
-  color: var(--box-ink);
-}
-
-.plugin-market__intro-desc {
-  margin: 0;
+.plugin-market__category-desc {
+  margin: -8px 0 20px;
   font: var(--td-font-body-small);
   color: var(--box-muted);
+}
+
+.plugin-market__section-title {
+  margin: 0 0 12px;
+  font: var(--td-font-title-small);
+  color: var(--box-ink);
 }
 
 .plugin-market__grid {
@@ -253,6 +289,12 @@ watch(
   font: var(--td-font-body-small);
   color: var(--box-muted);
   line-height: 1.55;
+}
+
+.plugin-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .plugin-card :deep(.t-button) {

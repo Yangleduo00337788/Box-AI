@@ -55,16 +55,49 @@ export function validateWorkflow(id: number) {
   return http.post<Result<{ valid: boolean; errors: string[] }>>(`/workflows/${id}/validate`)
 }
 
+export interface WorkflowPublishVO {
+  workflowId: number
+  status: string
+  publishedVersionId?: number
+  publishedVersionNo?: number
+  publishedAt?: string
+  webhookToken?: string
+  webhookUrl?: string
+  webhookSecret?: string
+}
+
+export function getWorkflowPublishStatus(id: number) {
+  return http.get<Result<WorkflowPublishVO>>(`/workflows/${id}/publish`)
+}
+
 export function publishWorkflow(id: number) {
-  return http.post<Result<{ workflowId: number; status: string }>>(`/workflows/${id}/publish`)
+  return http.post<Result<WorkflowPublishVO>>(`/workflows/${id}/publish`)
 }
 
 export function deleteWorkflow(id: number) {
   return http.delete<Result<void>>(`/workflows/${id}`)
 }
 
+export interface WorkflowNodeTrace {
+  nodeId: string
+  nodeType: string
+  status: string
+  durationMs: number
+  output?: Record<string, unknown>
+  errorMessage?: string
+}
+
+export interface WorkflowDebugResult {
+  executionId?: number
+  executionNo?: string
+  status: string
+  outputs?: Record<string, unknown>
+  nodeTraces?: WorkflowNodeTrace[]
+  errorMessage?: string
+}
+
 export function runWorkflowDebug(id: number, input: Record<string, unknown>) {
-  return http.post<Result<{ status: string; output?: unknown; errorMessage?: string }>>(
+  return http.post<Result<WorkflowDebugResult>>(
     `/workflows/${id}/debug`,
     { inputs: input },
     { timeout: 120000 },

@@ -1,6 +1,11 @@
 <template>
   <div>
-    <page-header title="MCP" desc="连接 MCP Server，同步并管理外部工具能力">
+    <page-header
+      title="MCP"
+      desc="连接 MCP Server，同步并管理外部工具能力"
+      :back-to="backTo"
+      :back-label="backLabel"
+    >
       <template #actions>
         <t-button theme="primary" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
@@ -10,8 +15,7 @@
     </page-header>
 
     <t-loading :loading="loading" size="small">
-      <t-table row-key="id" :data="items" :columns="columns" :bordered="true" stripe hover>
-        <template #empty><t-empty description="暂无 MCP Server" /></template>
+      <t-table v-if="items.length" row-key="id" :data="items" :columns="columns" :bordered="true" stripe hover>
         <template #op="{ row }">
           <t-space>
             <t-button variant="text" theme="primary" :loading="syncingId === row.id" @click="sync(row.id)">同步</t-button>
@@ -19,6 +23,7 @@
           </t-space>
         </template>
       </t-table>
+      <resource-manage-empty v-else category="mcp" @create="openCreate" />
     </t-loading>
 
     <t-dialog v-model:visible="dialogVisible" header="添加 MCP Server" :footer="false" width="560px">
@@ -37,7 +42,11 @@
 import { ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
+import { useResourceManageBack } from '@/composables/useResourceManageBack'
 import { createMcpServer, deleteMcpServer, listMcpServers, syncMcpServer, type McpServerVO } from '@/api/mcp'
+
+const { backTo, backLabel } = useResourceManageBack('mcp')
 
 const loading = ref(false)
 const saving = ref(false)

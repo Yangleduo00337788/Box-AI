@@ -1,46 +1,14 @@
 <template>
-  <auth-layout
-    slogan="把模型、知识、工具、工作流装进一个 Box"
-  >
-    <h2 class="form-title">创建账号</h2>
-
-    <div class="portal-switch">
-      <button
-        v-for="item in PORTAL_OPTIONS"
-        :key="item.value"
-        type="button"
-        class="portal-switch__item"
-        :class="{ 'portal-switch__item--active': accountType === item.value }"
-        @click="accountType = item.value"
-      >
-        {{ item.label }}
-      </button>
-    </div>
+  <auth-layout slogan="把模型、知识、工具、工作流装进一个 Box">
+    <h2 class="form-title">重置密码</h2>
     <p class="form-desc">
       已有账号？
-      <router-link :to="{ path: '/login', query: { portal: accountType } }">返回登录</router-link>
+      <router-link to="/login">返回登录</router-link>
     </p>
 
     <t-form :data="formData" :rules="rules" label-width="0" @submit="onSubmit">
-      <template v-if="accountType === 'enterprise'">
-        <t-form-item name="companyName" :rules="companyNameRules">
-          <t-input v-model="formData.companyName" placeholder="企业名称" clearable size="large">
-            <template #prefix-icon>
-              <t-icon name="city" />
-            </template>
-          </t-input>
-        </t-form-item>
-        <t-form-item name="contactEmail">
-          <t-input v-model="formData.contactEmail" placeholder="企业联系邮箱（选填）" clearable size="large">
-            <template #prefix-icon>
-              <t-icon name="mail" />
-            </template>
-          </t-input>
-        </t-form-item>
-      </template>
-
       <t-form-item name="email">
-        <t-input v-model="formData.email" placeholder="登录邮箱" clearable size="large">
+        <t-input v-model="formData.email" placeholder="注册邮箱" clearable size="large">
           <template #prefix-icon>
             <t-icon name="mail" />
           </template>
@@ -64,18 +32,11 @@
           </t-button>
         </div>
       </t-form-item>
-      <t-form-item name="nickname">
-        <t-input v-model="formData.nickname" placeholder="昵称（选填）" clearable size="large">
-          <template #prefix-icon>
-            <t-icon name="user" />
-          </template>
-        </t-input>
-      </t-form-item>
-      <t-form-item name="password">
+      <t-form-item name="newPassword">
         <t-input
-          v-model="formData.password"
+          v-model="formData.newPassword"
           type="password"
-          placeholder="至少 8 位密码"
+          placeholder="新密码（至少 8 位）"
           clearable
           size="large"
         >
@@ -88,7 +49,7 @@
         <t-input
           v-model="formData.confirmPassword"
           type="password"
-          placeholder="再次输入密码"
+          placeholder="再次输入新密码"
           clearable
           size="large"
         >
@@ -99,7 +60,7 @@
       </t-form-item>
       <t-form-item>
         <t-button theme="primary" type="submit" block size="large" shape="round" :loading="loading">
-          注册
+          重置密码
         </t-button>
       </t-form-item>
     </t-form>
@@ -107,37 +68,29 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onUnmounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, FormRule } from 'tdesign-vue-next'
 import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
-import { PORTAL_OPTIONS, type PortalType } from '@/constants/portal'
 import { extractApiError } from '@/api/apiError'
-import { sendVerificationCode } from '@/api/auth'
-import { useAuthStore } from '@/stores/auth'
+import { resetPassword, sendVerificationCode } from '@/api/auth'
 
-const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
 const loading = ref(false)
 const sendingCode = ref(false)
 const countdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
-const accountType = ref<PortalType>('personal')
 
 const formData = reactive({
-  companyName: '',
-  contactEmail: '',
   email: '',
   verificationCode: '',
-  nickname: '',
-  password: '',
+  newPassword: '',
   confirmPassword: '',
 })
 
 const confirmRule: FormRule = {
-  validator: (val) => val === formData.password,
+  validator: (val) => val === formData.newPassword,
   message: '两次密码不一致',
 }
 
@@ -147,28 +100,12 @@ const rules: FormProps['rules'] = {
     { email: true, message: '邮箱格式不正确' },
   ],
   verificationCode: [{ required: true, message: '请输入验证码' }],
-  password: [
-    { required: true, message: '请输入密码' },
+  newPassword: [
+    { required: true, message: '请输入新密码' },
     { min: 8, message: '密码至少 8 位' },
   ],
   confirmPassword: [{ required: true, message: '请确认密码' }, confirmRule],
 }
-
-const companyNameRules: FormRule[] = [{ required: true, message: '请输入企业名称' }]
-
-onMounted(() => {
-  auth.logout()
-  const queryPortal = route.query.portal
-  if (queryPortal === 'enterprise' || queryPortal === 'personal') {
-    accountType.value = queryPortal
-  }
-})
-
-onUnmounted(() => {
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-  }
-})
 
 function startCountdown() {
   countdown.value = 60
@@ -188,7 +125,7 @@ async function sendCode() {
   }
   sendingCode.value = true
   try {
-    const { data } = await sendVerificationCode(formData.email, 'REGISTER')
+    const { data } = await sendVerificationCode(formData.email, 'RESET_PASSWORD')
     if (data.data.devCode) {
       MessagePlugin.info(`开发模式验证码：${data.data.devCode}`)
     } else {
@@ -206,23 +143,25 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   if (validateResult !== true) return
   loading.value = true
   try {
-    await auth.register({
+    await resetPassword({
       email: formData.email,
-      password: formData.password,
       verificationCode: formData.verificationCode,
-      nickname: formData.nickname,
-      accountType: accountType.value === 'enterprise' ? 'ENTERPRISE' : 'PERSONAL',
-      companyName: accountType.value === 'enterprise' ? formData.companyName : undefined,
-      contactEmail: accountType.value === 'enterprise' ? formData.contactEmail : undefined,
+      newPassword: formData.newPassword,
     })
-    MessagePlugin.success('注册成功')
-    await router.push('/chat')
+    MessagePlugin.success('密码已重置，请登录')
+    await router.push('/login')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '注册失败'))
+    MessagePlugin.error(extractApiError(error, '重置密码失败'))
   } finally {
     loading.value = false
   }
 }
+
+onUnmounted(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
+})
 </script>
 
 <style scoped>
@@ -230,31 +169,6 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   margin: 0 0 16px;
   font: var(--td-font-title-large);
   color: var(--box-ink);
-}
-
-.portal-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.portal-switch__item {
-  padding: 10px 12px;
-  border: 1px solid var(--box-border);
-  border-radius: 12px;
-  background: var(--box-surface);
-  color: var(--box-muted);
-  font: var(--td-font-body-medium);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.portal-switch__item--active {
-  border-color: var(--box-ink);
-  background: var(--box-ink);
-  color: #fff;
-  font-weight: 600;
 }
 
 .form-desc {

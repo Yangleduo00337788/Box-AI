@@ -6,7 +6,7 @@
         返回对话
       </t-button>
 
-      <section v-for="group in SETTINGS_NAV" :key="group.title" class="settings-nav__group">
+      <section v-for="group in settingsNav" :key="group.title" class="settings-nav__group">
         <p class="settings-nav__title">{{ group.title }}</p>
         <router-link
           v-for="item in group.items"
@@ -29,11 +29,33 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { SETTINGS_NAV } from '@/constants/settings'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+
+const settingsNav = computed(() => {
+  if (auth.tenant?.tenantType !== 'ENTERPRISE') {
+    return SETTINGS_NAV
+  }
+  return SETTINGS_NAV.map((group) => {
+    if (group.title !== '账号') {
+      return group
+    }
+    return {
+      ...group,
+      items: [
+        ...group.items.slice(0, 5),
+        { value: '/team', label: '团队', icon: 'usergroup-add' },
+        ...group.items.slice(5),
+      ],
+    }
+  })
+})
 </script>
 
 <style scoped>

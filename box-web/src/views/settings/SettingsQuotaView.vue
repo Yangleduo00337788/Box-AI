@@ -52,6 +52,7 @@ const quotaItems = computed(() => {
     { label: 'Token', used: q.usedTokens, total: q.quotaTokens },
     { label: '成员', used: q.usedMembers, total: q.quotaMembers },
     { label: '工作空间', used: q.usedWorkspaces, total: q.quotaWorkspaces },
+    { label: '知识库', used: q.usedKnowledgeBases, total: q.quotaKnowledgeBases },
   ].map((item) => {
     const percent = calcPercent(item.used, item.total)
     return { ...item, percent, status: calcStatus(percent) }

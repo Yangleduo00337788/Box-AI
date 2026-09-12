@@ -50,9 +50,29 @@ export function uploadKnowledgeDocument(knowledgeBaseId: number, file: File) {
   })
 }
 
+export interface KnowledgeSearchHit {
+  chunkId: number
+  documentId: number
+  chunkIndex: number
+  content: string
+  score: number
+}
+
 export function searchKnowledge(knowledgeBaseId: number, query: string, topK = 5) {
-  return http.post<Result<Array<{ chunkId: number; content: string; score: number }>>>(
+  return http.post<Result<KnowledgeSearchHit[]>>(
     `/knowledge-bases/${knowledgeBaseId}/search`,
     { query, topK },
   )
+}
+
+export interface KnowledgeChunkVO {
+  id: number
+  chunkIndex: number
+  content: string
+  tokenCount?: number
+  status?: string
+}
+
+export function listDocumentChunks(documentId: number) {
+  return http.get<Result<KnowledgeChunkVO[]>>(`/documents/${documentId}/chunks`)
 }

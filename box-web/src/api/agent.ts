@@ -23,6 +23,8 @@ export interface AgentVO {
   streamEnabled?: boolean
   memoryEnabled?: boolean
   memoryWindowSize?: number
+  longTermMemoryEnabled?: boolean
+  configJson?: string
   createdBy: number
   createdAt: string
   updatedAt: string
@@ -74,19 +76,84 @@ export function updateAgentModel(
 
 export function updateAgentMemory(
   id: number,
-  payload: { memoryEnabled?: boolean; memoryWindowSize?: number },
+  payload: { memoryEnabled?: boolean; memoryWindowSize?: number; longTermMemoryEnabled?: boolean },
 ) {
   return http.put<Result<AgentVO>>(`/agents/${id}/memory`, payload)
 }
 
-export function chatAgent(id: number, message: string) {
-  return http.post<Result<{ content: string }>>(`/agents/${id}/chat`, { message, stream: false }, { timeout: 60000 })
+export interface AgentLongTermMemoryVO {
+  id: number
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+export function listAgentLongTermMemories(id: number) {
+  return http.get<Result<AgentLongTermMemoryVO[]>>(`/agents/${id}/long-term-memories`)
+}
+
+export function deleteAgentLongTermMemory(agentId: number, memoryId: number) {
+  return http.delete<Result<void>>(`/agents/${agentId}/long-term-memories/${memoryId}`)
+}
+
+export function updateAgentConfig(id: number, payload: { configJson?: string }) {
+  return http.put<Result<AgentVO>>(`/agents/${id}/config`, payload)
+}
+
+export interface AgentChatHistoryItem {
+  role: 'USER' | 'ASSISTANT'
+  content: string
+}
+
+export interface KnowledgeCitation {
+  index: number
+  chunkId: number
+  documentId: number
+  documentName: string
+  pageNumber?: number
+  chunkIndex?: number
+  content: string
+  score: number
+}
+
+export interface AgentChatResult {
+  content: string
+  citations?: KnowledgeCitation[]
+  executionId?: number
+}
+
+function buildChatHistory(messages: AgentChatHistoryItem[]) {
+  return messages
+    .filter((item) => item.content?.trim())
+    .map((item) => ({
+      role: item.role,
+      content: item.content.trim(),
+    }))
+}
+
+export function chatAgent(id: number, message: string, history: AgentChatHistoryItem[] = []) {
+  return http.post<Result<AgentChatResult>>(
+    `/agents/${id}/chat`,
+    { message, stream: false, history: buildChatHistory(history) },
+    { timeout: 60000 },
+  )
 }
 
 export interface ChatStreamEvent {
-  type: 'delta' | 'done' | 'error'
+  type: 'delta' | 'done' | 'error' | 'citations'
   content?: string
   message?: string
+  executionId?: number
+}
+
+function parseCitationsJson(raw?: string): KnowledgeCitation[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
 }
 
 function authHeaders(accept = 'application/json') {
@@ -105,14 +172,22 @@ function authHeaders(accept = 'application/json') {
   return headers
 }
 
-function parseSseEvent(rawEvent: string, onDelta: (chunk: string) => void): 'continue' | 'done' | 'error' {
+interface StreamEventHandlers {
+  onDelta: (chunk: string) => void
+  onCitations?: (citations: KnowledgeCitation[]) => void
+}
+
+function parseSseEvent(rawEvent: string, handlers: StreamEventHandlers): 'continue' | 'done' | 'error' {
   for (const line of rawEvent.split('\n')) {
     if (!line.startsWith('data:')) continue
     const payload = line.slice(5).trim()
     if (!payload) continue
     const event = JSON.parse(payload) as ChatStreamEvent
     if (event.type === 'delta' && event.content) {
-      onDelta(event.content)
+      handlers.onDelta(event.content)
+    }
+    if (event.type === 'citations' && event.content) {
+      handlers.onCitations?.(parseCitationsJson(event.content))
     }
     if (event.type === 'error') {
       throw new Error(event.message || '流式对话失败')
@@ -124,13 +199,13 @@ function parseSseEvent(rawEvent: string, onDelta: (chunk: string) => void): 'con
   return 'continue'
 }
 
-function drainSseBuffer(buffer: string, onDelta: (chunk: string) => void): { rest: string; finished: boolean } {
+function drainSseBuffer(buffer: string, handlers: StreamEventHandlers): { rest: string; finished: boolean } {
   let rest = buffer
   let boundary = rest.indexOf('\n\n')
   while (boundary >= 0) {
     const rawEvent = rest.slice(0, boundary)
     rest = rest.slice(boundary + 2)
-    const status = parseSseEvent(rawEvent, onDelta)
+    const status = parseSseEvent(rawEvent, handlers)
     if (status === 'done') {
       return { rest, finished: true }
     }
@@ -143,11 +218,14 @@ export async function chatAgentStream(
   id: number,
   message: string,
   onDelta: (chunk: string) => void,
+  history: AgentChatHistoryItem[] = [],
+  options?: { signal?: AbortSignal; onCitations?: (citations: KnowledgeCitation[]) => void },
 ): Promise<void> {
   const response = await fetch(`/api/v1/agents/${id}/chat`, {
     method: 'POST',
     headers: authHeaders('text/event-stream, application/json'),
-    body: JSON.stringify({ message, stream: true }),
+    body: JSON.stringify({ message, stream: true, history: buildChatHistory(history) }),
+    signal: options?.signal,
   })
 
   await assertStreamResponseOk(response)
@@ -166,14 +244,18 @@ export async function chatAgentStream(
       if (value) {
         buffer += decoder.decode(value, { stream: true })
       }
-      const drained = drainSseBuffer(buffer, onDelta)
+      const handlers: StreamEventHandlers = {
+        onDelta,
+        onCitations: options?.onCitations,
+      }
+      const drained = drainSseBuffer(buffer, handlers)
       buffer = drained.rest
       if (drained.finished) {
         return
       }
       if (done) {
         if (buffer.trim()) {
-          const status = parseSseEvent(buffer, onDelta)
+          const status = parseSseEvent(buffer, handlers)
           if (status === 'done') return
         }
         return
@@ -259,6 +341,29 @@ export function unbindAgentMcp(agentId: number, mcpServerId: number) {
   return http.delete<Result<void>>(`/agents/${agentId}/mcp/${mcpServerId}`)
 }
 
+export interface AgentSubAgentBindingVO {
+  id: number
+  subAgentId: number
+  subAgentName?: string
+  enabled?: boolean
+  sortOrder?: number
+}
+
+export function listAgentSubAgents(agentId: number) {
+  return http.get<Result<AgentSubAgentBindingVO[]>>(`/agents/${agentId}/sub-agents`)
+}
+
+export function bindAgentSubAgent(
+  agentId: number,
+  payload: { subAgentId: number; enabled?: boolean; sortOrder?: number },
+) {
+  return http.post<Result<AgentSubAgentBindingVO>>(`/agents/${agentId}/sub-agents`, payload)
+}
+
+export function unbindAgentSubAgent(agentId: number, subAgentId: number) {
+  return http.delete<Result<void>>(`/agents/${agentId}/sub-agents/${subAgentId}`)
+}
+
 export function getAgentPublishStatus(agentId: number) {
   return http.get<Result<AgentPublishVO>>(`/agents/${agentId}/publish`)
 }
@@ -269,4 +374,60 @@ export function publishAgent(agentId: number) {
 
 export function unpublishAgent(agentId: number) {
   return http.post<Result<AgentPublishVO>>(`/agents/${agentId}/unpublish`)
+}
+
+export interface AgentVersionVO {
+  id: number
+  versionNo: number
+  versionName: string
+  status: string
+  publishedAt?: string
+  createdAt: string
+  updatedAt: string
+  currentDraft: boolean
+  published: boolean
+}
+
+export interface AgentVersionDiffVO {
+  field: string
+  label: string
+  baseValue: string
+  targetValue: string
+  changed: boolean
+}
+
+export interface AgentVersionCompareVO {
+  baseVersionId: number
+  targetVersionId: number
+  diffs: AgentVersionDiffVO[]
+}
+
+export function listAgentVersions(agentId: number) {
+  return http.get<Result<AgentVersionVO[]>>(`/agents/${agentId}/versions`)
+}
+
+export function compareAgentVersions(agentId: number, baseId: number, targetId: number) {
+  return http.get<Result<AgentVersionCompareVO>>(`/agents/${agentId}/versions/compare`, {
+    params: { baseId, targetId },
+  })
+}
+
+export function createAgentVersion(agentId: number, sourceVersionId?: number) {
+  return http.post<Result<AgentVersionVO>>(`/agents/${agentId}/versions`, { sourceVersionId })
+}
+
+export function restoreAgentVersion(agentId: number, versionId: number) {
+  return http.post<Result<void>>(`/agents/${agentId}/versions/${versionId}/restore`)
+}
+
+export function archiveAgentVersion(agentId: number, versionId: number) {
+  return http.post<Result<AgentVersionVO>>(`/agents/${agentId}/versions/${versionId}/archive`)
+}
+
+export function duplicateAgent(agentId: number) {
+  return http.post<Result<AgentVO>>(`/agents/${agentId}/duplicate`)
+}
+
+export function archiveAgent(agentId: number) {
+  return http.post<Result<AgentVO>>(`/agents/${agentId}/archive`)
 }

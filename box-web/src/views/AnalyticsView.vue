@@ -2,6 +2,11 @@
   <div>
     <page-header title="分析" desc="查看工作空间内的智能体、对话与资源使用情况">
       <template #actions>
+        <t-radio-group v-model="periodDays" variant="default-filled" size="small" @change="loadOverview">
+          <t-radio-button :value="1">今天</t-radio-button>
+          <t-radio-button :value="7">7 天</t-radio-button>
+          <t-radio-button :value="30">30 天</t-radio-button>
+        </t-radio-group>
         <t-button variant="outline" @click="router.push('/executions')">查看执行记录</t-button>
       </template>
     </page-header>
@@ -15,6 +20,16 @@
         </article>
       </div>
     </t-loading>
+
+    <section v-if="overview?.topAgents?.length" class="section">
+      <h3 class="section__title">热门智能体（近 {{ overview.periodDays }} 天）</h3>
+      <t-table row-key="agentId" :data="overview.topAgents" :columns="topAgentColumns" bordered stripe size="small">
+        <template #successRate="{ row }">{{ row.successRate.toFixed(1) }}%</template>
+        <template #op="{ row }">
+          <t-button variant="text" theme="primary" @click="router.push(`/agents/${row.agentId}/builder`)">打开</t-button>
+        </template>
+      </t-table>
+    </section>
 
     <section v-if="overview?.quota" class="section">
       <h3 class="section__title">资源使用</h3>
@@ -41,13 +56,17 @@ import { fetchAnalyticsOverview, type AnalyticsOverviewVO } from '@/api/analytic
 const router = useRouter()
 const loading = ref(false)
 const overview = ref<AnalyticsOverviewVO | null>(null)
+const periodDays = ref(7)
 
 const stats = computed(() => {
   if (!overview.value) return []
   return [
     { label: '智能体', value: overview.value.agentCount, hint: '当前工作空间' },
     { label: '对话', value: overview.value.conversationCount, hint: '历史会话' },
-    { label: '执行', value: overview.value.executionCount, hint: 'Agent/Workflow 运行' },
+    { label: '执行', value: overview.value.periodExecutionCount, hint: `近 ${overview.value.periodDays} 天` },
+    { label: '成功率', value: `${overview.value.successRate.toFixed(1)}%`, hint: '执行成功占比' },
+    { label: '平均延迟', value: overview.value.avgLatencyMs ? `${overview.value.avgLatencyMs} ms` : '—', hint: '执行耗时' },
+    { label: '总执行', value: overview.value.executionCount, hint: '累计记录' },
     { label: '知识库', value: overview.value.knowledgeBaseCount, hint: 'RAG 资源' },
     { label: '工具', value: overview.value.toolCount, hint: 'HTTP Tool' },
     { label: '工作流', value: overview.value.workflowCount, hint: '编排数量' },
@@ -87,15 +106,24 @@ const usageItems = computed(() => {
   })
 })
 
-onMounted(async () => {
+const topAgentColumns = [
+  { colKey: 'agentName', title: '智能体' },
+  { colKey: 'executionCount', title: '执行次数', width: 100 },
+  { colKey: 'successRate', title: '成功率', width: 100 },
+  { colKey: 'op', title: '操作', width: 80 },
+]
+
+async function loadOverview() {
   loading.value = true
   try {
-    const { data } = await fetchAnalyticsOverview()
+    const { data } = await fetchAnalyticsOverview(periodDays.value)
     overview.value = data.data
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadOverview)
 </script>
 
 <style scoped>
