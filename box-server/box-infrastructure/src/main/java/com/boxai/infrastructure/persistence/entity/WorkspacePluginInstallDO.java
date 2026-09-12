@@ -18,6 +18,10 @@ public class WorkspacePluginInstallDO {
     private Long workspaceId;
     @Column("plugin_id")
     private Long pluginId;
+    @Column("resource_type")
+    private String resourceType;
+    @Column("resource_id")
+    private Long resourceId;
     @Column("installed_by")
     private Long installedBy;
     @Column("installed_at")

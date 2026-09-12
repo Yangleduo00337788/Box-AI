@@ -2,6 +2,7 @@ package com.boxai.tenant.application;
 
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.knowledge.KnowledgeBaseRepository;
 import com.boxai.domain.plan.Plan;
 import com.boxai.domain.plan.PlanRepository;
 import com.boxai.domain.plan.TenantUsage;
@@ -26,17 +27,20 @@ public class QuotaApplicationService {
     private final PlanRepository planRepository;
     private final TenantUsageRepository tenantUsageRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final PlanApplicationService planApplicationService;
 
     public QuotaApplicationService(TenantRepository tenantRepository,
                                    PlanRepository planRepository,
                                    TenantUsageRepository tenantUsageRepository,
                                    WorkspaceRepository workspaceRepository,
+                                   KnowledgeBaseRepository knowledgeBaseRepository,
                                    PlanApplicationService planApplicationService) {
         this.tenantRepository = tenantRepository;
         this.planRepository = planRepository;
         this.tenantUsageRepository = tenantUsageRepository;
         this.workspaceRepository = workspaceRepository;
+        this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.planApplicationService = planApplicationService;
     }
 
@@ -49,6 +53,11 @@ public class QuotaApplicationService {
 
     public QuotaSnapshotVO getQuotaForTenant(Long tenantId) {
         requireTenant(tenantId);
+        return buildSnapshot(tenantId);
+    }
+
+    public QuotaSnapshotVO getQuotaForWorkspace(Long workspaceId) {
+        Long tenantId = resolveTenantId(workspaceId);
         return buildSnapshot(tenantId);
     }
 
@@ -92,6 +101,22 @@ public class QuotaApplicationService {
         }
     }
 
+    public void assertKnowledgeBaseQuotaAvailable(Long workspaceId) {
+        Long tenantId = resolveTenantId(workspaceId);
+        Plan plan = resolvePlan(tenantId);
+        if (plan.getQuotaKnowledgeBases() == null || plan.getQuotaKnowledgeBases() <= 0) {
+            return;
+        }
+        int usedKnowledgeBases = knowledgeBaseRepository.countByTenantId(tenantId);
+        if (usedKnowledgeBases >= plan.getQuotaKnowledgeBases()) {
+            throw new BusinessException(ErrorCode.QUOTA_EXCEEDED, "知识库数量已达套餐上限");
+        }
+    }
+
+    public void consumeEmbeddingUsage(Long workspaceId, long estimatedTokens) {
+        consumeAiUsage(workspaceId, estimatedTokens);
+    }
+
     public void assignDefaultPlan(Tenant tenant) {
         if (tenant.getPlanId() != null) {
             return;
@@ -108,6 +133,7 @@ public class QuotaApplicationService {
         TenantUsage usage = getOrCreateUsage(tenantId, currentPeriod());
         int usedMembers = tenantRepository.listMembersByTenantId(tenantId).size();
         int usedWorkspaces = workspaceRepository.countByTenantId(tenantId);
+        int usedKnowledgeBases = knowledgeBaseRepository.countByTenantId(tenantId);
         return new QuotaSnapshotVO(
                 tenantId,
                 plan.getId(),
@@ -117,14 +143,17 @@ public class QuotaApplicationService {
                 plan.getQuotaTokens(),
                 plan.getQuotaMembers(),
                 plan.getQuotaWorkspaces(),
+                plan.getQuotaKnowledgeBases(),
                 usage.getAiCalls(),
                 usage.getTokens(),
                 usedMembers,
                 usedWorkspaces,
+                usedKnowledgeBases,
                 remaining(plan.getQuotaAiCalls(), usage.getAiCalls()),
                 remainingLong(plan.getQuotaTokens(), usage.getTokens()),
                 remaining(plan.getQuotaMembers(), usedMembers),
-                remaining(plan.getQuotaWorkspaces(), usedWorkspaces));
+                remaining(plan.getQuotaWorkspaces(), usedWorkspaces),
+                remaining(plan.getQuotaKnowledgeBases(), usedKnowledgeBases));
     }
 
     private void assertAiWithinLimit(Plan plan, TenantUsage usage) {

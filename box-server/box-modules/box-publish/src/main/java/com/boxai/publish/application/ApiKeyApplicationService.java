@@ -11,6 +11,7 @@ import com.boxai.publish.api.CreateApiKeyResponse;
 import com.boxai.publish.support.ApiKeyGenerator;
 import com.boxai.publish.support.ApiKeyHasher;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,23 +27,28 @@ public class ApiKeyApplicationService {
     private final ApiKeyGenerator apiKeyGenerator;
     private final ApiKeyHasher apiKeyHasher;
     private final RedisService redisService;
+    private final WorkspacePermissionService workspacePermissionService;
 
     public ApiKeyApplicationService(ApiKeyRepository apiKeyRepository,
                                     ApiKeyGenerator apiKeyGenerator,
                                     ApiKeyHasher apiKeyHasher,
-                                    RedisService redisService) {
+                                    RedisService redisService,
+                                    WorkspacePermissionService workspacePermissionService) {
         this.apiKeyRepository = apiKeyRepository;
         this.apiKeyGenerator = apiKeyGenerator;
         this.apiKeyHasher = apiKeyHasher;
         this.redisService = redisService;
+        this.workspacePermissionService = workspacePermissionService;
     }
 
     public List<ApiKeyVO> list() {
+        workspacePermissionService.requirePermission("agent:publish");
         return apiKeyRepository.listByWorkspace(workspaceId()).stream().map(this::toVO).toList();
     }
 
     @Transactional
     public CreateApiKeyResponse create(CreateApiKeyRequest request) {
+        workspacePermissionService.requirePermission("agent:publish");
         String rawKey = apiKeyGenerator.generate();
         ApiKey apiKey = new ApiKey();
         apiKey.setWorkspaceId(workspaceId());
@@ -58,6 +64,7 @@ public class ApiKeyApplicationService {
 
     @Transactional
     public void delete(Long id) {
+        workspacePermissionService.requirePermission("agent:publish");
         ApiKey apiKey = requireApiKey(id);
         apiKeyRepository.delete(apiKey.getId());
         evictCache(apiKey.getKeyHash());
@@ -65,6 +72,7 @@ public class ApiKeyApplicationService {
 
     @Transactional
     public ApiKeyVO disable(Long id) {
+        workspacePermissionService.requirePermission("agent:publish");
         ApiKey apiKey = requireApiKey(id);
         apiKey.setStatus(0);
         apiKeyRepository.update(apiKey);
@@ -74,11 +82,25 @@ public class ApiKeyApplicationService {
 
     @Transactional
     public ApiKeyVO enable(Long id) {
+        workspacePermissionService.requirePermission("agent:publish");
         ApiKey apiKey = requireApiKey(id);
         apiKey.setStatus(1);
         apiKeyRepository.update(apiKey);
         cache(apiKey);
         return toVO(apiKey);
+    }
+
+    @Transactional
+    public CreateApiKeyResponse rotate(Long id) {
+        ApiKey apiKey = requireApiKey(id);
+        evictCache(apiKey.getKeyHash());
+        String rawKey = apiKeyGenerator.generate();
+        apiKey.setKeyPrefix(apiKeyGenerator.prefix(rawKey));
+        apiKey.setKeyHash(apiKeyHasher.hash(rawKey));
+        apiKey.setStatus(1);
+        apiKeyRepository.update(apiKey);
+        cache(apiKey);
+        return new CreateApiKeyResponse(apiKey.getId(), apiKey.getName(), rawKey);
     }
 
     public ApiKey authenticate(String rawApiKey) {

@@ -7,5 +7,8 @@ public record PluginCatalogVO(
         String title,
         String description,
         Integer installCount,
-        Boolean installed
+        Boolean installed,
+        String resourceType,
+        Long resourceId,
+        String targetPath
 ) {}

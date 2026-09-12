@@ -22,6 +22,8 @@ public record AgentVO(
         Boolean streamEnabled,
         Boolean memoryEnabled,
         Integer memoryWindowSize,
+        Boolean longTermMemoryEnabled,
+        String configJson,
         Long createdBy,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

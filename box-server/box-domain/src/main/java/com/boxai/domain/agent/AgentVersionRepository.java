@@ -1,5 +1,6 @@
 package com.boxai.domain.agent;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface AgentVersionRepository {
@@ -15,4 +16,6 @@ public interface AgentVersionRepository {
     Optional<AgentVersion> findByAgentIdAndVersionNo(Long agentId, Integer versionNo);
 
     int maxVersionNo(Long agentId);
+
+    List<AgentVersion> listByAgentId(Long agentId);
 }

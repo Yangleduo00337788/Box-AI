@@ -3,7 +3,9 @@ package com.boxai.infrastructure.persistence.repository;
 import com.boxai.domain.knowledge.KnowledgeBase;
 import com.boxai.domain.knowledge.KnowledgeBaseRepository;
 import com.boxai.infrastructure.persistence.entity.KnowledgeBaseDO;
+import com.boxai.infrastructure.persistence.entity.WorkspaceDO;
 import com.boxai.infrastructure.persistence.mapper.KnowledgeBaseMapper;
+import com.boxai.infrastructure.persistence.mapper.WorkspaceMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Repository;
 
@@ -15,9 +17,11 @@ import java.util.Optional;
 public class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
 
     private final KnowledgeBaseMapper mapper;
+    private final WorkspaceMapper workspaceMapper;
 
-    public KnowledgeBaseRepositoryImpl(KnowledgeBaseMapper mapper) {
+    public KnowledgeBaseRepositoryImpl(KnowledgeBaseMapper mapper, WorkspaceMapper workspaceMapper) {
         this.mapper = mapper;
+        this.workspaceMapper = workspaceMapper;
     }
 
     @Override
@@ -57,6 +61,38 @@ public class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
     public List<KnowledgeBase> listByWorkspace(Long workspaceId) {
         return mapper.selectListByQuery(
                         QueryWrapper.create().eq("workspace_id", workspaceId).orderBy("updated_at", false))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public int countByWorkspace(Long workspaceId) {
+        return (int) mapper.selectCountByQuery(QueryWrapper.create().eq("workspace_id", workspaceId));
+    }
+
+    @Override
+    public int countByTenantId(Long tenantId) {
+        List<Long> workspaceIds = workspaceMapper.selectListByQuery(
+                        QueryWrapper.create().eq("tenant_id", tenantId).select("id"))
+                .stream()
+                .map(WorkspaceDO::getId)
+                .toList();
+        if (workspaceIds.isEmpty()) {
+            return 0;
+        }
+        Long count = mapper.selectCountByQuery(QueryWrapper.create().in("workspace_id", workspaceIds));
+        return count == null ? 0 : count.intValue();
+    }
+
+    @Override
+    public List<KnowledgeBase> searchByName(Long workspaceId, String keyword, int limit) {
+        return mapper.selectListByQuery(
+                        QueryWrapper.create()
+                                .eq("workspace_id", workspaceId)
+                                .like("name", keyword)
+                                .orderBy("updated_at", false)
+                                .limit(limit))
                 .stream()
                 .map(this::toDomain)
                 .toList();

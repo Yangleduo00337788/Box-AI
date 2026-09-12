@@ -4,9 +4,12 @@ import com.boxai.ai.ChatModelGateway;
 import com.boxai.ai.ChatStreamHandler;
 import com.boxai.ai.ChatTurn;
 import com.boxai.ai.ModelRuntimeConfig;
+import com.boxai.ai.ToolCall;
 import com.boxai.ai.ToolDefinition;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -21,13 +24,17 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
 public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Override
     public String chat(ModelRuntimeConfig config, String userMessage) {
@@ -59,13 +66,13 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         return model.chat(toMessages(turns)).aiMessage().text();
     }
 
-    private static final Pattern TOOL_CALL_PATTERN = Pattern.compile("\\{\\s*\"tool\"\\s*:\\s*\"([^\"]+)\"\\s*\\}");
+    private static final Pattern TOOL_CALL_PATTERN = Pattern.compile("\\{[^{}]*\"tool\"\\s*:\\s*\"([^\"]+)\"[^{}]*\\}");
 
     @Override
     public String chatWithTools(ModelRuntimeConfig config,
                                 List<ChatTurn> turns,
                                 List<ToolDefinition> tools,
-                                Function<String, String> toolExecutor,
+                                Function<ToolCall, String> toolExecutor,
                                 Double temperature,
                                 Double topP,
                                 Integer maxTokens) {
@@ -76,20 +83,61 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         prependToolInstruction(workingTurns, tools);
         for (int round = 0; round < 5; round++) {
             String response = chat(config, workingTurns, temperature, topP, maxTokens);
-            Matcher matcher = TOOL_CALL_PATTERN.matcher(response);
-            if (!matcher.find()) {
+            ToolCall toolCall = parseToolCall(response);
+            if (toolCall == null) {
                 return response;
             }
-            String toolKey = matcher.group(1);
-            String toolResult = toolExecutor.apply(toolKey);
+            String toolResult = toolExecutor.apply(toolCall);
             workingTurns.add(new ChatTurn("ASSISTANT", response));
-            workingTurns.add(new ChatTurn("USER", "工具 " + toolKey + " 的执行结果：\n" + toolResult + "\n请基于结果继续回答用户。"));
+            workingTurns.add(new ChatTurn("USER", "工具 " + toolCall.toolKey() + " 的执行结果：\n" + toolResult + "\n请基于结果继续回答用户。"));
         }
         throw new BusinessException(ErrorCode.EXECUTION_FAILED, "工具调用超过最大轮次");
     }
 
+    private ToolCall parseToolCall(String response) {
+        if (response == null || response.isBlank()) {
+            return null;
+        }
+        Matcher matcher = TOOL_CALL_PATTERN.matcher(response);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(matcher.group());
+            String toolKey = node.path("tool").asText(null);
+            if (toolKey == null || toolKey.isBlank()) {
+                return null;
+            }
+            Map<String, Object> arguments = new LinkedHashMap<>();
+            JsonNode argsNode = node.get("arguments");
+            if (argsNode != null && argsNode.isObject()) {
+                argsNode.fields().forEachRemaining(entry -> arguments.put(entry.getKey(), jsonValue(entry.getValue())));
+            }
+            return new ToolCall(toolKey, arguments);
+        } catch (Exception ex) {
+            return new ToolCall(matcher.group(1), Map.of());
+        }
+    }
+
+    private Object jsonValue(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isTextual()) {
+            return node.asText();
+        }
+        if (node.isNumber()) {
+            return node.numberValue();
+        }
+        if (node.isBoolean()) {
+            return node.asBoolean();
+        }
+        return node.toString();
+    }
+
     private void prependToolInstruction(List<ChatTurn> turns, List<ToolDefinition> tools) {
-        StringBuilder builder = new StringBuilder("你可以调用以下工具。需要调用时，仅回复 JSON：{\"tool\":\"tool_key\"}\n");
+        StringBuilder builder = new StringBuilder(
+                "你可以调用以下工具。需要调用时，仅回复 JSON：{\"tool\":\"tool_key\",\"arguments\":{...}}\n");
         for (ToolDefinition tool : tools) {
             builder.append("- ").append(tool.name());
             if (tool.description() != null && !tool.description().isBlank()) {

@@ -8,6 +8,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -77,6 +78,15 @@ public class AgentVersionRepositoryImpl implements AgentVersionRepository {
                 .orElse(0);
     }
 
+    @Override
+    public List<AgentVersion> listByAgentId(Long agentId) {
+        return mapper.selectListByQuery(
+                        QueryWrapper.create().eq("agent_id", agentId).orderBy("version_no", false))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
     private AgentVersion toDomain(AgentVersionDO row) {
         AgentVersion version = new AgentVersion();
         version.setId(row.getId());
@@ -94,6 +104,7 @@ public class AgentVersionRepositoryImpl implements AgentVersionRepository {
         version.setStreamEnabled(row.getStreamEnabled() != null && row.getStreamEnabled() == 1);
         version.setMemoryEnabled(row.getMemoryEnabled() != null && row.getMemoryEnabled() == 1);
         version.setMemoryWindowSize(row.getMemoryWindowSize() == null ? 20 : row.getMemoryWindowSize());
+        version.setLongTermMemoryEnabled(row.getLongTermMemoryEnabled() != null && row.getLongTermMemoryEnabled() == 1);
         version.setKnowledgeEnabled(row.getKnowledgeEnabled() != null && row.getKnowledgeEnabled() == 1);
         version.setToolEnabled(row.getToolEnabled() != null && row.getToolEnabled() == 1);
         version.setConfigJson(row.getConfigJson());
@@ -121,6 +132,7 @@ public class AgentVersionRepositoryImpl implements AgentVersionRepository {
         row.setStreamEnabled(Boolean.TRUE.equals(version.getStreamEnabled()) ? 1 : 0);
         row.setMemoryEnabled(Boolean.TRUE.equals(version.getMemoryEnabled()) ? 1 : 0);
         row.setMemoryWindowSize(version.getMemoryWindowSize() == null ? 20 : version.getMemoryWindowSize());
+        row.setLongTermMemoryEnabled(Boolean.TRUE.equals(version.getLongTermMemoryEnabled()) ? 1 : 0);
         row.setKnowledgeEnabled(Boolean.TRUE.equals(version.getKnowledgeEnabled()) ? 1 : 0);
         row.setToolEnabled(Boolean.TRUE.equals(version.getToolEnabled()) ? 1 : 0);
         row.setConfigJson(version.getConfigJson());

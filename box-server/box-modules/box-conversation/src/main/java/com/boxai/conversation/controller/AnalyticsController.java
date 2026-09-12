@@ -5,6 +5,7 @@ import com.boxai.conversation.api.AnalyticsOverviewVO;
 import com.boxai.conversation.application.AnalyticsApplicationService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,7 +19,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/overview")
-    public Result<AnalyticsOverviewVO> overview() {
-        return Result.success(analyticsApplicationService.overview());
+    public Result<AnalyticsOverviewVO> overview(@RequestParam(defaultValue = "7") int days) {
+        return Result.success(analyticsApplicationService.overview(days));
     }
 }

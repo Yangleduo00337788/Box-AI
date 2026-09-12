@@ -12,5 +12,7 @@ public interface KnowledgeChunkRepository {
 
     void deleteByDocument(Long documentId);
 
+    List<KnowledgeChunk> listByDocument(Long documentId);
+
     int countByKnowledgeBase(Long knowledgeBaseId);
 }

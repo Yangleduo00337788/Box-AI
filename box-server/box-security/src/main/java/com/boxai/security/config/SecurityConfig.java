@@ -50,9 +50,12 @@ public class SecurityConfig {
                                 "/error",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register",
+                                "/api/v1/auth/verification-code",
+                                "/api/v1/auth/password/reset",
                                 "/api/v1/admin/auth/login",
                                 "/api/v1/system/health",
-                                "/api/v1/system/content")
+                                "/api/v1/system/content",
+                                "/api/v1/hooks/**")
                         .permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, e) ->

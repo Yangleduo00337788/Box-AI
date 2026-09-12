@@ -25,6 +25,7 @@ public class AgentVersion {
     private Boolean streamEnabled;
     private Boolean memoryEnabled;
     private Integer memoryWindowSize;
+    private Boolean longTermMemoryEnabled;
     private Boolean knowledgeEnabled;
     private Boolean toolEnabled;
     private String configJson;

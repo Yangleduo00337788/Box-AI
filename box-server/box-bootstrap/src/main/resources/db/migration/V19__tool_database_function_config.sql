@@ -1,0 +1,31 @@
+CREATE TABLE tool_database_config (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tool_id BIGINT UNSIGNED NOT NULL,
+    database_type VARCHAR(32) NOT NULL DEFAULT 'MYSQL',
+    host VARCHAR(255) NOT NULL,
+    port INT NOT NULL DEFAULT 3306,
+    database_name VARCHAR(128) NOT NULL,
+    username VARCHAR(128) NOT NULL,
+    password_ciphertext TEXT NOT NULL,
+    allowed_operations JSON DEFAULT NULL,
+    max_rows INT NOT NULL DEFAULT 100,
+    timeout_ms INT NOT NULL DEFAULT 10000,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_tool_database_tool_id (tool_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据库 Tool 配置';
+
+CREATE TABLE tool_function_config (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tool_id BIGINT UNSIGNED NOT NULL,
+    function_name VARCHAR(128) NOT NULL,
+    function_code LONGTEXT NOT NULL,
+    runtime VARCHAR(32) NOT NULL DEFAULT 'JAVA_SCRIPT',
+    timeout_ms INT NOT NULL DEFAULT 5000,
+    memory_limit_mb INT NOT NULL DEFAULT 128,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_tool_function_tool_id (tool_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Function / Code Tool 配置';

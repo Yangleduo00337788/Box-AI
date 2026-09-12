@@ -13,5 +13,11 @@ public interface KnowledgeBaseRepository {
 
     List<KnowledgeBase> listByWorkspace(Long workspaceId);
 
+    int countByWorkspace(Long workspaceId);
+
+    int countByTenantId(Long tenantId);
+
+    List<KnowledgeBase> searchByName(Long workspaceId, String keyword, int limit);
+
     void delete(Long id);
 }

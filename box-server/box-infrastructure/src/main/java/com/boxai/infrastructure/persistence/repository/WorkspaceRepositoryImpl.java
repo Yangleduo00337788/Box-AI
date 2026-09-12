@@ -79,6 +79,22 @@ public class WorkspaceRepositoryImpl implements WorkspaceRepository {
     }
 
     @Override
+    public List<WorkspaceMember> listMembersByWorkspaceId(Long workspaceId) {
+        List<WorkspaceMemberDO> rows = memberMapper.selectListByQuery(
+                QueryWrapper.create().eq("workspace_id", workspaceId).eq("status", 1));
+        List<WorkspaceMember> result = new ArrayList<>();
+        for (WorkspaceMemberDO row : rows) {
+            WorkspaceMember member = toMember(row);
+            RoleDO role = roleMapper.selectOneById(row.getRoleId());
+            if (role != null) {
+                member.setRoleCode(role.getRoleCode());
+            }
+            result.add(member);
+        }
+        return result;
+    }
+
+    @Override
     public WorkspaceMember addMember(WorkspaceMember member) {
         WorkspaceMemberDO row = new WorkspaceMemberDO();
         row.setWorkspaceId(member.getWorkspaceId());
@@ -94,6 +110,27 @@ public class WorkspaceRepositoryImpl implements WorkspaceRepository {
         memberMapper.insert(row);
         member.setId(row.getId());
         return member;
+    }
+
+    @Override
+    public void updateMember(WorkspaceMember member) {
+        WorkspaceMemberDO row = memberMapper.selectOneById(member.getId());
+        if (row == null) {
+            return;
+        }
+        row.setRoleId(member.getRoleId());
+        row.setStatus(member.getStatus());
+        row.setUpdatedAt(LocalDateTime.now());
+        memberMapper.update(row);
+    }
+
+    @Override
+    public void removeMember(Long workspaceId, Long userId) {
+        WorkspaceMemberDO row = memberMapper.selectOneByQuery(
+                QueryWrapper.create().eq("workspace_id", workspaceId).eq("user_id", userId));
+        if (row != null) {
+            memberMapper.deleteById(row.getId());
+        }
     }
 
     @Override
@@ -115,6 +152,15 @@ public class WorkspaceRepositoryImpl implements WorkspaceRepository {
     public int countByTenantId(Long tenantId) {
         Long count = workspaceMapper.selectCountByQuery(QueryWrapper.create().eq("tenant_id", tenantId));
         return count == null ? 0 : count.intValue();
+    }
+
+    @Override
+    public List<Workspace> listByTenantId(Long tenantId) {
+        return workspaceMapper.selectListByQuery(
+                        QueryWrapper.create().eq("tenant_id", tenantId).orderBy("updated_at", false))
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     private Workspace toDomain(WorkspaceDO row) {

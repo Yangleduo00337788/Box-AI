@@ -2,20 +2,18 @@ package com.boxai.tool.application;
 
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.common.security.SsrfGuard;
 import com.boxai.domain.mcp.McpServer;
 import com.boxai.domain.mcp.McpServerRepository;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.tool.api.CreateMcpServerRequest;
 import com.boxai.tool.api.McpServerVO;
 import com.boxai.tool.api.UpdateMcpServerRequest;
+import com.boxai.tool.mcp.McpProtocolClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,24 +21,30 @@ import java.util.List;
 public class McpServerApplicationService {
 
     private final McpServerRepository mcpServerRepository;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    private final WorkspacePermissionService workspacePermissionService;
+    private final McpProtocolClient mcpProtocolClient;
 
-    public McpServerApplicationService(McpServerRepository mcpServerRepository) {
+    public McpServerApplicationService(McpServerRepository mcpServerRepository,
+                                       WorkspacePermissionService workspacePermissionService,
+                                       McpProtocolClient mcpProtocolClient) {
         this.mcpServerRepository = mcpServerRepository;
+        this.workspacePermissionService = workspacePermissionService;
+        this.mcpProtocolClient = mcpProtocolClient;
     }
 
     public List<McpServerVO> list() {
+        workspacePermissionService.requirePermission("tool:execute");
         return mcpServerRepository.listByWorkspace(workspaceId()).stream().map(this::toVO).toList();
     }
 
     public McpServerVO detail(Long id) {
+        workspacePermissionService.requirePermission("tool:execute");
         return toVO(requireServer(id));
     }
 
     @Transactional
     public McpServerVO create(CreateMcpServerRequest request) {
+        workspacePermissionService.requirePermission("tool:create");
         Long userId = WorkspaceContext.require().userId();
         McpServer server = new McpServer();
         server.setWorkspaceId(workspaceId());
@@ -48,7 +52,7 @@ public class McpServerApplicationService {
         server.setServerKey(request.serverKey().trim());
         server.setDescription(trimToNull(request.description()));
         server.setTransportType(request.transportType() == null ? "SSE" : request.transportType().trim().toUpperCase());
-        server.setEndpointUrl(request.endpointUrl().trim());
+        server.setEndpointUrl(validateEndpoint(request.endpointUrl()));
         server.setAuthType(request.authType() == null ? "NONE" : request.authType().trim().toUpperCase());
         server.setAuthConfigJson(trimToNull(request.authConfigJson()));
         server.setToolCatalogJson("[]");
@@ -60,10 +64,11 @@ public class McpServerApplicationService {
 
     @Transactional
     public McpServerVO update(Long id, UpdateMcpServerRequest request) {
+        workspacePermissionService.requirePermission("tool:create");
         McpServer server = requireServer(id);
         server.setName(request.name().trim());
         server.setDescription(trimToNull(request.description()));
-        server.setEndpointUrl(request.endpointUrl().trim());
+        server.setEndpointUrl(validateEndpoint(request.endpointUrl()));
         server.setTransportType(request.transportType() == null ? server.getTransportType() : request.transportType().trim().toUpperCase());
         server.setAuthType(request.authType() == null ? server.getAuthType() : request.authType().trim().toUpperCase());
         server.setAuthConfigJson(trimToNull(request.authConfigJson()));
@@ -76,27 +81,23 @@ public class McpServerApplicationService {
 
     @Transactional
     public void delete(Long id) {
+        workspacePermissionService.requirePermission("tool:create");
         requireServer(id);
         mcpServerRepository.delete(id);
     }
 
     @Transactional
     public McpServerVO sync(Long id) {
+        workspacePermissionService.requirePermission("tool:execute");
         McpServer server = requireServer(id);
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(server.getEndpointUrl()))
-                    .timeout(Duration.ofSeconds(8))
-                    .GET()
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            String catalog = response.statusCode() >= 200 && response.statusCode() < 500
-                    ? "[{\"name\":\"discovered\",\"description\":\"Endpoint reachable\"}]"
-                    : "[]";
-            server.setToolCatalogJson(catalog);
+            List<McpProtocolClient.McpToolDescriptor> tools = mcpProtocolClient.listTools(server);
+            server.setToolCatalogJson(mcpProtocolClient.catalogJson(tools));
             server.setLastSyncAt(LocalDateTime.now());
             mcpServerRepository.update(server);
             return toVO(server);
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.EXECUTION_FAILED, "MCP 同步失败: " + e.getMessage());
         }
@@ -137,5 +138,9 @@ public class McpServerApplicationService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String validateEndpoint(String endpointUrl) {
+        return SsrfGuard.validateHttpUrl(endpointUrl).toString();
     }
 }

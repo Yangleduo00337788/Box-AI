@@ -7,6 +7,9 @@ public record WorkflowPublishVO(
         String status,
         Long publishedVersionId,
         Integer publishedVersionNo,
-        LocalDateTime publishedAt
+        LocalDateTime publishedAt,
+        String webhookToken,
+        String webhookUrl,
+        String webhookSecret
 ) {
 }

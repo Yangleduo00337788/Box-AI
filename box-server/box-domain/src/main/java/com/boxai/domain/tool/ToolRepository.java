@@ -13,5 +13,7 @@ public interface ToolRepository {
 
     List<Tool> listByWorkspace(Long workspaceId);
 
+    List<Tool> searchByName(Long workspaceId, String keyword, int limit);
+
     void delete(Long id);
 }

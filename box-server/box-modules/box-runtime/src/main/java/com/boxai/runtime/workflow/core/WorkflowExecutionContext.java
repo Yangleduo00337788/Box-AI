@@ -1,7 +1,9 @@
 package com.boxai.runtime.workflow.core;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class WorkflowExecutionContext {
 
@@ -9,6 +11,9 @@ public class WorkflowExecutionContext {
     private final Long workflowVersionId;
     private final Long executionId;
     private final String executionNo;
+    private final boolean debugMode;
+    private final int depth;
+    private final Set<Long> callStack;
     private final Map<String, Object> variables = new LinkedHashMap<>();
     private final Map<String, Object> outputs = new LinkedHashMap<>();
 
@@ -17,13 +22,61 @@ public class WorkflowExecutionContext {
                                     Long executionId,
                                     String executionNo,
                                     Map<String, Object> inputs) {
+        this(workflowId, workflowVersionId, executionId, executionNo, inputs, false, 0, rootCallStack(workflowId));
+    }
+
+    public WorkflowExecutionContext(Long workflowId,
+                                    Long workflowVersionId,
+                                    Long executionId,
+                                    String executionNo,
+                                    Map<String, Object> inputs,
+                                    boolean debugMode) {
+        this(workflowId, workflowVersionId, executionId, executionNo, inputs, debugMode, 0, rootCallStack(workflowId));
+    }
+
+    private WorkflowExecutionContext(Long workflowId,
+                                     Long workflowVersionId,
+                                     Long executionId,
+                                     String executionNo,
+                                     Map<String, Object> inputs,
+                                     boolean debugMode,
+                                     int depth,
+                                     Set<Long> callStack) {
         this.workflowId = workflowId;
         this.workflowVersionId = workflowVersionId;
         this.executionId = executionId;
         this.executionNo = executionNo;
+        this.debugMode = debugMode;
+        this.depth = depth;
+        this.callStack = callStack;
         if (inputs != null) {
             this.variables.putAll(inputs);
         }
+    }
+
+    public static WorkflowExecutionContext child(WorkflowExecutionContext parent,
+                                                 Long workflowId,
+                                                 Long workflowVersionId,
+                                                 Map<String, Object> inputs) {
+        Set<Long> stack = new LinkedHashSet<>(parent.callStack);
+        stack.add(workflowId);
+        return new WorkflowExecutionContext(
+                workflowId,
+                workflowVersionId,
+                parent.executionId,
+                parent.executionNo,
+                inputs,
+                parent.debugMode,
+                parent.depth + 1,
+                stack);
+    }
+
+    private static Set<Long> rootCallStack(Long workflowId) {
+        Set<Long> stack = new LinkedHashSet<>();
+        if (workflowId != null) {
+            stack.add(workflowId);
+        }
+        return stack;
     }
 
     public Long workflowId() {
@@ -40,6 +93,18 @@ public class WorkflowExecutionContext {
 
     public String executionNo() {
         return executionNo;
+    }
+
+    public boolean debugMode() {
+        return debugMode;
+    }
+
+    public int depth() {
+        return depth;
+    }
+
+    public Set<Long> callStack() {
+        return callStack;
     }
 
     public Map<String, Object> variables() {

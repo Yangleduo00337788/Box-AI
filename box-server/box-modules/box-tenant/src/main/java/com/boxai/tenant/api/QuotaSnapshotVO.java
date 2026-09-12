@@ -9,12 +9,15 @@ public record QuotaSnapshotVO(
         Long quotaTokens,
         Integer quotaMembers,
         Integer quotaWorkspaces,
+        Integer quotaKnowledgeBases,
         Integer usedAiCalls,
         Long usedTokens,
         Integer usedMembers,
         Integer usedWorkspaces,
+        Integer usedKnowledgeBases,
         Integer remainingAiCalls,
         Long remainingTokens,
         Integer remainingMembers,
-        Integer remainingWorkspaces
+        Integer remainingWorkspaces,
+        Integer remainingKnowledgeBases
 ) {}

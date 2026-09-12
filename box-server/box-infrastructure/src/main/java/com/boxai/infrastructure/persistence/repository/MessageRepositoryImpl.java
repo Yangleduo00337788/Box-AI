@@ -42,6 +42,16 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
+    public Optional<Message> findById(Long id) {
+        return Optional.ofNullable(mapper.selectOneById(id)).map(this::toDomain);
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        mapper.deleteById(id);
+    }
+
+    @Override
     public Optional<Integer> findMaxSequenceNo(Long conversationId) {
         return mapper.selectListByQuery(
                         QueryWrapper.create()

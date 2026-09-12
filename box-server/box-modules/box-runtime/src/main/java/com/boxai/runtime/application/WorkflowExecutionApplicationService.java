@@ -13,6 +13,9 @@ import com.boxai.runtime.workflow.core.WorkflowExecutionContext;
 import com.boxai.runtime.workflow.core.WorkflowExecutionResult;
 import com.boxai.runtime.workflow.core.WorkflowNodeTrace;
 import com.boxai.runtime.workflow.engine.DefaultWorkflowExecutor;
+import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
+import com.boxai.tenant.application.QuotaApplicationService;
 import com.boxai.trace.application.ExecutionRecorder;
 import com.boxai.workflow.api.WorkflowValidateVO;
 import com.boxai.workflow.application.WorkflowApplicationService;
@@ -34,28 +37,46 @@ public class WorkflowExecutionApplicationService {
     private final DefaultWorkflowExecutor workflowExecutor;
     private final ExecutionRecorder executionRecorder;
     private final ObjectMapper objectMapper;
+    private final WorkspacePermissionService workspacePermissionService;
+    private final QuotaApplicationService quotaApplicationService;
 
     public WorkflowExecutionApplicationService(WorkflowVersionRepository workflowVersionRepository,
                                                  WorkflowApplicationService workflowApplicationService,
                                                  WorkflowDefinitionValidator workflowDefinitionValidator,
                                                  DefaultWorkflowExecutor workflowExecutor,
                                                  ExecutionRecorder executionRecorder,
-                                                 ObjectMapper objectMapper) {
+                                                 ObjectMapper objectMapper,
+                                                 WorkspacePermissionService workspacePermissionService,
+                                                 QuotaApplicationService quotaApplicationService) {
         this.workflowVersionRepository = workflowVersionRepository;
         this.workflowApplicationService = workflowApplicationService;
         this.workflowDefinitionValidator = workflowDefinitionValidator;
         this.workflowExecutor = workflowExecutor;
         this.executionRecorder = executionRecorder;
         this.objectMapper = objectMapper;
+        this.workspacePermissionService = workspacePermissionService;
+        this.quotaApplicationService = quotaApplicationService;
     }
 
     public WorkflowExecutionResultVO debug(Long workflowId, WorkflowExecuteRequest request) {
+        workspacePermissionService.requirePermission("workflow:execute");
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         WorkflowVersion version = workflowApplicationService.requireDraft(workflow);
         return run(workflow, version, request, true);
     }
 
     public WorkflowExecutionResultVO execute(Long workflowId, WorkflowExecuteRequest request) {
+        workspacePermissionService.requirePermission("workflow:execute");
+        Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
+        if (workflow.getPublishedVersionId() == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "工作流尚未发布，无法执行");
+        }
+        WorkflowVersion version = workflowVersionRepository.findById(workflow.getPublishedVersionId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKFLOW_VERSION_NOT_FOUND, "发布版本不存在"));
+        return run(workflow, version, request, false);
+    }
+
+    public WorkflowExecutionResultVO executeWebhook(Long workflowId, WorkflowExecuteRequest request) {
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         if (workflow.getPublishedVersionId() == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "工作流尚未发布，无法执行");
@@ -73,6 +94,7 @@ public class WorkflowExecutionApplicationService {
         if (!validation.valid()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, String.join("；", validation.errors()));
         }
+        quotaApplicationService.assertAiQuotaAvailable(WorkspaceContext.require().workspaceId());
 
         Map<String, Object> inputs = request == null || request.inputs() == null
                 ? Map.of()
@@ -86,9 +108,17 @@ public class WorkflowExecutionApplicationService {
                 version.getId(),
                 execution.getId(),
                 execution.getExecutionNo(),
-                new LinkedHashMap<>(inputs));
+                new LinkedHashMap<>(inputs),
+                debugMode);
 
         WorkflowExecutionResult result = workflowExecutor.execute(version.getDefinitionJson(), context);
+        result.nodeTraces().forEach(trace -> executionRecorder.recordWorkflowNodeSpan(
+                execution,
+                trace.nodeId(),
+                trace.nodeType(),
+                trace.status(),
+                trace.output(),
+                trace.errorMessage()));
         String outputJson = toJson(Map.of(
                 "outputs", result.outputs(),
                 "nodeTraces", result.nodeTraces()));

@@ -23,7 +23,7 @@ public interface ChatModelGateway {
     String chatWithTools(ModelRuntimeConfig config,
                          List<ChatTurn> turns,
                          List<ToolDefinition> tools,
-                         Function<String, String> toolExecutor,
+                         Function<ToolCall, String> toolExecutor,
                          Double temperature,
                          Double topP,
                          Integer maxTokens);

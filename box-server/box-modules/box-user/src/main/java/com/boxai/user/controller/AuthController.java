@@ -6,6 +6,9 @@ import com.boxai.user.api.AuthVO;
 import com.boxai.user.api.ChangePasswordRequest;
 import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
+import com.boxai.user.api.ResetPasswordRequest;
+import com.boxai.user.api.SendVerificationCodeRequest;
+import com.boxai.user.api.SendVerificationCodeResponse;
 import com.boxai.user.api.UpdateProfileRequest;
 import com.boxai.user.api.UpdateUserPreferenceRequest;
 import com.boxai.user.api.UserPreferenceVO;
@@ -40,6 +43,17 @@ public class AuthController {
     @PostMapping("/login")
     public Result<AuthVO> login(@Valid @RequestBody LoginRequest request) {
         return Result.success(authApplicationService.login(request));
+    }
+
+    @PostMapping("/verification-code")
+    public Result<SendVerificationCodeResponse> sendVerificationCode(@Valid @RequestBody SendVerificationCodeRequest request) {
+        return Result.success(authApplicationService.sendVerificationCode(request));
+    }
+
+    @PostMapping("/password/reset")
+    public Result<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authApplicationService.resetPassword(request);
+        return Result.success(null);
     }
 
     @GetMapping("/me")

@@ -51,4 +51,9 @@ public class ApiKeyController {
     public Result<ApiKeyVO> enable(@PathVariable Long id) {
         return Result.success(apiKeyApplicationService.enable(id));
     }
+
+    @PostMapping("/{id}/rotate")
+    public Result<CreateApiKeyResponse> rotate(@PathVariable Long id) {
+        return Result.success(apiKeyApplicationService.rotate(id));
+    }
 }

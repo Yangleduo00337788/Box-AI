@@ -28,6 +28,8 @@ public class PlanDO {
     private Integer quotaMembers;
     @Column("quota_workspaces")
     private Integer quotaWorkspaces;
+    @Column("quota_knowledge_bases")
+    private Integer quotaKnowledgeBases;
     @Column("byok_enabled")
     private Integer byokEnabled;
     private Integer status;

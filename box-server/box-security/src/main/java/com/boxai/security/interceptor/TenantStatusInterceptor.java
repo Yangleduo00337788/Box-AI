@@ -35,7 +35,10 @@ public class TenantStatusInterceptor implements HandlerInterceptor {
     private boolean isPublicPath(String uri) {
         return uri.startsWith("/api/v1/auth/login")
                 || uri.startsWith("/api/v1/auth/register")
+                || uri.startsWith("/api/v1/auth/verification-code")
+                || uri.startsWith("/api/v1/auth/password/reset")
                 || uri.startsWith("/api/v1/published/")
+                || uri.startsWith("/api/v1/hooks/")
                 || uri.equals("/api/v1/system/health")
                 || uri.equals("/api/v1/system/content");
     }

@@ -12,4 +12,6 @@ public interface AgentKnowledgeRepository {
     Optional<AgentKnowledge> findByVersionAndKnowledgeBase(Long versionId, Long knowledgeBaseId);
 
     List<AgentKnowledge> listByVersionId(Long versionId);
+
+    int countByKnowledgeBaseId(Long knowledgeBaseId);
 }

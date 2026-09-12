@@ -8,6 +8,7 @@ public record MessageVO(
         String content,
         String contentType,
         Integer sequenceNo,
+        String metadataJson,
         LocalDateTime createdAt
 ) {
 }

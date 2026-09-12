@@ -6,6 +6,7 @@ import com.boxai.agent.api.template.CreateAgentTemplateRequest;
 import com.boxai.agent.api.template.UpdateAgentTemplateRequest;
 import com.boxai.agent.api.template.UpdateAgentTemplateStatusRequest;
 import com.boxai.common.constant.ModelSources;
+import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.agent.Agent;
@@ -19,6 +20,7 @@ import com.boxai.domain.platform.PlatformModelRepository;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.security.context.SecurityContexts;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,19 +42,22 @@ public class AgentTemplateApplicationService {
     private final PlatformModelApplicationService platformModelApplicationService;
     private final PlatformModelRepository platformModelRepository;
     private final AgentApplicationService agentApplicationService;
+    private final WorkspacePermissionService workspacePermissionService;
 
     public AgentTemplateApplicationService(AgentTemplateRepository agentTemplateRepository,
                                            AgentRepository agentRepository,
                                            AgentVersionRepository agentVersionRepository,
                                            PlatformModelApplicationService platformModelApplicationService,
                                            PlatformModelRepository platformModelRepository,
-                                           AgentApplicationService agentApplicationService) {
+                                           AgentApplicationService agentApplicationService,
+                                           WorkspacePermissionService workspacePermissionService) {
         this.agentTemplateRepository = agentTemplateRepository;
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.platformModelApplicationService = platformModelApplicationService;
         this.platformModelRepository = platformModelRepository;
         this.agentApplicationService = agentApplicationService;
+        this.workspacePermissionService = workspacePermissionService;
     }
 
     public List<AgentTemplateVO> listAdmin() {
@@ -60,6 +65,7 @@ public class AgentTemplateApplicationService {
     }
 
     public List<AgentTemplateVO> listMarket() {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         return agentTemplateRepository.listListed().stream().map(this::toConsumerVO).toList();
     }
 
@@ -129,6 +135,7 @@ public class AgentTemplateApplicationService {
 
     @Transactional
     public AgentVO enable(Long templateId) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_CREATE);
         AgentTemplate template = requireListedTemplate(templateId);
         platformModelApplicationService.resolveForChat(template.getPlatformModelId());
         Long userId = WorkspaceContext.require().userId();
@@ -159,6 +166,7 @@ public class AgentTemplateApplicationService {
         version.setStreamEnabled(template.getStreamEnabled() == null || template.getStreamEnabled());
         version.setMemoryEnabled(true);
         version.setMemoryWindowSize(20);
+        version.setLongTermMemoryEnabled(false);
         version.setKnowledgeEnabled(false);
         version.setToolEnabled(false);
         version.setCreatedBy(userId);

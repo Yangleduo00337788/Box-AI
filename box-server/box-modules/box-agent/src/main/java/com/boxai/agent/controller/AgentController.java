@@ -2,21 +2,30 @@ package com.boxai.agent.controller;
 
 import com.boxai.agent.api.AgentChatRequest;
 import com.boxai.agent.api.AgentKnowledgeBindingVO;
+import com.boxai.agent.api.AgentLongTermMemoryVO;
 import com.boxai.agent.api.AgentMcpBindingVO;
 import com.boxai.agent.api.AgentPublishVO;
+import com.boxai.agent.api.AgentSubAgentBindingVO;
 import com.boxai.agent.api.AgentToolBindingVO;
+import com.boxai.agent.api.AgentVersionCompareVO;
+import com.boxai.agent.api.AgentVersionVO;
 import com.boxai.agent.api.AgentVO;
 import com.boxai.agent.api.BindAgentKnowledgeRequest;
 import com.boxai.agent.api.BindAgentMcpRequest;
+import com.boxai.agent.api.BindAgentSubAgentRequest;
 import com.boxai.agent.api.BindAgentToolRequest;
 import com.boxai.agent.api.CreateAgentRequest;
+import com.boxai.agent.api.CreateAgentVersionRequest;
+import com.boxai.agent.api.UpdateAgentConfigRequest;
 import com.boxai.agent.api.UpdateAgentMemoryRequest;
 import com.boxai.agent.api.UpdateAgentModelRequest;
 import com.boxai.agent.api.UpdateAgentPromptRequest;
 import com.boxai.agent.api.UpdateAgentRequest;
 import com.boxai.agent.application.AgentApplicationService;
 import com.boxai.agent.application.AgentBindingApplicationService;
+import com.boxai.agent.application.AgentLongTermMemoryApplicationService;
 import com.boxai.agent.application.AgentPublishApplicationService;
+import com.boxai.agent.application.AgentVersionApplicationService;
 import com.boxai.common.result.Result;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -27,6 +36,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -40,13 +50,19 @@ public class AgentController {
     private final AgentApplicationService agentApplicationService;
     private final AgentBindingApplicationService agentBindingApplicationService;
     private final AgentPublishApplicationService agentPublishApplicationService;
+    private final AgentVersionApplicationService agentVersionApplicationService;
+    private final AgentLongTermMemoryApplicationService agentLongTermMemoryApplicationService;
 
     public AgentController(AgentApplicationService agentApplicationService,
                            AgentBindingApplicationService agentBindingApplicationService,
-                           AgentPublishApplicationService agentPublishApplicationService) {
+                           AgentPublishApplicationService agentPublishApplicationService,
+                           AgentVersionApplicationService agentVersionApplicationService,
+                           AgentLongTermMemoryApplicationService agentLongTermMemoryApplicationService) {
         this.agentApplicationService = agentApplicationService;
         this.agentBindingApplicationService = agentBindingApplicationService;
         this.agentPublishApplicationService = agentPublishApplicationService;
+        this.agentVersionApplicationService = agentVersionApplicationService;
+        this.agentLongTermMemoryApplicationService = agentLongTermMemoryApplicationService;
     }
 
     @GetMapping
@@ -82,6 +98,22 @@ public class AgentController {
     @PutMapping("/{id}/memory")
     public Result<AgentVO> updateMemory(@PathVariable Long id, @Valid @RequestBody UpdateAgentMemoryRequest request) {
         return Result.success(agentApplicationService.updateMemoryConfig(id, request));
+    }
+
+    @GetMapping("/{id}/long-term-memories")
+    public Result<List<AgentLongTermMemoryVO>> listLongTermMemories(@PathVariable Long id) {
+        return Result.success(agentLongTermMemoryApplicationService.list(id));
+    }
+
+    @DeleteMapping("/{id}/long-term-memories/{memoryId}")
+    public Result<Void> deleteLongTermMemory(@PathVariable Long id, @PathVariable Long memoryId) {
+        agentLongTermMemoryApplicationService.delete(id, memoryId);
+        return Result.success();
+    }
+
+    @PutMapping("/{id}/config")
+    public Result<AgentVO> updateConfig(@PathVariable Long id, @Valid @RequestBody UpdateAgentConfigRequest request) {
+        return Result.success(agentApplicationService.updateConfig(id, request));
     }
 
     @PostMapping("/{id}/chat")
@@ -150,6 +182,23 @@ public class AgentController {
         return Result.success();
     }
 
+    @GetMapping("/{id}/sub-agents")
+    public Result<List<AgentSubAgentBindingVO>> listSubAgents(@PathVariable Long id) {
+        return Result.success(agentBindingApplicationService.listSubAgents(id));
+    }
+
+    @PostMapping("/{id}/sub-agents")
+    public Result<AgentSubAgentBindingVO> bindSubAgent(@PathVariable Long id,
+                                                       @Valid @RequestBody BindAgentSubAgentRequest request) {
+        return Result.success(agentBindingApplicationService.bindSubAgent(id, request));
+    }
+
+    @DeleteMapping("/{id}/sub-agents/{subAgentId}")
+    public Result<Void> unbindSubAgent(@PathVariable Long id, @PathVariable Long subAgentId) {
+        agentBindingApplicationService.unbindSubAgent(id, subAgentId);
+        return Result.success();
+    }
+
     @GetMapping("/{id}/publish")
     public Result<AgentPublishVO> publishStatus(@PathVariable Long id) {
         return Result.success(agentPublishApplicationService.getPublishStatus(id));
@@ -163,5 +212,44 @@ public class AgentController {
     @PostMapping("/{id}/unpublish")
     public Result<AgentPublishVO> unpublish(@PathVariable Long id) {
         return Result.success(agentPublishApplicationService.unpublish(id));
+    }
+
+    @GetMapping("/{id}/versions")
+    public Result<List<AgentVersionVO>> listVersions(@PathVariable Long id) {
+        return Result.success(agentVersionApplicationService.list(id));
+    }
+
+    @GetMapping("/{id}/versions/compare")
+    public Result<AgentVersionCompareVO> compareVersions(@PathVariable Long id,
+                                                         @RequestParam Long baseId,
+                                                         @RequestParam Long targetId) {
+        return Result.success(agentVersionApplicationService.compare(id, baseId, targetId));
+    }
+
+    @PostMapping("/{id}/versions")
+    public Result<AgentVersionVO> createVersion(@PathVariable Long id,
+                                               @RequestBody(required = false) CreateAgentVersionRequest request) {
+        return Result.success(agentVersionApplicationService.createSnapshot(id, request));
+    }
+
+    @PostMapping("/{id}/versions/{versionId}/restore")
+    public Result<Void> restoreVersion(@PathVariable Long id, @PathVariable Long versionId) {
+        agentVersionApplicationService.restore(id, versionId);
+        return Result.success();
+    }
+
+    @PostMapping("/{id}/versions/{versionId}/archive")
+    public Result<AgentVersionVO> archiveVersion(@PathVariable Long id, @PathVariable Long versionId) {
+        return Result.success(agentVersionApplicationService.archive(id, versionId));
+    }
+
+    @PostMapping("/{id}/duplicate")
+    public Result<AgentVO> duplicate(@PathVariable Long id) {
+        return Result.success(agentApplicationService.duplicate(id));
+    }
+
+    @PostMapping("/{id}/archive")
+    public Result<AgentVO> archive(@PathVariable Long id) {
+        return Result.success(agentApplicationService.archive(id));
     }
 }

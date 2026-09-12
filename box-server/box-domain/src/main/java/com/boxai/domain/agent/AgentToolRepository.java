@@ -12,4 +12,6 @@ public interface AgentToolRepository {
     Optional<AgentTool> findByVersionAndTool(Long versionId, Long toolId);
 
     List<AgentTool> listByVersionId(Long versionId);
+
+    int countByToolId(Long toolId);
 }

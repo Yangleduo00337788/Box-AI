@@ -19,6 +19,7 @@ public class Plan {
     private Long quotaTokens;
     private Integer quotaMembers;
     private Integer quotaWorkspaces;
+    private Integer quotaKnowledgeBases;
     private Integer byokEnabled;
     private Integer status;
     private LocalDateTime createdAt;

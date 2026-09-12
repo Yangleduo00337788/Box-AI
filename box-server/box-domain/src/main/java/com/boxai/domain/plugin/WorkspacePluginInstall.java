@@ -12,6 +12,8 @@ public class WorkspacePluginInstall {
     private Long id;
     private Long workspaceId;
     private Long pluginId;
+    private String resourceType;
+    private Long resourceId;
     private Long installedBy;
     private LocalDateTime installedAt;
     private LocalDateTime createdAt;

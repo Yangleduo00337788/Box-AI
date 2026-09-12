@@ -16,10 +16,14 @@ import com.boxai.user.api.AuthVO;
 import com.boxai.user.api.ChangePasswordRequest;
 import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
+import com.boxai.user.api.ResetPasswordRequest;
+import com.boxai.user.api.SendVerificationCodeRequest;
+import com.boxai.user.api.SendVerificationCodeResponse;
 import com.boxai.user.api.UpdateProfileRequest;
 import com.boxai.user.api.TenantSummaryVO;
 import com.boxai.user.api.UserVO;
 import com.boxai.user.api.WorkspaceVO;
+import com.boxai.user.support.VerificationCodePurpose;
 import com.boxai.workspace.application.WorkspaceApplicationService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -37,19 +41,22 @@ public class AuthApplicationService {
     private final TenantApplicationService tenantApplicationService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final VerificationCodeService verificationCodeService;
 
     public AuthApplicationService(UserRepository userRepository,
                                   WorkspaceRepository workspaceRepository,
                                   WorkspaceApplicationService workspaceApplicationService,
                                   TenantApplicationService tenantApplicationService,
                                   PasswordEncoder passwordEncoder,
-                                  JwtService jwtService) {
+                                  JwtService jwtService,
+                                  VerificationCodeService verificationCodeService) {
         this.userRepository = userRepository;
         this.workspaceRepository = workspaceRepository;
         this.workspaceApplicationService = workspaceApplicationService;
         this.tenantApplicationService = tenantApplicationService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.verificationCodeService = verificationCodeService;
     }
 
     @Transactional
@@ -60,6 +67,7 @@ public class AuthApplicationService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写企业名称");
         }
         String email = request.email().trim().toLowerCase(Locale.ROOT);
+        verificationCodeService.verify(email, VerificationCodePurpose.REGISTER, request.verificationCode());
         if (userRepository.findByEmail(email).isPresent()) {
             throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, "邮箱已注册");
         }
@@ -138,6 +146,29 @@ public class AuthApplicationService {
         return issue(user);
     }
 
+    public SendVerificationCodeResponse sendVerificationCode(SendVerificationCodeRequest request) {
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        VerificationCodePurpose purpose = parsePurpose(request.purpose());
+        if (VerificationCodePurpose.REGISTER == purpose && userRepository.findByEmail(email).isPresent()) {
+            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, "邮箱已注册");
+        }
+        if (VerificationCodePurpose.RESET_PASSWORD == purpose
+                && userRepository.findByEmail(email).isEmpty()) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "该邮箱未注册");
+        }
+        String devCode = verificationCodeService.send(email, purpose);
+        return new SendVerificationCodeResponse(devCode);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "该邮箱未注册"));
+        verificationCodeService.verify(email, VerificationCodePurpose.RESET_PASSWORD, request.verificationCode());
+        userRepository.updatePasswordHash(user.getId(), passwordEncoder.encode(request.newPassword()));
+    }
+
     @Transactional
     public void updatePassword(Long userId, ChangePasswordRequest request) {
         User user = userRepository.findById(userId)
@@ -172,6 +203,17 @@ public class AuthApplicationService {
             return null;
         }
         return new TenantSummaryVO(tenant.id(), tenant.name(), tenant.slug(), tenant.tenantType());
+    }
+
+    private VerificationCodePurpose parsePurpose(String purpose) {
+        if (purpose == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码用途无效");
+        }
+        try {
+            return VerificationCodePurpose.valueOf(purpose.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码用途无效");
+        }
     }
 
     private String normalizeAccountType(String accountType) {

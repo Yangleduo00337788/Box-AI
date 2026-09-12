@@ -11,6 +11,7 @@ import com.boxai.domain.agent.AgentVersionRepository;
 import com.boxai.domain.publish.Publish;
 import com.boxai.domain.publish.PublishRepository;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,18 +24,22 @@ public class AgentPublishApplicationService {
     private final AgentVersionRepository agentVersionRepository;
     private final AgentBindingApplicationService agentBindingApplicationService;
     private final PublishRepository publishRepository;
+    private final WorkspacePermissionService workspacePermissionService;
 
     public AgentPublishApplicationService(AgentRepository agentRepository,
                                           AgentVersionRepository agentVersionRepository,
                                           AgentBindingApplicationService agentBindingApplicationService,
-                                          PublishRepository publishRepository) {
+                                          PublishRepository publishRepository,
+                                          WorkspacePermissionService workspacePermissionService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.agentBindingApplicationService = agentBindingApplicationService;
         this.publishRepository = publishRepository;
+        this.workspacePermissionService = workspacePermissionService;
     }
 
     public AgentPublishVO getPublishStatus(Long agentId) {
+        workspacePermissionService.requirePermission("agent:read");
         Agent agent = requireAgent(agentId);
         if (agent.getPublishedVersionId() == null) {
             return new AgentPublishVO(agent.getId(), agent.getStatus(), null, null, null, null);
@@ -52,6 +57,7 @@ public class AgentPublishApplicationService {
 
     @Transactional
     public AgentPublishVO publish(Long agentId) {
+        workspacePermissionService.requirePermission("agent:publish");
         Agent agent = requireAgent(agentId);
         AgentVersion draft = agentVersionRepository.findLatestDraft(agent.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "智能体草稿版本不存在"));
@@ -90,6 +96,7 @@ public class AgentPublishApplicationService {
 
     @Transactional
     public AgentPublishVO unpublish(Long agentId) {
+        workspacePermissionService.requirePermission("agent:publish");
         Agent agent = requireAgent(agentId);
         agent.setPublishedVersionId(null);
         agent.setStatus("DRAFT");
@@ -122,6 +129,7 @@ public class AgentPublishApplicationService {
         version.setStreamEnabled(source.getStreamEnabled());
         version.setMemoryEnabled(source.getMemoryEnabled());
         version.setMemoryWindowSize(source.getMemoryWindowSize());
+        version.setLongTermMemoryEnabled(source.getLongTermMemoryEnabled());
         version.setKnowledgeEnabled(source.getKnowledgeEnabled());
         version.setToolEnabled(source.getToolEnabled());
         version.setConfigJson(source.getConfigJson());

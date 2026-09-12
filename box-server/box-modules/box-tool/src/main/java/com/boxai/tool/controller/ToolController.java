@@ -2,6 +2,7 @@ package com.boxai.tool.controller;
 
 import com.boxai.common.result.Result;
 import com.boxai.tool.api.CreateToolRequest;
+import com.boxai.tool.api.ToolTestRequest;
 import com.boxai.tool.api.ToolTestResultVO;
 import com.boxai.tool.api.ToolVO;
 import com.boxai.tool.api.UpdateToolRequest;
@@ -55,7 +56,8 @@ public class ToolController {
     }
 
     @PostMapping("/{id}/test")
-    public Result<ToolTestResultVO> test(@PathVariable Long id) {
-        return Result.success(toolApplicationService.test(id));
+    public Result<ToolTestResultVO> test(@PathVariable Long id,
+                                         @RequestBody(required = false) ToolTestRequest request) {
+        return Result.success(toolApplicationService.test(id, request));
     }
 }

@@ -12,6 +12,8 @@ public record CreateToolRequest(
         @NotBlank @Pattern(regexp = "HTTP|FUNCTION|DATABASE|CODE|MCP") String type,
         String inputSchemaJson,
         String outputSchemaJson,
-        @Valid HttpToolConfigRequest httpConfig
+        @Valid HttpToolConfigRequest httpConfig,
+        @Valid DatabaseToolConfigRequest databaseConfig,
+        @Valid FunctionToolConfigRequest functionConfig
 ) {
 }

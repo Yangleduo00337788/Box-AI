@@ -50,6 +50,8 @@ public class WorkspacePluginInstallRepositoryImpl implements WorkspacePluginInst
         WorkspacePluginInstallDO row = new WorkspacePluginInstallDO();
         row.setWorkspaceId(install.getWorkspaceId());
         row.setPluginId(install.getPluginId());
+        row.setResourceType(install.getResourceType());
+        row.setResourceId(install.getResourceId());
         row.setInstalledBy(install.getInstalledBy());
         row.setInstalledAt(install.getInstalledAt() == null ? LocalDateTime.now() : install.getInstalledAt());
         row.setCreatedAt(LocalDateTime.now());
@@ -73,6 +75,8 @@ public class WorkspacePluginInstallRepositoryImpl implements WorkspacePluginInst
         install.setId(row.getId());
         install.setWorkspaceId(row.getWorkspaceId());
         install.setPluginId(row.getPluginId());
+        install.setResourceType(row.getResourceType());
+        install.setResourceId(row.getResourceId());
         install.setInstalledBy(row.getInstalledBy());
         install.setInstalledAt(row.getInstalledAt());
         install.setCreatedAt(row.getCreatedAt());

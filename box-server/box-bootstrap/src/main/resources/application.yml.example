@@ -16,12 +16,28 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  mail:
+    host: ${BOX_MAIL_HOST:}
+    port: ${BOX_MAIL_PORT:587}
+    username: ${BOX_MAIL_USERNAME:}
+    password: ${BOX_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 mybatis-flex:
   global-config:
     print-banner: false
 
 box:
+  mail:
+    from: noreply@box.ai
+  auth:
+    verification:
+      expose-code: true
   security:
     jwt:
       secret: box-dev-jwt-secret-change-me-please-32b

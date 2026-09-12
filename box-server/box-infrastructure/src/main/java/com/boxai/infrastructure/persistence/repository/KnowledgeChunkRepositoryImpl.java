@@ -75,6 +75,15 @@ public class KnowledgeChunkRepositoryImpl implements KnowledgeChunkRepository {
     }
 
     @Override
+    public List<KnowledgeChunk> listByDocument(Long documentId) {
+        return mapper.selectListByQuery(
+                        QueryWrapper.create().eq("document_id", documentId).orderBy("chunk_index", true))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public int countByKnowledgeBase(Long knowledgeBaseId) {
         Long count = mapper.selectCountByQuery(QueryWrapper.create().eq("knowledge_base_id", knowledgeBaseId));
         return count == null ? 0 : count.intValue();

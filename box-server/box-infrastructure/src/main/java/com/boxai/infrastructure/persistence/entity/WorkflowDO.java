@@ -23,6 +23,10 @@ public class WorkflowDO {
     private Long draftVersionId;
     @Column("published_version_id")
     private Long publishedVersionId;
+    @Column("webhook_token")
+    private String webhookToken;
+    @Column("webhook_secret")
+    private String webhookSecret;
     @Column("created_by")
     private Long createdBy;
     @Column("created_at")

@@ -2,6 +2,8 @@ package com.boxai.conversation.api;
 
 import com.boxai.tenant.api.QuotaSnapshotVO;
 
+import java.util.List;
+
 public record AnalyticsOverviewVO(
         int agentCount,
         int conversationCount,
@@ -11,5 +13,13 @@ public record AnalyticsOverviewVO(
         int toolCount,
         int workflowCount,
         int mcpServerCount,
-        QuotaSnapshotVO quota
+        QuotaSnapshotVO quota,
+        int periodDays,
+        int periodExecutionCount,
+        double successRate,
+        long avgLatencyMs,
+        List<RecentAgentVO> recentAgents,
+        List<RecentConversationVO> recentConversations,
+        List<RecentWorkflowVO> recentWorkflows,
+        List<TopAgentVO> topAgents
 ) {}

@@ -19,6 +19,8 @@ import com.boxai.domain.model.ModelProviderRepository;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.model.platform.ResolvedPlatformModel;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.agent.application.AgentLongTermMemoryApplicationService;
+import com.boxai.knowledge.application.KnowledgeRetrievalResult;
 import com.boxai.knowledge.application.KnowledgeRetrievalService;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +41,7 @@ public class AgentChatPreparer {
     private final SecretCipher secretCipher;
     private final KnowledgeRetrievalService knowledgeRetrievalService;
     private final AgentToolRuntimeService agentToolRuntimeService;
+    private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
 
     public AgentChatPreparer(AgentRepository agentRepository,
                              AgentVersionRepository agentVersionRepository,
@@ -48,7 +51,8 @@ public class AgentChatPreparer {
                              PlatformModelApplicationService platformModelApplicationService,
                              SecretCipher secretCipher,
                              KnowledgeRetrievalService knowledgeRetrievalService,
-                             AgentToolRuntimeService agentToolRuntimeService) {
+                             AgentToolRuntimeService agentToolRuntimeService,
+                             AgentLongTermMemoryApplicationService longTermMemoryApplicationService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.modelDefinitionRepository = modelDefinitionRepository;
@@ -58,13 +62,25 @@ public class AgentChatPreparer {
         this.secretCipher = secretCipher;
         this.knowledgeRetrievalService = knowledgeRetrievalService;
         this.agentToolRuntimeService = agentToolRuntimeService;
+        this.longTermMemoryApplicationService = longTermMemoryApplicationService;
     }
 
     public PreparedAgentChat prepare(Long agentId, List<ChatTurn> history, String userMessage) {
+        return prepare(agentId, history, userMessage, null);
+    }
+
+    public PreparedAgentChat prepare(Long agentId, List<ChatTurn> history, String userMessage, Long platformModelOverride) {
         Agent agent = requireAgent(agentId);
         AgentVersion version = agentVersionRepository.findLatestDraft(agent.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "智能体草稿版本不存在"));
-        return prepareWithVersion(agent, version, history, userMessage);
+        return prepareWithVersion(agent, version, history, userMessage, platformModelOverride);
+    }
+
+    public KnowledgeRetrievalResult retrieveKnowledge(AgentVersion version, String userMessage) {
+        if (!Boolean.TRUE.equals(version.getKnowledgeEnabled())) {
+            return KnowledgeRetrievalResult.empty();
+        }
+        return knowledgeRetrievalService.retrieve(version.getId(), userMessage);
     }
 
     public PreparedAgentChat preparePublished(Long agentId, List<ChatTurn> history, String userMessage) {
@@ -74,15 +90,26 @@ public class AgentChatPreparer {
         }
         AgentVersion version = agentVersionRepository.findById(agent.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "发布版本不存在"));
-        return prepareWithVersion(agent, version, history, userMessage);
+        return prepareWithVersion(agent, version, history, userMessage, null);
     }
 
     private PreparedAgentChat prepareWithVersion(Agent agent,
                                                  AgentVersion draft,
                                                  List<ChatTurn> history,
-                                                 String userMessage) {
-        List<ChatTurn> turns = buildTurns(draft, history, userMessage);
+                                                 String userMessage,
+                                                 Long platformModelOverride) {
+        List<ChatTurn> turns = buildTurns(agent.getId(), draft, history, userMessage);
         String modelSource = draft.getModelSource() == null ? ModelSources.PLATFORM : draft.getModelSource();
+        if (platformModelOverride != null) {
+            if (!ModelSources.PLATFORM.equals(modelSource)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "当前智能体使用自定义模型，不支持在对话中切换平台模型");
+            }
+            if (!platformModelApplicationService.isRunnable(platformModelOverride)) {
+                throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "所选平台模型不可用");
+            }
+            ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(platformModelOverride);
+            return buildPrepared(resolved.runtimeConfig(), turns, draft, resolved.platformCredentialId(), true, resolved.platformModelId());
+        }
         if (ModelSources.PLATFORM.equals(modelSource)) {
             Long platformModelId = draft.getPlatformModelId();
             if (!platformModelApplicationService.isRunnable(platformModelId)) {
@@ -143,16 +170,26 @@ public class AgentChatPreparer {
                 tools);
     }
 
-    private List<ChatTurn> buildTurns(AgentVersion draft, List<ChatTurn> history, String userMessage) {
+    private List<ChatTurn> buildTurns(Long agentId, AgentVersion draft, List<ChatTurn> history, String userMessage) {
         List<ChatTurn> turns = new ArrayList<>();
         String systemPrompt = draft.getSystemPrompt();
         if (Boolean.TRUE.equals(draft.getKnowledgeEnabled())) {
-            String ragContext = knowledgeRetrievalService.buildContext(draft.getId(), userMessage);
+            KnowledgeRetrievalResult retrieval = knowledgeRetrievalService.retrieve(draft.getId(), userMessage);
+            String ragContext = retrieval.context();
             if (ragContext != null && !ragContext.isBlank()) {
-                String ragBlock = "以下是与用户问题相关的知识库内容，请优先参考：\n" + ragContext;
+                String ragBlock = "以下是与用户问题相关的知识库内容，请优先参考，并在回答中标注引用编号：\n" + ragContext;
                 systemPrompt = systemPrompt == null || systemPrompt.isBlank()
                         ? ragBlock
                         : systemPrompt + "\n\n" + ragBlock;
+            }
+        }
+        if (Boolean.TRUE.equals(draft.getLongTermMemoryEnabled())) {
+            String memoryContext = longTermMemoryApplicationService.buildContext(draft, agentId, userMessage);
+            if (memoryContext != null && !memoryContext.isBlank()) {
+                String memoryBlock = "以下是关于该用户的长期记忆，可在回答时参考：\n" + memoryContext;
+                systemPrompt = systemPrompt == null || systemPrompt.isBlank()
+                        ? memoryBlock
+                        : systemPrompt + "\n\n" + memoryBlock;
             }
         }
         if (systemPrompt != null && !systemPrompt.isBlank()) {

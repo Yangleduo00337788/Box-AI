@@ -8,6 +8,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -27,6 +28,19 @@ public class RoleRepositoryImpl implements RoleRepository {
     }
 
     @Override
+    public Optional<Role> findById(Long id) {
+        return Optional.ofNullable(roleMapper.selectOneById(id)).map(this::toDomain);
+    }
+
+    @Override
+    public List<Role> listByWorkspace(Long workspaceId) {
+        return roleMapper.selectListByQuery(QueryWrapper.create().eq("workspace_id", workspaceId))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public Role save(Role role) {
         RoleDO row = new RoleDO();
         row.setWorkspaceId(role.getWorkspaceId());
@@ -41,6 +55,21 @@ public class RoleRepositoryImpl implements RoleRepository {
         roleMapper.insert(row);
         role.setId(row.getId());
         return role;
+    }
+
+    @Override
+    public void update(Role role) {
+        RoleDO row = new RoleDO();
+        row.setId(role.getId());
+        row.setRoleName(role.getRoleName());
+        row.setDescription(role.getDescription());
+        row.setUpdatedAt(LocalDateTime.now());
+        roleMapper.update(row);
+    }
+
+    @Override
+    public void delete(Long id) {
+        roleMapper.deleteById(id);
     }
 
     private Role toDomain(RoleDO row) {

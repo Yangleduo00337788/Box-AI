@@ -51,6 +51,12 @@ public class AgentToolRepositoryImpl implements AgentToolRepository {
                 .toList();
     }
 
+    @Override
+    public int countByToolId(Long toolId) {
+        Long count = mapper.selectCountByQuery(QueryWrapper.create().eq("tool_id", toolId));
+        return count == null ? 0 : count.intValue();
+    }
+
     private AgentTool toDomain(AgentToolDO row) {
         AgentTool binding = new AgentTool();
         binding.setId(row.getId());

@@ -41,6 +41,8 @@ public class AgentVersionDO {
     private Integer memoryEnabled;
     @Column("memory_window_size")
     private Integer memoryWindowSize;
+    @Column("long_term_memory_enabled")
+    private Integer longTermMemoryEnabled;
     @Column("knowledge_enabled")
     private Integer knowledgeEnabled;
     @Column("tool_enabled")

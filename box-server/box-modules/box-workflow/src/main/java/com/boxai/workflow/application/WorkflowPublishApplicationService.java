@@ -10,12 +10,14 @@ import com.boxai.domain.workflow.WorkflowRepository;
 import com.boxai.domain.workflow.WorkflowVersion;
 import com.boxai.domain.workflow.WorkflowVersionRepository;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.workflow.api.WorkflowPublishVO;
 import com.boxai.workflow.api.WorkflowValidateVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class WorkflowPublishApplicationService {
@@ -25,23 +27,27 @@ public class WorkflowPublishApplicationService {
     private final WorkflowApplicationService workflowApplicationService;
     private final WorkflowDefinitionValidator workflowDefinitionValidator;
     private final PublishRepository publishRepository;
+    private final WorkspacePermissionService workspacePermissionService;
 
     public WorkflowPublishApplicationService(WorkflowRepository workflowRepository,
                                              WorkflowVersionRepository workflowVersionRepository,
                                              WorkflowApplicationService workflowApplicationService,
                                              WorkflowDefinitionValidator workflowDefinitionValidator,
-                                             PublishRepository publishRepository) {
+                                             PublishRepository publishRepository,
+                                             WorkspacePermissionService workspacePermissionService) {
         this.workflowRepository = workflowRepository;
         this.workflowVersionRepository = workflowVersionRepository;
         this.workflowApplicationService = workflowApplicationService;
         this.workflowDefinitionValidator = workflowDefinitionValidator;
         this.publishRepository = publishRepository;
+        this.workspacePermissionService = workspacePermissionService;
     }
 
     public WorkflowPublishVO getPublishStatus(Long workflowId) {
+        workspacePermissionService.requirePermission("workflow:execute");
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         if (workflow.getPublishedVersionId() == null) {
-            return new WorkflowPublishVO(workflow.getId(), workflow.getStatus(), null, null, null);
+            return new WorkflowPublishVO(workflow.getId(), workflow.getStatus(), null, null, null, null, null, null);
         }
         WorkflowVersion published = workflowVersionRepository.findById(workflow.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.WORKFLOW_VERSION_NOT_FOUND, "发布版本不存在"));
@@ -50,11 +56,15 @@ public class WorkflowPublishApplicationService {
                 workflow.getStatus(),
                 published.getId(),
                 published.getVersionNo(),
-                published.getCreatedAt());
+                published.getCreatedAt(),
+                workflow.getWebhookToken(),
+                buildWebhookUrl(workflow.getWebhookToken()),
+                workflow.getWebhookSecret());
     }
 
     @Transactional
     public WorkflowPublishVO publish(Long workflowId) {
+        workspacePermissionService.requirePermission("workflow:update");
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         WorkflowVersion draft = workflowApplicationService.requireDraft(workflow);
         WorkflowValidateVO validation = workflowDefinitionValidator.validate(draft.getDefinitionJson());
@@ -67,6 +77,12 @@ public class WorkflowPublishApplicationService {
 
         workflow.setPublishedVersionId(draft.getId());
         workflow.setStatus("PUBLISHED");
+        if (workflow.getWebhookToken() == null || workflow.getWebhookToken().isBlank()) {
+            workflow.setWebhookToken(UUID.randomUUID().toString().replace("-", ""));
+        }
+        if (workflow.getWebhookSecret() == null || workflow.getWebhookSecret().isBlank()) {
+            workflow.setWebhookSecret(UUID.randomUUID().toString().replace("-", ""));
+        }
         workflowRepository.update(workflow);
 
         int nextVersionNo = workflowVersionRepository.findMaxVersionNo(workflow.getId()).orElse(0) + 1;
@@ -100,5 +116,12 @@ public class WorkflowPublishApplicationService {
         version.setChangeLog(source.getChangeLog());
         version.setCreatedBy(WorkspaceContext.require().userId());
         return version;
+    }
+
+    private String buildWebhookUrl(String webhookToken) {
+        if (webhookToken == null || webhookToken.isBlank()) {
+            return null;
+        }
+        return "/api/v1/hooks/workflows/" + webhookToken;
     }
 }

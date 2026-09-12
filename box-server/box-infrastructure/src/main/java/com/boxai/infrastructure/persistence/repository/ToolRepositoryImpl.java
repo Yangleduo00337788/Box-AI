@@ -57,6 +57,19 @@ public class ToolRepositoryImpl implements ToolRepository {
     }
 
     @Override
+    public List<Tool> searchByName(Long workspaceId, String keyword, int limit) {
+        return mapper.selectListByQuery(
+                        QueryWrapper.create()
+                                .eq("workspace_id", workspaceId)
+                                .like("name", keyword)
+                                .orderBy("updated_at", false)
+                                .limit(limit))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public void delete(Long id) {
         mapper.deleteById(id);
     }

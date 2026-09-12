@@ -1,12 +1,13 @@
 package com.boxai.runtime.workflow.executor;
 
+import com.boxai.common.security.SsrfGuard;
+import com.boxai.common.security.SsrfSafeHttpClient;
 import com.boxai.runtime.workflow.core.NodeExecutionContext;
 import com.boxai.runtime.workflow.core.NodeExecutionResult;
 import com.boxai.runtime.workflow.engine.WorkflowTemplateRenderer;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -42,18 +43,17 @@ public class HttpNodeExecutor implements NodeExecutor {
         long timeoutMs = Math.min(Math.max(config.path("timeoutMs").asLong(10000L), 1000L), 30000L);
         String outputVariable = config.path("outputVariable").asText("httpResult");
         try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(timeoutMs))
-                    .build();
+            Duration timeout = Duration.ofMillis(timeoutMs);
+            HttpClient client = SsrfSafeHttpClient.create(timeout, false);
             HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMillis(timeoutMs));
+                    .uri(SsrfGuard.validateHttpUrl(url))
+                    .timeout(timeout);
             if ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method)) {
                 builder.method(method, HttpRequest.BodyPublishers.ofString(body));
             } else {
                 builder.method(method, HttpRequest.BodyPublishers.noBody());
             }
-            HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = SsrfSafeHttpClient.send(client, builder.build(), false, timeout);
             Map<String, Object> output = Map.of(
                     "statusCode", response.statusCode(),
                     "body", response.body());

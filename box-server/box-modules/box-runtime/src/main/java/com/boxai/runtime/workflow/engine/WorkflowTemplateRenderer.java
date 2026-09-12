@@ -19,10 +19,29 @@ public class WorkflowTemplateRenderer {
         StringBuffer buffer = new StringBuffer();
         while (matcher.find()) {
             String key = matcher.group(1);
-            Object value = variables.get(key);
+            Object value = resolveVariable(key, variables);
             matcher.appendReplacement(buffer, Matcher.quoteReplacement(value == null ? "" : String.valueOf(value)));
         }
         matcher.appendTail(buffer);
         return buffer.toString();
+    }
+
+    private Object resolveVariable(String key, Map<String, Object> variables) {
+        if (variables.containsKey(key)) {
+            return variables.get(key);
+        }
+        if (key == null || !key.contains(".")) {
+            return null;
+        }
+        String[] parts = key.split("\\.");
+        Object current = variables.get(parts[0]);
+        for (int i = 1; i < parts.length && current != null; i++) {
+            if (current instanceof Map<?, ?> map) {
+                current = map.get(parts[i]);
+            } else {
+                return null;
+            }
+        }
+        return current;
     }
 }

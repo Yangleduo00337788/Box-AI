@@ -9,5 +9,9 @@ public interface MessageRepository {
 
     List<Message> listByConversationId(Long conversationId);
 
+    Optional<Message> findById(Long id);
+
+    void deleteById(Long id);
+
     Optional<Integer> findMaxSequenceNo(Long conversationId);
 }

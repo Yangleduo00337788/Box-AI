@@ -44,9 +44,40 @@ public class ExecutionRepositoryImpl implements ExecutionRepository {
 
     @Override
     public List<Execution> listByWorkspace(Long workspaceId, int limit) {
+        return listByWorkspace(workspaceId, null, null, null, null, limit);
+    }
+
+    @Override
+    public List<Execution> listByWorkspace(Long workspaceId,
+                                           String executionType,
+                                           String status,
+                                           Long agentId,
+                                           Long conversationId,
+                                           int limit) {
+        QueryWrapper query = QueryWrapper.create()
+                .eq("workspace_id", workspaceId)
+                .orderBy("created_at", false)
+                .limit(Math.max(limit, 1));
+        if (executionType != null && !executionType.isBlank()) {
+            query.eq("execution_type", executionType.trim().toUpperCase());
+        }
+        if (status != null && !status.isBlank()) {
+            query.eq("status", status.trim().toUpperCase());
+        }
+        if (agentId != null) {
+            query.eq("agent_id", agentId);
+        }
+        if (conversationId != null) {
+            query.eq("conversation_id", conversationId);
+        }
+        return mapper.selectListByQuery(query).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<Execution> listByConversation(Long conversationId, int limit) {
         return mapper.selectListByQuery(
                         QueryWrapper.create()
-                                .eq("workspace_id", workspaceId)
+                                .eq("conversation_id", conversationId)
                                 .orderBy("created_at", false)
                                 .limit(Math.max(limit, 1)))
                 .stream()

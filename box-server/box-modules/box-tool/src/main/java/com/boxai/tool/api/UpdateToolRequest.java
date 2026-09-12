@@ -12,6 +12,8 @@ public record UpdateToolRequest(
         String inputSchemaJson,
         String outputSchemaJson,
         Integer status,
-        @Valid HttpToolConfigRequest httpConfig
+        @Valid HttpToolConfigRequest httpConfig,
+        @Valid DatabaseToolConfigRequest databaseConfig,
+        @Valid FunctionToolConfigRequest functionConfig
 ) {
 }

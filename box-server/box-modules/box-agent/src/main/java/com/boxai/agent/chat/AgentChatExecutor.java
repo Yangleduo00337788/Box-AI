@@ -3,17 +3,21 @@ package com.boxai.agent.chat;
 import com.boxai.agent.api.ChatStreamEvent;
 import com.boxai.ai.ChatModelGateway;
 import com.boxai.ai.ChatStreamHandler;
+import com.boxai.ai.ToolCall;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.model.ModelCredentialRepository;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.domain.trace.Execution;
 import com.boxai.tenant.application.QuotaApplicationService;
+import com.boxai.trace.application.ExecutionRecorder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -27,17 +31,20 @@ public class AgentChatExecutor {
     private final QuotaApplicationService quotaApplicationService;
     private final PlatformModelApplicationService platformModelApplicationService;
     private final AgentToolRuntimeService agentToolRuntimeService;
+    private final ExecutionRecorder executionRecorder;
 
     public AgentChatExecutor(ChatModelGateway chatModelGateway,
                              ModelCredentialRepository credentialRepository,
                              QuotaApplicationService quotaApplicationService,
                              PlatformModelApplicationService platformModelApplicationService,
-                             AgentToolRuntimeService agentToolRuntimeService) {
+                             AgentToolRuntimeService agentToolRuntimeService,
+                             ExecutionRecorder executionRecorder) {
         this.chatModelGateway = chatModelGateway;
         this.credentialRepository = credentialRepository;
         this.quotaApplicationService = quotaApplicationService;
         this.platformModelApplicationService = platformModelApplicationService;
         this.agentToolRuntimeService = agentToolRuntimeService;
+        this.executionRecorder = executionRecorder;
     }
 
     public void assertQuotaAvailable() {
@@ -45,6 +52,10 @@ public class AgentChatExecutor {
     }
 
     public String chat(PreparedAgentChat prepared) {
+        return chat(prepared, null);
+    }
+
+    public String chat(PreparedAgentChat prepared, Execution execution) {
         Long workspaceId = WorkspaceContext.require().workspaceId();
         quotaApplicationService.assertAiQuotaAvailable(workspaceId);
         try {
@@ -55,7 +66,7 @@ public class AgentChatExecutor {
                         prepared.runtimeConfig(),
                         prepared.turns(),
                         prepared.tools(),
-                        toolKey -> agentToolRuntimeService.executeByKey(resolvedTools, toolKey),
+                        toolCall -> executeToolWithTrace(execution, resolvedTools, toolCall),
                         prepared.temperature(),
                         prepared.topP(),
                         prepared.maxTokens());
@@ -82,6 +93,17 @@ public class AgentChatExecutor {
     }
 
     public SseEmitter stream(PreparedAgentChat prepared, Consumer<String> onCompleted) {
+        return stream(prepared, onCompleted, null);
+    }
+
+    public SseEmitter stream(PreparedAgentChat prepared, Consumer<String> onCompleted, Long executionId) {
+        return stream(prepared, onCompleted, executionId, null);
+    }
+
+    public SseEmitter stream(PreparedAgentChat prepared,
+                             Consumer<String> onCompleted,
+                             Long executionId,
+                             String citationsJson) {
         Long workspaceId = WorkspaceContext.require().workspaceId();
         quotaApplicationService.assertAiQuotaAvailable(workspaceId);
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
@@ -89,6 +111,9 @@ public class AgentChatExecutor {
         StringBuilder contentBuilder = new StringBuilder();
         CompletableFuture.runAsync(() -> {
             try {
+                if (citationsJson != null && !citationsJson.isBlank()) {
+                    sendStreamEvent(emitter, ChatStreamEvent.citations(citationsJson));
+                }
                 chatModelGateway.streamChat(
                         prepared.runtimeConfig(),
                         prepared.turns(),
@@ -115,7 +140,9 @@ public class AgentChatExecutor {
                                     if (onCompleted != null) {
                                         onCompleted.accept(content);
                                     }
-                                    sendStreamEvent(emitter, ChatStreamEvent.done());
+                                    sendStreamEvent(emitter, executionId == null
+                                            ? ChatStreamEvent.done()
+                                            : ChatStreamEvent.done(executionId));
                                     emitter.complete();
                                 } catch (Exception e) {
                                     emitter.completeWithError(e);
@@ -158,6 +185,25 @@ public class AgentChatExecutor {
             }
         }
         return Math.max(total, 1L);
+    }
+
+    private String executeToolWithTrace(Execution execution, List<ResolvedAgentTool> tools, ToolCall toolCall) {
+        String toolKey = toolCall.toolKey();
+        Map<String, Object> input = toolCall.arguments() == null || toolCall.arguments().isEmpty()
+                ? Map.of("toolKey", toolKey)
+                : Map.of("toolKey", toolKey, "arguments", toolCall.arguments());
+        try {
+            String result = agentToolRuntimeService.executeByKey(tools, toolKey, toolCall.arguments());
+            if (execution != null) {
+                executionRecorder.recordToolSpan(execution, toolKey, input, result);
+            }
+            return result;
+        } catch (RuntimeException e) {
+            if (execution != null) {
+                executionRecorder.recordToolSpanFailed(execution, toolKey, input, e.getMessage());
+            }
+            throw e;
+        }
     }
 
     private void completeStreamWithError(SseEmitter emitter, Throwable error) {

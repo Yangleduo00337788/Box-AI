@@ -16,6 +16,7 @@ import com.boxai.security.context.LoginUser;
 import com.boxai.tenant.application.QuotaApplicationService;
 import com.boxai.workspace.api.CreateWorkspaceRequest;
 import com.boxai.workspace.api.WorkspaceDetailVO;
+import com.boxai.workspace.support.RolePermissionSeeder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,15 +31,18 @@ public class WorkspaceApplicationService {
     private final RoleRepository roleRepository;
     private final TenantRepository tenantRepository;
     private final QuotaApplicationService quotaApplicationService;
+    private final RolePermissionSeeder rolePermissionSeeder;
 
     public WorkspaceApplicationService(WorkspaceRepository workspaceRepository,
                                        RoleRepository roleRepository,
                                        TenantRepository tenantRepository,
-                                       QuotaApplicationService quotaApplicationService) {
+                                       QuotaApplicationService quotaApplicationService,
+                                       RolePermissionSeeder rolePermissionSeeder) {
         this.workspaceRepository = workspaceRepository;
         this.roleRepository = roleRepository;
         this.tenantRepository = tenantRepository;
         this.quotaApplicationService = quotaApplicationService;
+        this.rolePermissionSeeder = rolePermissionSeeder;
     }
 
     @Transactional
@@ -84,8 +88,11 @@ public class WorkspaceApplicationService {
         workspaceRepository.save(workspace);
 
         Role admin = saveRole(workspace.getId(), RoleCodes.TENANT_ADMIN, "工作空间管理员");
-        saveRole(workspace.getId(), RoleCodes.DEVELOPER, "开发者");
-        saveRole(workspace.getId(), RoleCodes.MEMBER, "成员");
+        Role developer = saveRole(workspace.getId(), RoleCodes.DEVELOPER, "开发者");
+        Role memberRole = saveRole(workspace.getId(), RoleCodes.MEMBER, "成员");
+        rolePermissionSeeder.seedBuiltInRole(admin);
+        rolePermissionSeeder.seedBuiltInRole(developer);
+        rolePermissionSeeder.seedBuiltInRole(memberRole);
 
         WorkspaceMember member = new WorkspaceMember();
         member.setWorkspaceId(workspace.getId());

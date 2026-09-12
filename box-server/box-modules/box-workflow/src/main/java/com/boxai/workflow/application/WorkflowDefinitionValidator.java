@@ -82,6 +82,18 @@ public class WorkflowDefinitionValidator {
             if ("Output".equalsIgnoreCase(type)) {
                 outputCount++;
             }
+            if ("Tool".equalsIgnoreCase(type)) {
+                validateToolNode(id, node, errors);
+            }
+            if ("Webhook".equalsIgnoreCase(type)) {
+                validateWebhookNode(id, node, errors);
+            }
+            if ("SubWorkflow".equalsIgnoreCase(type)) {
+                validateSubWorkflowNode(id, node, errors);
+            }
+            if ("Agent".equalsIgnoreCase(type)) {
+                validateAgentNode(id, node, errors);
+            }
         }
 
         if (startCount == 0) {
@@ -136,6 +148,60 @@ public class WorkflowDefinitionValidator {
         }
 
         return new WorkflowValidateVO(errors.isEmpty(), errors);
+    }
+
+    private void validateAgentNode(String nodeId, JsonNode node, List<String> errors) {
+        JsonNode config = node.get("config");
+        if (config == null || !config.isObject()) {
+            errors.add("Agent 节点 " + nodeId + " 缺少 config");
+            return;
+        }
+        if (!config.has("agentId")) {
+            errors.add("Agent 节点 " + nodeId + " 缺少 agentId");
+        }
+    }
+
+    private void validateSubWorkflowNode(String nodeId, JsonNode node, List<String> errors) {
+        JsonNode config = node.get("config");
+        if (config == null || !config.isObject()) {
+            errors.add("Sub Workflow 节点 " + nodeId + " 缺少 config");
+            return;
+        }
+        if (!config.has("workflowId")) {
+            errors.add("Sub Workflow 节点 " + nodeId + " 缺少 workflowId");
+        }
+    }
+
+    private void validateWebhookNode(String nodeId, JsonNode node, List<String> errors) {
+        JsonNode config = node.get("config");
+        if (config == null || !config.isObject()) {
+            errors.add("Webhook 节点 " + nodeId + " 缺少 config");
+            return;
+        }
+        if (!config.has("url") || config.path("url").asText("").isBlank()) {
+            errors.add("Webhook 节点 " + nodeId + " 缺少 url");
+        }
+    }
+
+    private void validateToolNode(String nodeId, JsonNode node, List<String> errors) {
+        JsonNode config = node.get("config");
+        if (config == null || !config.isObject()) {
+            errors.add("Tool 节点 " + nodeId + " 缺少 config");
+            return;
+        }
+        String sourceType = config.path("sourceType").asText("HTTP").trim().toUpperCase();
+        if ("MCP".equals(sourceType)) {
+            if (!config.has("mcpServerId")) {
+                errors.add("Tool 节点 " + nodeId + " 缺少 mcpServerId");
+            }
+            if (!config.has("mcpToolName") || config.path("mcpToolName").asText("").isBlank()) {
+                errors.add("Tool 节点 " + nodeId + " 缺少 mcpToolName");
+            }
+            return;
+        }
+        if (!config.has("toolId")) {
+            errors.add("Tool 节点 " + nodeId + " 缺少 toolId");
+        }
     }
 
     private boolean hasCycle(Map<String, List<String>> adjacency, Set<String> nodeIds) {

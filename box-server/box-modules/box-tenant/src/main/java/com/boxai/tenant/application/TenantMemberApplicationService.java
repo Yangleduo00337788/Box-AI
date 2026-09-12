@@ -5,11 +5,16 @@ import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.constant.UserTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.rbac.Role;
+import com.boxai.domain.rbac.RoleRepository;
 import com.boxai.domain.tenant.Tenant;
 import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.user.User;
 import com.boxai.domain.user.UserRepository;
+import com.boxai.domain.workspace.Workspace;
+import com.boxai.domain.workspace.WorkspaceMember;
+import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.tenant.api.AddTenantMemberRequest;
 import com.boxai.tenant.api.TenantMemberVO;
 import org.springframework.stereotype.Service;
@@ -24,13 +29,19 @@ public class TenantMemberApplicationService {
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final QuotaApplicationService quotaApplicationService;
+    private final WorkspaceRepository workspaceRepository;
+    private final RoleRepository roleRepository;
 
     public TenantMemberApplicationService(TenantRepository tenantRepository,
                                           UserRepository userRepository,
-                                          QuotaApplicationService quotaApplicationService) {
+                                          QuotaApplicationService quotaApplicationService,
+                                          WorkspaceRepository workspaceRepository,
+                                          RoleRepository roleRepository) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.quotaApplicationService = quotaApplicationService;
+        this.workspaceRepository = workspaceRepository;
+        this.roleRepository = roleRepository;
     }
 
     public List<TenantMemberVO> listMembers(Long tenantId) {
@@ -61,6 +72,7 @@ public class TenantMemberApplicationService {
         member.setRoleCode(normalizeRoleCode(request.roleCode()));
         member.setStatus(1);
         tenantRepository.addMember(member);
+        syncToTenantWorkspaces(tenantId, user.getId(), member.getRoleCode());
         return toVo(member);
     }
 
@@ -127,6 +139,28 @@ public class TenantMemberApplicationService {
             return roleCode;
         }
         throw new BusinessException(ErrorCode.BAD_REQUEST, "角色无效");
+    }
+
+    private void syncToTenantWorkspaces(Long tenantId, Long userId, String tenantRoleCode) {
+        String workspaceRoleCode = RoleCodes.TENANT_ADMIN.equals(tenantRoleCode)
+                ? RoleCodes.DEVELOPER
+                : RoleCodes.MEMBER;
+        for (Workspace workspace : workspaceRepository.listByTenantId(tenantId)) {
+            if (workspaceRepository.findMember(workspace.getId(), userId).isPresent()) {
+                continue;
+            }
+            Role role = roleRepository.findByWorkspaceAndCode(workspace.getId(), workspaceRoleCode)
+                    .orElse(null);
+            if (role == null) {
+                continue;
+            }
+            WorkspaceMember workspaceMember = new WorkspaceMember();
+            workspaceMember.setWorkspaceId(workspace.getId());
+            workspaceMember.setUserId(userId);
+            workspaceMember.setRoleId(role.getId());
+            workspaceMember.setStatus(1);
+            workspaceRepository.addMember(workspaceMember);
+        }
     }
 
     private TenantMemberVO toVo(TenantMember member) {

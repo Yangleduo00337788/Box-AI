@@ -16,6 +16,8 @@ public class Workflow {
     private String status;
     private Long draftVersionId;
     private Long publishedVersionId;
+    private String webhookToken;
+    private String webhookSecret;
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

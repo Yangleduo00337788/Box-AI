@@ -11,7 +11,11 @@ public interface WorkflowRepository {
 
     Optional<Workflow> findById(Long id);
 
+    Optional<Workflow> findByWebhookToken(String webhookToken);
+
     List<Workflow> listByWorkspace(Long workspaceId);
+
+    List<Workflow> searchByName(Long workspaceId, String keyword, int limit);
 
     void delete(Long id);
 }

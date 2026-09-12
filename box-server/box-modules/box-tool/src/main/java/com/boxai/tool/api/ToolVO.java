@@ -12,6 +12,8 @@ public record ToolVO(
         String outputSchemaJson,
         Integer status,
         HttpToolConfigVO httpConfig,
+        DatabaseToolConfigVO databaseConfig,
+        FunctionToolConfigVO functionConfig,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

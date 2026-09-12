@@ -2,6 +2,7 @@ package com.boxai.knowledge.application;
 
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.agent.AgentKnowledgeRepository;
 import com.boxai.domain.knowledge.KnowledgeBase;
 import com.boxai.domain.knowledge.KnowledgeBaseRepository;
 import com.boxai.domain.knowledge.KnowledgeChunkRepository;
@@ -10,6 +11,8 @@ import com.boxai.knowledge.api.CreateKnowledgeBaseRequest;
 import com.boxai.knowledge.api.KnowledgeBaseVO;
 import com.boxai.knowledge.api.UpdateKnowledgeBaseRequest;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
+import com.boxai.tenant.application.QuotaApplicationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,25 +24,39 @@ public class KnowledgeBaseApplicationService {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeDocumentRepository knowledgeDocumentRepository;
     private final KnowledgeChunkRepository knowledgeChunkRepository;
+    private final AgentKnowledgeRepository agentKnowledgeRepository;
+    private final WorkspacePermissionService workspacePermissionService;
+    private final QuotaApplicationService quotaApplicationService;
 
     public KnowledgeBaseApplicationService(KnowledgeBaseRepository knowledgeBaseRepository,
                                            KnowledgeDocumentRepository knowledgeDocumentRepository,
-                                           KnowledgeChunkRepository knowledgeChunkRepository) {
+                                           KnowledgeChunkRepository knowledgeChunkRepository,
+                                           AgentKnowledgeRepository agentKnowledgeRepository,
+                                           WorkspacePermissionService workspacePermissionService,
+                                           QuotaApplicationService quotaApplicationService) {
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
         this.knowledgeChunkRepository = knowledgeChunkRepository;
+        this.agentKnowledgeRepository = agentKnowledgeRepository;
+        this.workspacePermissionService = workspacePermissionService;
+        this.quotaApplicationService = quotaApplicationService;
     }
 
     public List<KnowledgeBaseVO> list() {
+        workspacePermissionService.requirePermission("knowledge:create");
         return knowledgeBaseRepository.listByWorkspace(workspaceId()).stream().map(this::toVO).toList();
     }
 
     public KnowledgeBaseVO detail(Long id) {
+        workspacePermissionService.requirePermission("knowledge:create");
         return toVO(requireKnowledgeBase(id));
     }
 
     @Transactional
     public KnowledgeBaseVO create(CreateKnowledgeBaseRequest request) {
+        workspacePermissionService.requirePermission("knowledge:create");
+        Long workspaceId = workspaceId();
+        quotaApplicationService.assertKnowledgeBaseQuotaAvailable(workspaceId);
         Long userId = WorkspaceContext.require().userId();
         KnowledgeBase kb = new KnowledgeBase();
         kb.setWorkspaceId(workspaceId());
@@ -56,6 +73,7 @@ public class KnowledgeBaseApplicationService {
 
     @Transactional
     public KnowledgeBaseVO update(Long id, UpdateKnowledgeBaseRequest request) {
+        workspacePermissionService.requirePermission("knowledge:create");
         KnowledgeBase kb = requireKnowledgeBase(id);
         kb.setName(request.name().trim());
         kb.setDescription(trimToNull(request.description()));
@@ -66,7 +84,13 @@ public class KnowledgeBaseApplicationService {
 
     @Transactional
     public void delete(Long id) {
+        workspacePermissionService.requirePermission("knowledge:delete");
         KnowledgeBase kb = requireKnowledgeBase(id);
+        int bindingCount = agentKnowledgeRepository.countByKnowledgeBaseId(kb.getId());
+        if (bindingCount > 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "该知识库已被 " + bindingCount + " 个智能体绑定，请先解除绑定后再删除");
+        }
         knowledgeDocumentRepository.listByKnowledgeBase(kb.getId()).forEach(doc -> {
             knowledgeChunkRepository.deleteByDocument(doc.getId());
             knowledgeDocumentRepository.delete(doc.getId());

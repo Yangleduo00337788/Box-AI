@@ -53,6 +53,12 @@ public class AgentKnowledgeRepositoryImpl implements AgentKnowledgeRepository {
                 .toList();
     }
 
+    @Override
+    public int countByKnowledgeBaseId(Long knowledgeBaseId) {
+        Long count = mapper.selectCountByQuery(QueryWrapper.create().eq("knowledge_base_id", knowledgeBaseId));
+        return count == null ? 0 : count.intValue();
+    }
+
     private AgentKnowledge toDomain(AgentKnowledgeDO row) {
         AgentKnowledge binding = new AgentKnowledge();
         binding.setId(row.getId());

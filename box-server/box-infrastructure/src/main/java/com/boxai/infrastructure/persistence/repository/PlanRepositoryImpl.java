@@ -73,6 +73,7 @@ public class PlanRepositoryImpl implements PlanRepository {
         plan.setQuotaTokens(row.getQuotaTokens());
         plan.setQuotaMembers(row.getQuotaMembers());
         plan.setQuotaWorkspaces(row.getQuotaWorkspaces());
+        plan.setQuotaKnowledgeBases(row.getQuotaKnowledgeBases());
         plan.setByokEnabled(row.getByokEnabled());
         plan.setStatus(row.getStatus());
         plan.setCreatedAt(row.getCreatedAt());
@@ -90,6 +91,7 @@ public class PlanRepositoryImpl implements PlanRepository {
         row.setQuotaTokens(plan.getQuotaTokens());
         row.setQuotaMembers(plan.getQuotaMembers());
         row.setQuotaWorkspaces(plan.getQuotaWorkspaces());
+        row.setQuotaKnowledgeBases(plan.getQuotaKnowledgeBases());
         row.setByokEnabled(plan.getByokEnabled() == null ? 0 : plan.getByokEnabled());
         row.setStatus(plan.getStatus() == null ? 1 : plan.getStatus());
         return row;

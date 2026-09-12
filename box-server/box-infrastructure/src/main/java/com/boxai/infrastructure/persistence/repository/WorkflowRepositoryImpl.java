@@ -48,9 +48,32 @@ public class WorkflowRepositoryImpl implements WorkflowRepository {
     }
 
     @Override
+    public Optional<Workflow> findByWebhookToken(String webhookToken) {
+        if (webhookToken == null || webhookToken.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(mapper.selectOneByQuery(
+                        QueryWrapper.create().eq("webhook_token", webhookToken)))
+                .map(this::toDomain);
+    }
+
+    @Override
     public List<Workflow> listByWorkspace(Long workspaceId) {
         return mapper.selectListByQuery(
                         QueryWrapper.create().eq("workspace_id", workspaceId).orderBy("updated_at", false))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Workflow> searchByName(Long workspaceId, String keyword, int limit) {
+        return mapper.selectListByQuery(
+                        QueryWrapper.create()
+                                .eq("workspace_id", workspaceId)
+                                .like("name", keyword)
+                                .orderBy("updated_at", false)
+                                .limit(limit))
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -70,6 +93,8 @@ public class WorkflowRepositoryImpl implements WorkflowRepository {
         workflow.setStatus(row.getStatus());
         workflow.setDraftVersionId(row.getDraftVersionId());
         workflow.setPublishedVersionId(row.getPublishedVersionId());
+        workflow.setWebhookToken(row.getWebhookToken());
+        workflow.setWebhookSecret(row.getWebhookSecret());
         workflow.setCreatedBy(row.getCreatedBy());
         workflow.setCreatedAt(row.getCreatedAt());
         workflow.setUpdatedAt(row.getUpdatedAt());
@@ -84,6 +109,8 @@ public class WorkflowRepositoryImpl implements WorkflowRepository {
         row.setStatus(workflow.getStatus() == null ? "DRAFT" : workflow.getStatus());
         row.setDraftVersionId(workflow.getDraftVersionId());
         row.setPublishedVersionId(workflow.getPublishedVersionId());
+        row.setWebhookToken(workflow.getWebhookToken());
+        row.setWebhookSecret(workflow.getWebhookSecret());
         row.setCreatedBy(workflow.getCreatedBy());
         return row;
     }

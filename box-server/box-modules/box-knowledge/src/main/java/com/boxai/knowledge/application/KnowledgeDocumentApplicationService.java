@@ -9,8 +9,11 @@ import com.boxai.domain.knowledge.KnowledgeChunkRepository;
 import com.boxai.domain.knowledge.KnowledgeDocument;
 import com.boxai.domain.knowledge.KnowledgeDocumentRepository;
 import com.boxai.domain.storage.ObjectStorage;
+import com.boxai.knowledge.api.KnowledgeChunkVO;
 import com.boxai.knowledge.api.KnowledgeDocumentVO;
+import com.boxai.knowledge.support.DocumentTextExtractor;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.permission.WorkspacePermissionService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +40,8 @@ public class KnowledgeDocumentApplicationService {
     private final ObjectStorage objectStorage;
     private final String storageBucket;
     private final KnowledgeChunkIndexingService chunkIndexingService;
+    private final DocumentTextExtractor documentTextExtractor;
+    private final WorkspacePermissionService workspacePermissionService;
 
     public KnowledgeDocumentApplicationService(KnowledgeBaseApplicationService knowledgeBaseApplicationService,
                                                KnowledgeBaseRepository knowledgeBaseRepository,
@@ -44,6 +49,8 @@ public class KnowledgeDocumentApplicationService {
                                                KnowledgeChunkRepository knowledgeChunkRepository,
                                                ObjectStorage objectStorage,
                                                KnowledgeChunkIndexingService chunkIndexingService,
+                                               DocumentTextExtractor documentTextExtractor,
+                                               WorkspacePermissionService workspacePermissionService,
                                                @Value("${box.minio.bucket:box}") String storageBucket) {
         this.knowledgeBaseApplicationService = knowledgeBaseApplicationService;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
@@ -51,20 +58,31 @@ public class KnowledgeDocumentApplicationService {
         this.knowledgeChunkRepository = knowledgeChunkRepository;
         this.objectStorage = objectStorage;
         this.chunkIndexingService = chunkIndexingService;
+        this.documentTextExtractor = documentTextExtractor;
+        this.workspacePermissionService = workspacePermissionService;
         this.storageBucket = storageBucket;
     }
 
     public List<KnowledgeDocumentVO> list(Long knowledgeBaseId) {
+        workspacePermissionService.requirePermission("knowledge:create");
         knowledgeBaseApplicationService.requireKnowledgeBase(knowledgeBaseId);
         return knowledgeDocumentRepository.listByKnowledgeBase(knowledgeBaseId).stream().map(this::toVO).toList();
     }
 
     public KnowledgeDocumentVO detail(Long documentId) {
+        workspacePermissionService.requirePermission("knowledge:create");
         return toVO(requireDocument(documentId));
+    }
+
+    public List<KnowledgeChunkVO> listChunks(Long documentId) {
+        workspacePermissionService.requirePermission("knowledge:create");
+        requireDocument(documentId);
+        return knowledgeChunkRepository.listByDocument(documentId).stream().map(this::toChunkVO).toList();
     }
 
     @Transactional
     public KnowledgeDocumentVO upload(Long knowledgeBaseId, MultipartFile file) {
+        workspacePermissionService.requirePermission("knowledge:upload");
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请上传文件");
         }
@@ -93,7 +111,8 @@ public class KnowledgeDocumentApplicationService {
             byte[] bytes = file.getBytes();
             document.setMd5(md5(bytes));
             objectStorage.put(storageBucket, storageKey, file.getInputStream(), file.getSize(), file.getContentType());
-            processDocument(kb, document, new String(bytes, StandardCharsets.UTF_8));
+            String text = documentTextExtractor.extract(bytes, originalName);
+            processDocument(kb, document, text);
             knowledgeDocumentRepository.update(document);
             refreshKnowledgeBaseCounts(kb);
             return toVO(document);
@@ -108,6 +127,7 @@ public class KnowledgeDocumentApplicationService {
 
     @Transactional
     public void delete(Long documentId) {
+        workspacePermissionService.requirePermission("knowledge:delete");
         KnowledgeDocument document = requireDocument(documentId);
         KnowledgeBase kb = knowledgeBaseApplicationService.requireKnowledgeBase(document.getKnowledgeBaseId());
         chunkIndexingService.deleteDocumentIndex(document.getId());
@@ -171,6 +191,15 @@ public class KnowledgeDocumentApplicationService {
             throw new BusinessException(ErrorCode.WORKSPACE_ACCESS_DENIED, "无权访问该文档");
         }
         return document;
+    }
+
+    private KnowledgeChunkVO toChunkVO(KnowledgeChunk chunk) {
+        return new KnowledgeChunkVO(
+                chunk.getId(),
+                chunk.getChunkIndex(),
+                chunk.getContent(),
+                chunk.getTokenCount(),
+                chunk.getStatus());
     }
 
     private KnowledgeDocumentVO toVO(KnowledgeDocument document) {

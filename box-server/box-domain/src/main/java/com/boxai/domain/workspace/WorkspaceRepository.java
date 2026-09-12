@@ -13,9 +13,17 @@ public interface WorkspaceRepository {
 
     List<WorkspaceMember> listMembersByUserId(Long userId);
 
+    List<WorkspaceMember> listMembersByWorkspaceId(Long workspaceId);
+
     WorkspaceMember addMember(WorkspaceMember member);
+
+    void updateMember(WorkspaceMember member);
+
+    void removeMember(Long workspaceId, Long userId);
 
     Optional<WorkspaceMember> findMember(Long workspaceId, Long userId);
 
     int countByTenantId(Long tenantId);
+
+    List<Workspace> listByTenantId(Long tenantId);
 }

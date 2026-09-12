@@ -32,6 +32,9 @@ public class WorkspaceInterceptor implements HandlerInterceptor {
             }
             return true;
         }
+        if (isWebhookPath(request)) {
+            return true;
+        }
         if (isPublicPath(request.getRequestURI())) {
             return true;
         }
@@ -65,6 +68,10 @@ public class WorkspaceInterceptor implements HandlerInterceptor {
 
     private boolean isPublishedApiPath(HttpServletRequest request) {
         return request.getRequestURI().startsWith("/api/v1/published/");
+    }
+
+    private boolean isWebhookPath(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/api/v1/hooks/");
     }
 
     private boolean isPublicPath(String uri) {
