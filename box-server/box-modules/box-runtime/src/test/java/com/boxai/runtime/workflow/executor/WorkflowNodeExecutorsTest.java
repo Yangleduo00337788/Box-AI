@@ -51,6 +51,21 @@ class WorkflowNodeExecutorsTest {
     }
 
     @Test
+    void switchNodeMatchesCase() throws Exception {
+        SwitchNodeExecutor executor = new SwitchNodeExecutor();
+        WorkflowExecutionContext context = new WorkflowExecutionContext(1L, 1L, 1L, "exec-switch",
+                Map.of("input", Map.of("type", "vip")));
+        WorkflowNode node = new WorkflowNode("switch-1", "Switch",
+                objectMapper.readTree("""
+                        {"variable":"input.type","operator":"equals","cases":[{"id":"vip","value":"vip"},{"id":"normal","value":"normal"}],"defaultCase":"default"}
+                        """));
+        NodeExecutionResult result = executor.execute(new NodeExecutionContext(new WorkflowGraph(List.of(), List.of()), context, node));
+        assertTrue(result.succeeded());
+        assertEquals("vip", result.branchHandle());
+        assertEquals("vip", context.getVariable("switchResult"));
+    }
+
+    @Test
     void parallelNodeRunsTasks() throws Exception {
         ParallelNodeExecutor executor = new ParallelNodeExecutor(inlineScriptExecutor, templateRenderer, objectMapper);
         WorkflowExecutionContext context = new WorkflowExecutionContext(1L, 1L, 1L, "exec-3", Map.of("name", "Box"));

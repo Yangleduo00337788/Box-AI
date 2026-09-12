@@ -14,6 +14,7 @@ import com.boxai.runtime.workflow.core.WorkflowExecutionResult;
 import com.boxai.runtime.workflow.core.WorkflowNodeTrace;
 import com.boxai.runtime.workflow.engine.DefaultWorkflowExecutor;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.notification.NotificationPublisher;
 import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.tenant.application.QuotaApplicationService;
 import com.boxai.trace.application.ExecutionRecorder;
@@ -39,6 +40,7 @@ public class WorkflowExecutionApplicationService {
     private final ObjectMapper objectMapper;
     private final WorkspacePermissionService workspacePermissionService;
     private final QuotaApplicationService quotaApplicationService;
+    private final NotificationPublisher notificationPublisher;
 
     public WorkflowExecutionApplicationService(WorkflowVersionRepository workflowVersionRepository,
                                                  WorkflowApplicationService workflowApplicationService,
@@ -47,7 +49,8 @@ public class WorkflowExecutionApplicationService {
                                                  ExecutionRecorder executionRecorder,
                                                  ObjectMapper objectMapper,
                                                  WorkspacePermissionService workspacePermissionService,
-                                                 QuotaApplicationService quotaApplicationService) {
+                                                 QuotaApplicationService quotaApplicationService,
+                                                 NotificationPublisher notificationPublisher) {
         this.workflowVersionRepository = workflowVersionRepository;
         this.workflowApplicationService = workflowApplicationService;
         this.workflowDefinitionValidator = workflowDefinitionValidator;
@@ -56,17 +59,18 @@ public class WorkflowExecutionApplicationService {
         this.objectMapper = objectMapper;
         this.workspacePermissionService = workspacePermissionService;
         this.quotaApplicationService = quotaApplicationService;
+        this.notificationPublisher = notificationPublisher;
     }
 
     public WorkflowExecutionResultVO debug(Long workflowId, WorkflowExecuteRequest request) {
-        workspacePermissionService.requirePermission("workflow:execute");
+        workspacePermissionService.requirePermission(com.boxai.common.constant.PermissionCodes.WORKFLOW_EXECUTE);
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         WorkflowVersion version = workflowApplicationService.requireDraft(workflow);
         return run(workflow, version, request, true);
     }
 
     public WorkflowExecutionResultVO execute(Long workflowId, WorkflowExecuteRequest request) {
-        workspacePermissionService.requirePermission("workflow:execute");
+        workspacePermissionService.requirePermission(com.boxai.common.constant.PermissionCodes.WORKFLOW_EXECUTE);
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         if (workflow.getPublishedVersionId() == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "工作流尚未发布，无法执行");
@@ -90,7 +94,8 @@ public class WorkflowExecutionApplicationService {
                                           WorkflowVersion version,
                                           WorkflowExecuteRequest request,
                                           boolean debugMode) {
-        WorkflowValidateVO validation = workflowDefinitionValidator.validate(version.getDefinitionJson());
+        WorkflowValidateVO validation = workflowDefinitionValidator.validate(
+                version.getDefinitionJson(), WorkspaceContext.require().workspaceId());
         if (!validation.valid()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, String.join("；", validation.errors()));
         }
@@ -127,6 +132,15 @@ public class WorkflowExecutionApplicationService {
             executionRecorder.succeed(execution, outputJson, null);
         } else {
             executionRecorder.fail(execution, result.errorMessage());
+            Long userId = WorkspaceContext.require().userId();
+            notificationPublisher.publish(
+                    userId,
+                    workflow.getWorkspaceId(),
+                    "工作流执行失败",
+                    "工作流「" + workflow.getName() + "」执行失败："
+                            + (result.errorMessage() == null ? "未知错误" : result.errorMessage()),
+                    "WORKFLOW",
+                    "/executions");
         }
 
         return toVO(workflow.getId(), version.getId(), result);

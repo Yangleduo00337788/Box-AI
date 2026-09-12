@@ -16,9 +16,33 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 @Component
 public class InlineScriptExecutor {
+
+    private static final Pattern[] FORBIDDEN_PATTERNS = {
+            Pattern.compile("(?i)Java\\.type"),
+            Pattern.compile("(?i)importPackage"),
+            Pattern.compile("(?i)importClass"),
+            Pattern.compile("(?i)load\\s*\\("),
+            Pattern.compile("(?i)loadWithNewGlobal"),
+            Pattern.compile("(?i)Packages\\."),
+            Pattern.compile("(?i)java\\.lang"),
+            Pattern.compile("(?i)java\\.io"),
+            Pattern.compile("(?i)java\\.net"),
+            Pattern.compile("(?i)java\\.nio"),
+            Pattern.compile("(?i)javax\\.script"),
+            Pattern.compile("(?i)ProcessBuilder"),
+            Pattern.compile("(?i)Runtime\\.getRuntime"),
+            Pattern.compile("(?i)Files\\."),
+            Pattern.compile("(?i)FileReader"),
+            Pattern.compile("(?i)FileWriter"),
+            Pattern.compile("(?i)Socket\\s*\\("),
+            Pattern.compile("(?i)URL\\s*\\("),
+            Pattern.compile("(?i)fetch\\s*\\("),
+            Pattern.compile("(?i)XMLHttpRequest"),
+    };
 
     private final ObjectMapper objectMapper;
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -28,10 +52,11 @@ public class InlineScriptExecutor {
     }
 
     public String execute(String functionCode, String functionName, Map<String, Object> arguments, int timeoutMs) {
+        assertScriptSafe(functionCode);
         Map<String, Object> args = arguments == null ? Map.of() : arguments;
         Callable<Object> task = () -> runScript(functionCode, functionName, args);
+        Future<Object> future = executor.submit(task);
         try {
-            Future<Object> future = executor.submit(task);
             Object result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
             if (result == null) {
                 return "";
@@ -41,11 +66,25 @@ public class InlineScriptExecutor {
             }
             return objectMapper.writeValueAsString(result);
         } catch (TimeoutException ex) {
-            throw new BusinessException(ErrorCode.EXECUTION_FAILED, "脚本执行超时");
+            future.cancel(true);
+            throw new BusinessException(ErrorCode.SCRIPT_TIMEOUT, "脚本执行超时");
         } catch (BusinessException ex) {
+            future.cancel(true);
             throw ex;
         } catch (Exception ex) {
+            future.cancel(true);
             throw new BusinessException(ErrorCode.EXECUTION_FAILED, "脚本执行失败: " + ex.getMessage());
+        }
+    }
+
+    void assertScriptSafe(String functionCode) {
+        if (functionCode == null || functionCode.isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "脚本内容不能为空");
+        }
+        for (Pattern pattern : FORBIDDEN_PATTERNS) {
+            if (pattern.matcher(functionCode).find()) {
+                throw new BusinessException(ErrorCode.SCRIPT_SECURITY_VIOLATION, "脚本包含禁止的操作: " + pattern.pattern());
+            }
         }
     }
 

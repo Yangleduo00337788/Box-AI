@@ -65,7 +65,7 @@ public class ToolNodeExecutor implements NodeExecutor {
 
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
-        workspacePermissionService.requirePermission("tool:execute");
+        workspacePermissionService.requirePermission(com.boxai.common.constant.PermissionCodes.TOOL_EXECUTE);
         JsonNode config = context.node().config();
         if (config == null) {
             return NodeExecutionResult.failed("Tool 节点缺少配置");

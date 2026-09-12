@@ -84,7 +84,8 @@ public class SubWorkflowNodeExecutor implements NodeExecutor {
         } catch (BusinessException ex) {
             return NodeExecutionResult.failed(ex.getMessage());
         }
-        WorkflowValidateVO validation = workflowDefinitionValidator.validate(childVersion.getDefinitionJson());
+        WorkflowValidateVO validation = workflowDefinitionValidator.validate(
+                childVersion.getDefinitionJson(), WorkspaceContext.require().workspaceId());
         if (!validation.valid()) {
             return NodeExecutionResult.failed("子工作流定义无效: " + String.join("；", validation.errors()));
         }

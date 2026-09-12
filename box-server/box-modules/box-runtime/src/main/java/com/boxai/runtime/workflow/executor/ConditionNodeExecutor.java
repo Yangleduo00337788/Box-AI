@@ -2,10 +2,10 @@ package com.boxai.runtime.workflow.executor;
 
 import com.boxai.runtime.workflow.core.NodeExecutionContext;
 import com.boxai.runtime.workflow.core.NodeExecutionResult;
+import com.boxai.runtime.workflow.util.ConditionEvaluator;
+import com.boxai.runtime.workflow.util.WorkflowVariableResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
-
-import java.util.Objects;
 
 @Component
 public class ConditionNodeExecutor implements NodeExecutor {
@@ -21,21 +21,10 @@ public class ConditionNodeExecutor implements NodeExecutor {
         String variable = config == null ? null : config.path("variable").asText(null);
         String operator = config == null ? "equals" : config.path("operator").asText("equals");
         String expected = config == null ? null : config.path("value").asText(null);
-        Object actual = variable == null ? null : context.executionContext().getVariable(variable);
-        boolean matched = evaluate(actual, operator, expected);
+        Object actual = variable == null ? null : WorkflowVariableResolver.resolve(context.executionContext(), variable);
+        boolean matched = ConditionEvaluator.evaluate(actual, operator, expected);
         String branch = matched ? "true" : "false";
         context.executionContext().setVariable("conditionResult", matched);
         return NodeExecutionResult.okWithBranch(branch);
-    }
-
-    private boolean evaluate(Object actual, String operator, String expected) {
-        String actualText = actual == null ? null : String.valueOf(actual);
-        return switch (operator == null ? "equals" : operator.toLowerCase()) {
-            case "notequals", "not_equals", "!=" -> !Objects.equals(actualText, expected);
-            case "contains" -> actualText != null && expected != null && actualText.contains(expected);
-            case "empty" -> actualText == null || actualText.isBlank();
-            case "notempty", "not_empty" -> actualText != null && !actualText.isBlank();
-            default -> Objects.equals(actualText, expected);
-        };
     }
 }
