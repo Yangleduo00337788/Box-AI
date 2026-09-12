@@ -56,6 +56,37 @@ services:
     volumes:
       - box-minio-data:/data
 
+  box-server:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: box-server/Dockerfile
+    container_name: box-server
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/box?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: box
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      BOX_MINIO_ENDPOINT: http://minio:9000
+      BOX_MINIO_ACCESS_KEY: box
+      BOX_MINIO_SECRET_KEY: boxsecret1
+      BOX_ELASTICSEARCH_HOST: elasticsearch
+      BOX_ELASTICSEARCH_PORT: 9200
+      BOX_SECURITY_JWT_SECRET: box-docker-jwt-secret-change-me-please-32b
+      BOX_SECURITY_CRYPTO_AES_KEY: box-docker-aes-256-key-change!!
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+      minio:
+        condition: service_started
+
 volumes:
   box-mysql-data:
   box-redis-data:

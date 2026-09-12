@@ -1,4 +1,4 @@
-package com.boxai.conversation.api;
+package com.boxai.analytics.api;
 
 import com.boxai.tenant.api.QuotaSnapshotVO;
 
@@ -22,4 +22,5 @@ public record AnalyticsOverviewVO(
         List<RecentConversationVO> recentConversations,
         List<RecentWorkflowVO> recentWorkflows,
         List<TopAgentVO> topAgents
-) {}
+) {
+}

@@ -1,19 +1,21 @@
-package com.boxai.conversation.application;
+package com.boxai.analytics.application;
 
+import com.boxai.analytics.api.AnalyticsOverviewVO;
+import com.boxai.analytics.api.AnalyticsTrendPointVO;
+import com.boxai.analytics.api.AnalyticsTrendsVO;
+import com.boxai.analytics.api.RecentAgentVO;
+import com.boxai.analytics.api.RecentConversationVO;
+import com.boxai.analytics.api.RecentWorkflowVO;
+import com.boxai.analytics.api.TopAgentVO;
 import com.boxai.common.constant.PermissionCodes;
-import com.boxai.conversation.api.AnalyticsOverviewVO;
-import com.boxai.conversation.api.RecentAgentVO;
-import com.boxai.conversation.api.RecentConversationVO;
-import com.boxai.conversation.api.RecentWorkflowVO;
-import com.boxai.conversation.api.TopAgentVO;
 import com.boxai.domain.agent.Agent;
 import com.boxai.domain.agent.AgentRepository;
 import com.boxai.domain.conversation.Conversation;
 import com.boxai.domain.conversation.ConversationRepository;
-import com.boxai.domain.trace.Execution;
 import com.boxai.domain.knowledge.KnowledgeBaseRepository;
 import com.boxai.domain.mcp.McpServerRepository;
 import com.boxai.domain.tool.ToolRepository;
+import com.boxai.domain.trace.Execution;
 import com.boxai.domain.trace.ExecutionRepository;
 import com.boxai.domain.workflow.Workflow;
 import com.boxai.domain.workflow.WorkflowRepository;
@@ -23,8 +25,11 @@ import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.tenant.application.QuotaApplicationService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -152,5 +157,47 @@ public class AnalyticsApplicationService {
                 recentConversations,
                 recentWorkflows,
                 topAgents);
+    }
+
+    public AnalyticsTrendsVO trends(int days) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
+        Long workspaceId = WorkspaceContext.require().workspaceId();
+        int periodDays = days <= 0 ? 7 : Math.min(days, 90);
+        LocalDate today = LocalDate.now();
+        LocalDateTime since = today.minusDays(periodDays - 1).atStartOfDay();
+        List<Execution> periodExecutions = executionRepository.listByWorkspace(workspaceId, 1000).stream()
+                .filter(item -> item.getStartedAt() != null && !item.getStartedAt().isBefore(since))
+                .toList();
+
+        Map<LocalDate, List<Execution>> grouped = new LinkedHashMap<>();
+        for (int offset = periodDays - 1; offset >= 0; offset--) {
+            grouped.put(today.minusDays(offset), new ArrayList<>());
+        }
+        for (Execution execution : periodExecutions) {
+            LocalDate date = execution.getStartedAt().toLocalDate();
+            grouped.computeIfAbsent(date, key -> new ArrayList<>()).add(execution);
+        }
+
+        List<AnalyticsTrendPointVO> points = grouped.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    List<Execution> items = entry.getValue();
+                    int total = items.size();
+                    int succeeded = items.stream()
+                            .filter(item -> "SUCCEEDED".equalsIgnoreCase(item.getStatus())
+                                    || "SUCCESS".equalsIgnoreCase(item.getStatus()))
+                            .toList()
+                            .size();
+                    double successRate = total == 0 ? 0D : succeeded * 100D / total;
+                    long avgLatencyMs = (long) items.stream()
+                            .map(Execution::getDurationMs)
+                            .filter(value -> value != null && value > 0)
+                            .mapToLong(Long::longValue)
+                            .average()
+                            .orElse(0D);
+                    return new AnalyticsTrendPointVO(entry.getKey().toString(), total, successRate, avgLatencyMs);
+                })
+                .toList();
+        return new AnalyticsTrendsVO(periodDays, points);
     }
 }

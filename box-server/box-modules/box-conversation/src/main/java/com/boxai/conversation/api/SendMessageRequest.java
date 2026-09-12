@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 public record SendMessageRequest(
         @NotBlank @Size(max = 8000) String message,
         Boolean stream,
-        Long platformModelId
+        Long platformModelId,
+        String toolConfirmationToken
 ) {
 }

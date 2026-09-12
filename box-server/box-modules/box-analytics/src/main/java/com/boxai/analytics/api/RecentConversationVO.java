@@ -1,4 +1,4 @@
-package com.boxai.conversation.api;
+package com.boxai.analytics.api;
 
 import java.time.LocalDateTime;
 

@@ -1,10 +1,12 @@
 package com.boxai.publish.controller;
 
 import com.boxai.agent.api.AgentChatRequest;
+import com.boxai.agent.api.AgentEmbedConfigVO;
 import com.boxai.common.result.Result;
 import com.boxai.publish.application.PublishedAgentApplicationService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +22,11 @@ public class PublishedAgentController {
 
     public PublishedAgentController(PublishedAgentApplicationService publishedAgentApplicationService) {
         this.publishedAgentApplicationService = publishedAgentApplicationService;
+    }
+
+    @GetMapping("/{agentId}/embed-config")
+    public Result<AgentEmbedConfigVO> embedConfig(@PathVariable Long agentId) {
+        return Result.success(publishedAgentApplicationService.getEmbedConfig(agentId));
     }
 
     @PostMapping("/{agentId}/chat")

@@ -1,8 +1,8 @@
-package com.boxai.conversation.api;
+package com.boxai.analytics.api;
 
 import java.time.LocalDateTime;
 
-public record RecentWorkflowVO(
+public record RecentAgentVO(
         Long id,
         String name,
         String status,

@@ -139,7 +139,11 @@ public class ConversationApplicationService {
         KnowledgeRetrievalResult retrieval = draft == null
                 ? KnowledgeRetrievalResult.empty()
                 : agentChatPreparer.retrieveKnowledge(draft, content);
-        PreparedAgentChat prepared = buildPreparedChat(conversation, content, request.platformModelId());
+        PreparedAgentChat prepared = buildPreparedChat(
+                conversation,
+                content,
+                request.platformModelId(),
+                request.toolConfirmationToken());
         executionRecorder.recordRagSpan(execution, Map.of("query", content), retrieval.citations());
         agentChatExecutor.assertQuotaAvailable();
         Message userMessage = appendMessage(conversation, "USER", content, null);
@@ -172,7 +176,11 @@ public class ConversationApplicationService {
         KnowledgeRetrievalResult retrieval = draft == null
                 ? KnowledgeRetrievalResult.empty()
                 : agentChatPreparer.retrieveKnowledge(draft, content);
-        PreparedAgentChat prepared = buildPreparedChat(conversation, content, request.platformModelId());
+        PreparedAgentChat prepared = buildPreparedChat(
+                conversation,
+                content,
+                request.platformModelId(),
+                request.toolConfirmationToken());
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
         appendMessage(conversation, "USER", content, null);
@@ -195,15 +203,22 @@ public class ConversationApplicationService {
             executionRecorder.recordLlmSpan(execution, content, Map.of("content", assistantContent));
             executionRecorder.succeed(execution, toOutputJson(assistantContent), estimateTokens(assistantContent));
             captureLongTermMemory(draft, fresh, content, assistantContent);
-        }), execution.getId(), citationsJson);
+        }), execution.getId(), citationsJson, execution);
     }
 
-    private PreparedAgentChat buildPreparedChat(Conversation conversation, String userMessage, Long platformModelId) {
-        return agentChatPreparer.prepare(
+    private PreparedAgentChat buildPreparedChat(Conversation conversation,
+                                                String userMessage,
+                                                Long platformModelId,
+                                                String toolConfirmationToken) {
+        PreparedAgentChat prepared = agentChatPreparer.prepare(
                 conversation.getAgentId(),
                 historyTurns(conversation, userMessage),
                 userMessage,
                 platformModelId);
+        if (toolConfirmationToken == null || toolConfirmationToken.isBlank()) {
+            return prepared;
+        }
+        return prepared.withToolConfirmationToken(toolConfirmationToken.trim());
     }
 
     private List<ChatTurn> historyTurns(Conversation conversation, String currentUserMessage) {
@@ -283,7 +298,7 @@ public class ConversationApplicationService {
         KnowledgeRetrievalResult retrieval = draft == null
                 ? KnowledgeRetrievalResult.empty()
                 : agentChatPreparer.retrieveKnowledge(draft, content);
-        PreparedAgentChat prepared = buildPreparedChat(conversation, content, platformModelId);
+        PreparedAgentChat prepared = buildPreparedChat(conversation, content, platformModelId, null);
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
         Long modelId = prepared.modelId();
@@ -303,7 +318,7 @@ public class ConversationApplicationService {
             executionRecorder.recordLlmSpan(execution, content, Map.of("content", assistantContent));
             executionRecorder.succeed(execution, toOutputJson(assistantContent), estimateTokens(assistantContent));
             captureLongTermMemory(draft, fresh, content, assistantContent);
-        }), execution.getId(), citationsJson);
+        }), execution.getId(), citationsJson, execution);
     }
 
     private void captureLongTermMemory(AgentVersion version,

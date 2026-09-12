@@ -1,4 +1,4 @@
-package com.boxai.conversation.api;
+package com.boxai.analytics.api;
 
 public record TopAgentVO(
         Long agentId,

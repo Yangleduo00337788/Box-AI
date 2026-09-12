@@ -6,6 +6,7 @@ import com.boxai.user.api.AuthVO;
 import com.boxai.user.api.ChangePasswordRequest;
 import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
+import com.boxai.user.api.OAuthProviderVO;
 import com.boxai.user.api.ResetPasswordRequest;
 import com.boxai.user.api.SendVerificationCodeRequest;
 import com.boxai.user.api.SendVerificationCodeResponse;
@@ -13,25 +14,33 @@ import com.boxai.user.api.UpdateProfileRequest;
 import com.boxai.user.api.UpdateUserPreferenceRequest;
 import com.boxai.user.api.UserPreferenceVO;
 import com.boxai.user.application.AuthApplicationService;
+import com.boxai.user.application.OAuthApplicationService;
 import com.boxai.user.application.UserPreferenceApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final AuthApplicationService authApplicationService;
+    private final OAuthApplicationService oauthApplicationService;
     private final UserPreferenceApplicationService userPreferenceApplicationService;
 
     public AuthController(AuthApplicationService authApplicationService,
+                          OAuthApplicationService oauthApplicationService,
                           UserPreferenceApplicationService userPreferenceApplicationService) {
         this.authApplicationService = authApplicationService;
+        this.oauthApplicationService = oauthApplicationService;
         this.userPreferenceApplicationService = userPreferenceApplicationService;
     }
 
@@ -43,6 +52,26 @@ public class AuthController {
     @PostMapping("/login")
     public Result<AuthVO> login(@Valid @RequestBody LoginRequest request) {
         return Result.success(authApplicationService.login(request));
+    }
+
+    @GetMapping("/oauth/providers")
+    public Result<List<OAuthProviderVO>> listOAuthProviders() {
+        return Result.success(oauthApplicationService.listProviders());
+    }
+
+    @GetMapping("/oauth/{provider}/authorize")
+    public Result<Void> oauthAuthorize(@PathVariable String provider,
+                                       @RequestParam(required = false) String redirectUri) {
+        oauthApplicationService.startAuthorize(provider, redirectUri);
+        return Result.success(null);
+    }
+
+    @GetMapping("/oauth/{provider}/callback")
+    public Result<Void> oauthCallback(@PathVariable String provider,
+                                      @RequestParam(required = false) String code,
+                                      @RequestParam(required = false) String state) {
+        oauthApplicationService.handleCallback(provider, code, state);
+        return Result.success(null);
     }
 
     @PostMapping("/verification-code")

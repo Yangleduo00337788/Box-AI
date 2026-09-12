@@ -15,6 +15,8 @@ import com.boxai.domain.agent.AgentVersion;
 import com.boxai.domain.agent.AgentVersionRepository;
 import com.boxai.domain.publish.PublishRepository;
 import com.boxai.domain.trace.Execution;
+import com.boxai.agent.api.AgentEmbedConfigVO;
+import com.boxai.agent.support.AgentEmbedConfigSupport;
 import com.boxai.knowledge.application.KnowledgeRetrievalResult;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.trace.application.ExecutionRecorder;
@@ -52,6 +54,19 @@ public class PublishedAgentApplicationService {
         this.agentChatExecutor = agentChatExecutor;
         this.executionRecorder = executionRecorder;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
+    }
+
+    public AgentEmbedConfigVO getEmbedConfig(Long agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_NOT_FOUND, "智能体不存在"));
+        if (agent.getPublishedVersionId() == null) {
+            throw new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体尚未发布");
+        }
+        publishRepository.findLatestActive(PublishResourceTypes.AGENT, agentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体发布记录不存在"));
+        AgentVersion version = agentVersionRepository.findById(agent.getPublishedVersionId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "发布版本不存在"));
+        return AgentEmbedConfigSupport.toVO(version.getConfigJson(), agent.getName());
     }
 
     public AgentChatVO chat(Long agentId, AgentChatRequest request) {
@@ -97,6 +112,7 @@ public class PublishedAgentApplicationService {
                 toInputJson(message));
         executionRecorder.recordRagSpan(execution, Map.of("query", message), retrieval.citations());
         agentChatExecutor.assertQuotaAvailable();
+        agentChatExecutor.assertPublishedChatRateLimit(agentId);
         configureSseResponse(response);
         Long workspaceId = workspaceId();
         Long userId = WorkspaceContext.require().userId();
@@ -105,7 +121,7 @@ public class PublishedAgentApplicationService {
             executionRecorder.succeed(execution, toOutputJson(content), estimateTokens(content));
             longTermMemoryApplicationService.captureFromTurn(
                     version, agentId, workspaceId, userId, message, content);
-        });
+        }, execution.getId(), null, execution);
     }
 
     private Agent requirePublishedAgent(Long agentId) {

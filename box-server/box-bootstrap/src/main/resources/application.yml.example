@@ -38,6 +38,18 @@ box:
   auth:
     verification:
       expose-code: true
+  oauth:
+    github:
+      enabled: false
+      client-id: ${BOX_OAUTH_GITHUB_CLIENT_ID:}
+      client-secret: ${BOX_OAUTH_GITHUB_CLIENT_SECRET:}
+    google:
+      enabled: false
+      client-id: ${BOX_OAUTH_GOOGLE_CLIENT_ID:}
+      client-secret: ${BOX_OAUTH_GOOGLE_CLIENT_SECRET:}
+    sso:
+      enabled: false
+      issuer-uri: ${BOX_OAUTH_SSO_ISSUER_URI:}
   security:
     jwt:
       secret: box-dev-jwt-secret-change-me-please-32b

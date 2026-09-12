@@ -51,6 +51,10 @@
         </dependency>
         <dependency>
             <groupId>com.boxai</groupId>
+            <artifactId>box-analytics</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.boxai</groupId>
             <artifactId>box-tenant</artifactId>
         </dependency>
         <dependency>

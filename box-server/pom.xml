@@ -102,6 +102,11 @@
             </dependency>
             <dependency>
                 <groupId>com.boxai</groupId>
+                <artifactId>box-analytics</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.boxai</groupId>
                 <artifactId>box-tenant</artifactId>
                 <version>${project.version}</version>
             </dependency>

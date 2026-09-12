@@ -1,8 +1,9 @@
-package com.boxai.conversation.controller;
+package com.boxai.analytics.controller;
 
+import com.boxai.analytics.api.AnalyticsOverviewVO;
+import com.boxai.analytics.api.AnalyticsTrendsVO;
+import com.boxai.analytics.application.AnalyticsApplicationService;
 import com.boxai.common.result.Result;
-import com.boxai.conversation.api.AnalyticsOverviewVO;
-import com.boxai.conversation.application.AnalyticsApplicationService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,5 +22,10 @@ public class AnalyticsController {
     @GetMapping("/overview")
     public Result<AnalyticsOverviewVO> overview(@RequestParam(defaultValue = "7") int days) {
         return Result.success(analyticsApplicationService.overview(days));
+    }
+
+    @GetMapping("/trends")
+    public Result<AnalyticsTrendsVO> trends(@RequestParam(defaultValue = "7") int days) {
+        return Result.success(analyticsApplicationService.trends(days));
     }
 }
