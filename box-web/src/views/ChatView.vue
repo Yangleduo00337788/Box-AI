@@ -138,7 +138,26 @@
               <span v-if="isLoadingBubble(item, index)" class="typing-dots" aria-label="思考中">
                 <i /><i /><i />
               </span>
-              <template v-else>{{ displayContent(item, index) }}</template>
+              <template v-else>
+                <template v-for="(segment, segIndex) in contentSegments(item, index)" :key="segIndex">
+                  <span v-if="segment.type === 'text'">{{ segment.text }}</span>
+                  <t-popup
+                    v-else
+                    placement="top"
+                    trigger="click"
+                    show-arrow
+                    destroy-on-close
+                  >
+                    <template #content>
+                      <div class="chat-citation-popup">
+                        <div class="chat-citation-popup__title">{{ segment.citation?.documentName }}</div>
+                        <div class="chat-citation-popup__body">{{ segment.citation?.content }}</div>
+                      </div>
+                    </template>
+                    <button type="button" class="chat-citation-inline">{{ segment.text }}</button>
+                  </t-popup>
+                </template>
+              </template>
             </div>
             <div v-if="messageCitations(item).length" class="chat-citations">
               <span class="chat-citations__label">引用来源</span>
@@ -288,6 +307,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import ChatModelPicker from '@/components/ChatModelPicker.vue'
 import { extractApiError } from '@/api/apiError'
+import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { appPreferences } from '@/composables/useAppPreferences'
 import { useAgentSelection } from '@/composables/useAgentSelection'
@@ -427,12 +447,50 @@ function applyStreamCitations(index: number, citations: KnowledgeCitation[]) {
   messages.value[index].citations = citations
 }
 
+interface ContentSegment {
+  type: 'text' | 'cite'
+  text: string
+  citation?: KnowledgeCitation
+}
+
 function displayContent(item: MessageVO, index: number) {
   if (item.content) return item.content
   if (chatting.value && index === messages.value.length - 1 && item.role === 'ASSISTANT') {
     return '思考中…'
   }
   return ''
+}
+
+function contentSegments(item: MessageVO, index: number): ContentSegment[] {
+  const content = displayContent(item, index)
+  if (!content || content === '思考中…') {
+    return [{ type: 'text', text: content }]
+  }
+  const citations = messageCitations(item)
+  if (!citations.length) {
+    return [{ type: 'text', text: content }]
+  }
+  const citeMap = new Map(citations.map((cite) => [cite.index, cite]))
+  const segments: ContentSegment[] = []
+  const pattern = /\[(\d+)\]/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', text: content.slice(lastIndex, match.index) })
+    }
+    const citation = citeMap.get(Number(match[1]))
+    if (citation) {
+      segments.push({ type: 'cite', text: match[0], citation })
+    } else {
+      segments.push({ type: 'text', text: match[0] })
+    }
+    lastIndex = pattern.lastIndex
+  }
+  if (lastIndex < content.length) {
+    segments.push({ type: 'text', text: content.slice(lastIndex) })
+  }
+  return segments.length ? segments : [{ type: 'text', text: content }]
 }
 
 function isLoadingBubble(item: MessageVO, index: number) {
@@ -640,6 +698,14 @@ async function sendChat(id?: number, preset?: string) {
       onDone: (executionId) => {
         if (tracePanelOpen.value) {
           loadLatestTrace(targetId, executionId)
+        }
+      },
+      onToolConfirm: async (payload) => {
+        const agentId = selectedAgent.value?.id
+        if (!agentId) return
+        const confirmed = await promptToolConfirmation(agentId, payload)
+        if (confirmed && assistantIndex >= 0) {
+          messages.value[assistantIndex].content += `\n\n[已确认执行工具 ${payload.toolName || payload.toolKey}]`
         }
       },
     })
@@ -1293,6 +1359,24 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.chat-citation-inline {
+  display: inline;
+  margin: 0 1px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 82, 217, 0.08);
+  color: var(--td-brand-color);
+  font: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.chat-citation-inline:hover {
+  background: rgba(0, 82, 217, 0.14);
 }
 
 .chat-citation-chip {

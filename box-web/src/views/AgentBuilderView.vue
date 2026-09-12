@@ -187,7 +187,17 @@
               style="margin-bottom: 12px"
             />
             <t-button theme="primary" :loading="bindingTool" @click="bindTool">绑定 HTTP 工具</t-button>
+            <t-checkbox v-model="bindToolRequireConfirm" style="margin-bottom: 8px">
+              绑定后需二次确认（危险工具）
+            </t-checkbox>
             <t-table row-key="id" :data="toolBindings" :columns="toolColumns" size="small" style="margin-top: 16px">
+              <template #requireConfirmation="{ row }">
+                <t-switch
+                  size="small"
+                  :value="row.requireConfirmation"
+                  @change="(val: boolean) => toggleToolRequireConfirm(row.toolId, val)"
+                />
+              </template>
               <template #op="{ row }">
                 <t-button variant="text" theme="danger" @click="unbindTool(row.toolId)">解除</t-button>
               </template>
@@ -295,6 +305,32 @@
                 </t-tab-panel>
                 <t-tab-panel value="embed" label="Embed">
                   <div class="api-snippet">
+                    <h4 class="config-subtitle">外观定制</h4>
+                    <t-form label-align="top" class="embed-form">
+                      <t-form-item label="主题色">
+                        <t-color-picker v-model="embedForm.themeColor" format="HEX" />
+                      </t-form-item>
+                      <t-form-item label="Logo URL">
+                        <t-input v-model="embedForm.logoUrl" placeholder="https://..." />
+                      </t-form-item>
+                      <t-form-item label="欢迎语">
+                        <t-textarea
+                          v-model="embedForm.welcomeMessage"
+                          placeholder="你好，有什么可以帮你？"
+                          :autosize="{ minRows: 2, maxRows: 4 }"
+                          maxlength="500"
+                        />
+                      </t-form-item>
+                      <t-form-item label="推荐问题（每行一条）">
+                        <t-textarea
+                          v-model="embedForm.suggestedQuestionsText"
+                          placeholder="如何开始使用？&#10;有哪些功能？"
+                          :autosize="{ minRows: 3, maxRows: 6 }"
+                        />
+                      </t-form-item>
+                      <t-button theme="primary" :loading="savingEmbed" @click="saveEmbedConfig">保存 Embed 配置</t-button>
+                    </t-form>
+                    <h4 class="config-subtitle" style="margin-top: 20px">集成代码</h4>
                     <p>Web Chat URL</p>
                     <pre>{{ publishChatUrl }}</pre>
                     <p style="margin-top: 12px">Embed Code</p>
@@ -457,12 +493,14 @@ import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import { extractApiError } from '@/api/apiError'
+import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import {
   archiveAgentVersion,
   bindAgentKnowledge,
   bindAgentMcp,
   bindAgentSubAgent,
   bindAgentTool,
+  updateAgentToolBinding,
   chatAgent,
   chatAgentStream,
   compareAgentVersions,
@@ -486,6 +524,7 @@ import {
   unpublishAgent,
   updateAgent,
   updateAgentConfig,
+  updateAgentEmbedConfig,
   updateAgentMemory,
   updateAgentModel,
   updateAgentPrompt,
@@ -567,6 +606,7 @@ const bindingMcp = ref(false)
 const bindingSubAgent = ref(false)
 const savingMemory = ref(false)
 const savingConfig = ref(false)
+const savingEmbed = ref(false)
 const publishing = ref(false)
 const publishTab = ref<'api' | 'embed' | 'sdk'>('api')
 const sdkLang = ref<'javascript' | 'python' | 'curl'>('javascript')
@@ -665,8 +705,10 @@ const knowledgeColumns = [
   { colKey: 'topK', title: 'Top K', width: 80 },
   { colKey: 'op', title: '操作', width: 100 },
 ]
+const bindToolRequireConfirm = ref(false)
 const toolColumns = [
   { colKey: 'toolId', title: '工具 ID' },
+  { colKey: 'requireConfirmation', title: '需确认', width: 90 },
   { colKey: 'enabled', title: '启用', width: 80 },
   { colKey: 'op', title: '操作', width: 100 },
 ]
@@ -712,9 +754,22 @@ const configForm = reactive({
   maxExecutionTimeMs: 120000,
 })
 
+const embedForm = reactive({
+  themeColor: '#0052d9',
+  logoUrl: '',
+  welcomeMessage: '',
+  suggestedQuestionsText: '',
+})
+
 interface AgentConfigPayload {
   variables?: unknown[]
   advanced?: { maxToolCalls?: number; maxExecutionTimeMs?: number }
+  embed?: {
+    themeColor?: string
+    logoUrl?: string
+    welcomeMessage?: string
+    suggestedQuestions?: string[]
+  }
 }
 
 const overviewRules: FormProps['rules'] = {
@@ -867,6 +922,10 @@ function applyConfigJson(raw?: string) {
     configForm.variablesJson = '[]'
     configForm.maxToolCalls = 10
     configForm.maxExecutionTimeMs = 120000
+    embedForm.themeColor = '#0052d9'
+    embedForm.logoUrl = ''
+    embedForm.welcomeMessage = ''
+    embedForm.suggestedQuestionsText = ''
     return
   }
   try {
@@ -874,9 +933,20 @@ function applyConfigJson(raw?: string) {
     configForm.variablesJson = JSON.stringify(parsed.variables || [], null, 2)
     configForm.maxToolCalls = parsed.advanced?.maxToolCalls ?? 10
     configForm.maxExecutionTimeMs = parsed.advanced?.maxExecutionTimeMs ?? 120000
+    embedForm.themeColor = parsed.embed?.themeColor || '#0052d9'
+    embedForm.logoUrl = parsed.embed?.logoUrl || ''
+    embedForm.welcomeMessage = parsed.embed?.welcomeMessage || ''
+    embedForm.suggestedQuestionsText = (parsed.embed?.suggestedQuestions || []).join('\n')
   } catch {
     configForm.variablesJson = '[]'
   }
+}
+
+function parseSuggestedQuestions(text: string) {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
 }
 
 function buildConfigJson() {
@@ -889,13 +959,51 @@ function buildConfigJson() {
   } catch {
     throw new Error('变量 JSON 格式无效，请使用数组格式')
   }
-  return JSON.stringify({
+  const payload: AgentConfigPayload = {
     variables,
     advanced: {
       maxToolCalls: configForm.maxToolCalls,
       maxExecutionTimeMs: configForm.maxExecutionTimeMs,
     },
-  })
+  }
+  const questions = parseSuggestedQuestions(embedForm.suggestedQuestionsText)
+  if (
+    embedForm.themeColor ||
+    embedForm.logoUrl ||
+    embedForm.welcomeMessage ||
+    questions.length
+  ) {
+    payload.embed = {
+      themeColor: embedForm.themeColor || '#0052d9',
+      logoUrl: embedForm.logoUrl.trim(),
+      welcomeMessage: embedForm.welcomeMessage.trim(),
+      suggestedQuestions: questions,
+    }
+  }
+  return JSON.stringify(payload)
+}
+
+async function saveEmbedConfig() {
+  savingEmbed.value = true
+  try {
+    const { data } = await updateAgentEmbedConfig(agentId.value, {
+      themeColor: embedForm.themeColor,
+      logoUrl: embedForm.logoUrl.trim(),
+      welcomeMessage: embedForm.welcomeMessage.trim(),
+      suggestedQuestions: parseSuggestedQuestions(embedForm.suggestedQuestionsText),
+    })
+    if (data.data) {
+      embedForm.themeColor = data.data.themeColor || '#0052d9'
+      embedForm.logoUrl = data.data.logoUrl || ''
+      embedForm.welcomeMessage = data.data.welcomeMessage || ''
+      embedForm.suggestedQuestionsText = (data.data.suggestedQuestions || []).join('\n')
+    }
+    MessagePlugin.success('Embed 配置已保存，发布后将对外生效')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '保存失败'))
+  } finally {
+    savingEmbed.value = false
+  }
 }
 
 async function saveConfig() {
@@ -1008,11 +1116,21 @@ async function unbindKnowledge(knowledgeBaseId: number) {
   knowledgeBindings.value = knowledgeBindings.value.filter((item) => item.knowledgeBaseId !== knowledgeBaseId)
 }
 
+async function toggleToolRequireConfirm(toolId: number, requireConfirmation: boolean) {
+  await updateAgentToolBinding(agentId.value, toolId, { requireConfirmation })
+  const { data } = await listAgentTools(agentId.value)
+  toolBindings.value = data.data || []
+}
+
 async function bindTool() {
   if (!selectedToolId.value) return
   bindingTool.value = true
   try {
-    await bindAgentTool(agentId.value, { toolId: selectedToolId.value, enabled: true })
+    await bindAgentTool(agentId.value, {
+      toolId: selectedToolId.value,
+      enabled: true,
+      requireConfirmation: bindToolRequireConfirm.value,
+    })
     const { data } = await listAgentTools(agentId.value)
     toolBindings.value = data.data || []
     MessagePlugin.success('工具已绑定')
@@ -1245,6 +1363,13 @@ async function sendChat() {
             documentName: item.documentName,
             content: item.content,
           }))
+        },
+        onToolConfirm: async (payload) => {
+          const confirmed = await promptToolConfirmation(agentId.value, payload)
+          if (confirmed && assistantIndex >= 0) {
+            const note = `\n\n[已确认执行工具 ${payload.toolName || payload.toolKey}]`
+            messages.value[assistantIndex].content += note
+          }
         },
       })
       if (stoppedByUser.value && !messages.value[assistantIndex].content) {

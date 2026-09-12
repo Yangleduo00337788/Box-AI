@@ -20,59 +20,67 @@
       </t-form-item>
     </t-form>
 
-    <div class="debug-console__layout">
-      <t-loading :loading="loading" size="small" class="debug-console__list">
-        <t-table
-          row-key="id"
-          :data="executions"
-          :columns="columns"
-          bordered
-          stripe
-          hover
-          size="small"
-          @row-click="selectExecution"
-        >
-          <template #status="{ row }">
-            <t-tag :theme="statusTheme(row.status)" variant="light" size="small">{{ statusLabel(row.status) }}</t-tag>
-          </template>
-          <template #type="{ row }">
-            {{ row.executionType === 'WORKFLOW' ? '工作流' : '智能体' }}
-          </template>
-          <template #empty>
-            <t-empty description="暂无执行记录" />
-          </template>
-        </t-table>
-      </t-loading>
-
-      <aside class="debug-console__detail">
-        <template v-if="detail">
-          <h3>执行详情</h3>
-          <t-descriptions :column="1" bordered size="small">
-            <t-descriptions-item label="编号">{{ detail.executionNo }}</t-descriptions-item>
-            <t-descriptions-item label="状态">{{ statusLabel(detail.status) }}</t-descriptions-item>
-            <t-descriptions-item label="耗时">{{ detail.durationMs ?? '—' }} ms</t-descriptions-item>
-            <t-descriptions-item label="开始">{{ detail.startedAt || '—' }}</t-descriptions-item>
-          </t-descriptions>
-          <section v-if="detail.inputJson" class="detail-block">
-            <h4>输入</h4>
-            <pre>{{ formatJson(detail.inputJson) }}</pre>
-          </section>
-          <section v-if="detail.outputJson" class="detail-block">
-            <h4>输出</h4>
-            <pre>{{ formatJson(detail.outputJson) }}</pre>
-          </section>
-          <section v-if="detail.errorMessage" class="detail-block detail-block--error">
-            <h4>错误</h4>
-            <pre>{{ detail.errorMessage }}</pre>
-          </section>
-          <section v-if="traceSpans.length" class="detail-block">
-            <h4>Trace 树</h4>
-            <trace-span-tree :spans="traceSpans" />
-          </section>
+    <t-loading :loading="loading" size="small" class="debug-console__list">
+      <t-table
+        row-key="id"
+        :data="executions"
+        :columns="columns"
+        bordered
+        stripe
+        hover
+        size="small"
+        :active-row-keys="detail ? [detail.id] : []"
+        @row-click="selectExecution"
+      >
+        <template #status="{ row }">
+          <t-tag :theme="statusTheme(row.status)" variant="light" size="small">{{ statusLabel(row.status) }}</t-tag>
         </template>
-        <t-empty v-else description="选择左侧执行记录查看详情" />
-      </aside>
-    </div>
+        <template #type="{ row }">
+          {{ row.executionType === 'WORKFLOW' ? '工作流' : '智能体' }}
+        </template>
+        <template #empty>
+          <t-empty description="暂无执行记录" />
+        </template>
+      </t-table>
+    </t-loading>
+
+    <section v-if="detail" class="debug-console__inspector">
+      <header class="debug-console__inspector-head">
+        <div>
+          <h3>{{ detail.executionNo }}</h3>
+          <p>
+            <t-tag :theme="statusTheme(detail.status)" variant="light" size="small">{{ statusLabel(detail.status) }}</t-tag>
+            <span>{{ detail.durationMs ?? '—' }} ms</span>
+            <span>{{ detail.startedAt || '—' }}</span>
+          </p>
+        </div>
+      </header>
+
+      <div class="debug-console__columns">
+        <section class="debug-console__column">
+          <h4>输入</h4>
+          <pre v-if="detail.inputJson">{{ formatJson(detail.inputJson) }}</pre>
+          <t-empty v-else description="无输入数据" size="small" />
+        </section>
+
+        <section class="debug-console__column debug-console__column--trace">
+          <h4>Execution 树</h4>
+          <trace-span-tree v-if="traceSpans.length" :spans="traceSpans" />
+          <t-empty v-else description="暂无 Trace 数据" size="small" />
+        </section>
+
+        <section class="debug-console__column">
+          <h4>输出</h4>
+          <pre v-if="detail.outputJson">{{ formatJson(detail.outputJson) }}</pre>
+          <t-empty v-else-if="!detail.errorMessage" description="无输出数据" size="small" />
+          <div v-if="detail.errorMessage" class="detail-block--error">
+            <h5>错误</h5>
+            <pre>{{ detail.errorMessage }}</pre>
+          </div>
+        </section>
+      </div>
+    </section>
+    <t-empty v-else class="debug-console__placeholder" description="选择上方执行记录查看 Input / Trace / Output" />
   </div>
 </template>
 
@@ -184,41 +192,80 @@ onMounted(loadExecutions)
   margin-bottom: 16px;
 }
 
-.debug-console__layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
-  gap: 16px;
-  align-items: start;
+.debug-console__list {
+  margin-bottom: 16px;
 }
 
-.debug-console__detail {
+.debug-console__placeholder {
+  margin-top: 24px;
+}
+
+.debug-console__inspector {
   border: 1px solid var(--td-component-border);
   border-radius: 12px;
   padding: 16px;
-  min-height: 480px;
   background: var(--td-bg-color-container);
 }
 
-.debug-console__detail h3,
-.debug-console__detail h4 {
-  margin: 0 0 12px;
+.debug-console__inspector-head h3 {
+  margin: 0 0 8px;
 }
 
-.detail-block {
+.debug-console__inspector-head p {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+}
+
+.debug-console__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
   margin-top: 16px;
+  align-items: start;
 }
 
-.detail-block pre {
+.debug-console__column {
+  min-height: 360px;
+  border: 1px solid var(--td-component-border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--td-bg-color-secondarycontainer);
+}
+
+.debug-console__column h4,
+.debug-console__column h5 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.debug-console__column pre {
   margin: 0;
   padding: 10px;
   border-radius: 8px;
-  background: var(--td-bg-color-secondarycontainer);
+  background: var(--td-bg-color-container);
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: 480px;
+  overflow: auto;
+}
+
+.debug-console__column--trace {
+  max-height: 520px;
+  overflow: auto;
 }
 
 .detail-block--error pre {
   color: var(--td-error-color);
+}
+
+@media (max-width: 1200px) {
+  .debug-console__columns {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

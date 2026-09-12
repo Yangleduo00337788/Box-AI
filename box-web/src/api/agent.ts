@@ -1,5 +1,12 @@
-import { assertStreamResponseOk } from './apiError'
 import http, { type Result } from './http'
+import {
+  consumeSseStream,
+  type ChatStreamEvent,
+  type ChatToolEventPayload,
+  type StreamEventHandlers,
+} from './chatStream'
+
+export type { ChatStreamEvent, ChatToolEventPayload }
 
 export type ModelSource = 'PLATFORM' | 'BYOK'
 
@@ -100,6 +107,26 @@ export function updateAgentConfig(id: number, payload: { configJson?: string }) 
   return http.put<Result<AgentVO>>(`/agents/${id}/config`, payload)
 }
 
+export interface AgentEmbedConfigVO {
+  themeColor?: string
+  logoUrl?: string
+  welcomeMessage?: string
+  suggestedQuestions?: string[]
+  agentName?: string
+}
+
+export function getAgentEmbedConfig(id: number) {
+  return http.get<Result<AgentEmbedConfigVO>>(`/agents/${id}/embed-config`)
+}
+
+export function updateAgentEmbedConfig(id: number, payload: Partial<AgentEmbedConfigVO>) {
+  return http.put<Result<AgentEmbedConfigVO>>(`/agents/${id}/embed-config`, payload)
+}
+
+export function getPublishedAgentEmbedConfig(id: number) {
+  return http.get<Result<AgentEmbedConfigVO>>(`/published/agents/${id}/embed-config`)
+}
+
 export interface AgentChatHistoryItem {
   role: 'USER' | 'ASSISTANT'
   content: string
@@ -139,23 +166,6 @@ export function chatAgent(id: number, message: string, history: AgentChatHistory
   )
 }
 
-export interface ChatStreamEvent {
-  type: 'delta' | 'done' | 'error' | 'citations'
-  content?: string
-  message?: string
-  executionId?: number
-}
-
-function parseCitationsJson(raw?: string): KnowledgeCitation[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
 function authHeaders(accept = 'application/json') {
   const token = localStorage.getItem('box.token')
   const workspaceId = localStorage.getItem('box.workspaceId')
@@ -172,102 +182,42 @@ function authHeaders(accept = 'application/json') {
   return headers
 }
 
-interface StreamEventHandlers {
-  onDelta: (chunk: string) => void
-  onCitations?: (citations: KnowledgeCitation[]) => void
-}
-
-function parseSseEvent(rawEvent: string, handlers: StreamEventHandlers): 'continue' | 'done' | 'error' {
-  for (const line of rawEvent.split('\n')) {
-    if (!line.startsWith('data:')) continue
-    const payload = line.slice(5).trim()
-    if (!payload) continue
-    const event = JSON.parse(payload) as ChatStreamEvent
-    if (event.type === 'delta' && event.content) {
-      handlers.onDelta(event.content)
-    }
-    if (event.type === 'citations' && event.content) {
-      handlers.onCitations?.(parseCitationsJson(event.content))
-    }
-    if (event.type === 'error') {
-      throw new Error(event.message || '流式对话失败')
-    }
-    if (event.type === 'done') {
-      return 'done'
-    }
-  }
-  return 'continue'
-}
-
-function drainSseBuffer(buffer: string, handlers: StreamEventHandlers): { rest: string; finished: boolean } {
-  let rest = buffer
-  let boundary = rest.indexOf('\n\n')
-  while (boundary >= 0) {
-    const rawEvent = rest.slice(0, boundary)
-    rest = rest.slice(boundary + 2)
-    const status = parseSseEvent(rawEvent, handlers)
-    if (status === 'done') {
-      return { rest, finished: true }
-    }
-    boundary = rest.indexOf('\n\n')
-  }
-  return { rest, finished: false }
-}
-
 export async function chatAgentStream(
   id: number,
   message: string,
   onDelta: (chunk: string) => void,
   history: AgentChatHistoryItem[] = [],
-  options?: { signal?: AbortSignal; onCitations?: (citations: KnowledgeCitation[]) => void },
+  options?: {
+    signal?: AbortSignal
+    toolConfirmationToken?: string
+    onCitations?: (citations: KnowledgeCitation[]) => void
+    onToolStart?: (payload: ChatToolEventPayload) => void
+    onToolDelta?: (payload: ChatToolEventPayload) => void
+    onToolEnd?: (payload: ChatToolEventPayload) => void
+    onToolConfirm?: (payload: import('./chatStream').ChatToolConfirmPayload) => void
+  },
 ): Promise<void> {
   const response = await fetch(`/api/v1/agents/${id}/chat`, {
     method: 'POST',
     headers: authHeaders('text/event-stream, application/json'),
-    body: JSON.stringify({ message, stream: true, history: buildChatHistory(history) }),
+    body: JSON.stringify({
+      message,
+      stream: true,
+      history: buildChatHistory(history),
+      toolConfirmationToken: options?.toolConfirmationToken,
+    }),
     signal: options?.signal,
   })
 
-  await assertStreamResponseOk(response)
-
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error('无法读取流式响应')
+  const handlers: StreamEventHandlers = {
+    onDelta,
+    onCitations: options?.onCitations,
+    onToolStart: options?.onToolStart,
+    onToolDelta: options?.onToolDelta,
+    onToolEnd: options?.onToolEnd,
+    onToolConfirm: options?.onToolConfirm,
   }
-
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (value) {
-        buffer += decoder.decode(value, { stream: true })
-      }
-      const handlers: StreamEventHandlers = {
-        onDelta,
-        onCitations: options?.onCitations,
-      }
-      const drained = drainSseBuffer(buffer, handlers)
-      buffer = drained.rest
-      if (drained.finished) {
-        return
-      }
-      if (done) {
-        if (buffer.trim()) {
-          const status = parseSseEvent(buffer, handlers)
-          if (status === 'done') return
-        }
-        return
-      }
-    }
-  } finally {
-    try {
-      await reader.cancel()
-    } catch {
-      // ignore cancel errors
-    }
-  }
+  await consumeSseStream(response, handlers, options?.signal)
 }
 
 export function deleteAgent(id: number) {
@@ -285,6 +235,7 @@ export interface AgentToolBindingVO {
   id: number
   toolId: number
   enabled?: boolean
+  requireConfirmation?: boolean
 }
 
 export interface AgentMcpBindingVO {
@@ -321,8 +272,26 @@ export function listAgentTools(agentId: number) {
   return http.get<Result<AgentToolBindingVO[]>>(`/agents/${agentId}/tools`)
 }
 
-export function bindAgentTool(agentId: number, payload: { toolId: number; enabled?: boolean }) {
+export function bindAgentTool(
+  agentId: number,
+  payload: { toolId: number; enabled?: boolean; requireConfirmation?: boolean },
+) {
   return http.post<Result<AgentToolBindingVO>>(`/agents/${agentId}/tools`, payload)
+}
+
+export function updateAgentToolBinding(
+  agentId: number,
+  toolId: number,
+  payload: { enabled?: boolean; requireConfirmation?: boolean },
+) {
+  return http.put<Result<AgentToolBindingVO>>(`/agents/${agentId}/tools/${toolId}`, payload)
+}
+
+export function confirmAgentTool(agentId: number, confirmationToken: string) {
+  return http.post<Result<{ toolKey: string; toolName: string; output: string }>>(
+    `/agents/${agentId}/tools/confirm`,
+    { confirmationToken },
+  )
 }
 
 export function unbindAgentTool(agentId: number, toolId: number) {
