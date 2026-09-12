@@ -20,6 +20,16 @@
       :position="Position.Right"
       :style="{ top: '70%' }"
     />
+    <template v-else-if="data.nodeType === 'Switch'">
+      <Handle
+        v-for="(handle, index) in switchHandles"
+        :key="handle.id"
+        :id="handle.id"
+        type="source"
+        :position="Position.Right"
+        :style="switchHandleStyle(index, switchHandles.length)"
+      />
+    </template>
     <Handle
       v-else-if="data.nodeType !== 'Output'"
       type="source"
@@ -34,6 +44,11 @@ import { Handle, Position } from '@vue-flow/core'
 import type { WorkflowNodeData } from '@/utils/workflowFlow'
 import { PALETTE_ITEMS } from '@/utils/workflowFlow'
 
+interface SwitchCase {
+  id: string
+  value?: string
+}
+
 const props = defineProps<{
   data: WorkflowNodeData
 }>()
@@ -42,6 +57,23 @@ const iconName = computed(() => {
   const item = PALETTE_ITEMS.find((entry) => entry.type === props.data.nodeType)
   return item?.icon || 'app'
 })
+
+const switchHandles = computed(() => {
+  if (props.data.nodeType !== 'Switch') return []
+  const config = props.data.config || {}
+  const cases = Array.isArray(config.cases) ? (config.cases as SwitchCase[]) : []
+  const defaultCase = String(config.defaultCase || 'default')
+  const handles = cases
+    .filter((item) => item?.id)
+    .map((item) => ({ id: String(item.id), label: String(item.id) }))
+  handles.push({ id: defaultCase, label: `${defaultCase} (默认)` })
+  return handles
+})
+
+function switchHandleStyle(index: number, total: number) {
+  const top = ((index + 1) / (total + 1)) * 100
+  return { top: `${top}%` }
+}
 </script>
 
 <style scoped>
@@ -64,6 +96,10 @@ const iconName = computed(() => {
 
 .wf-node--llm {
   border-color: var(--td-brand-color);
+}
+
+.wf-node--switch {
+  border-color: #e37318;
 }
 
 .wf-node__head {

@@ -357,6 +357,20 @@ watch(
   height: calc(100vh - 96px);
 }
 
+@media (min-width: 1920px) {
+  .editor {
+    height: calc(100vh - 72px);
+  }
+
+  .editor__header h1 {
+    font-size: 20px;
+  }
+
+  .editor__fallback {
+    min-height: 720px;
+  }
+}
+
 .editor__header {
   display: flex;
   align-items: center;

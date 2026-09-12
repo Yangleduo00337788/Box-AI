@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   getUnreadNotificationCount,
@@ -86,7 +86,16 @@ async function markAllRead() {
   unreadCount.value = 0
 }
 
-onMounted(refreshUnread)
+let pollTimer: ReturnType<typeof setInterval> | undefined
+
+onMounted(() => {
+  refreshUnread()
+  pollTimer = setInterval(refreshUnread, 60_000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
 </script>
 
 <style scoped>

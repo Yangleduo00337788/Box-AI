@@ -8,7 +8,7 @@
 
     <div class="settings-card">
       <div class="toolbar">
-        <t-button theme="primary" @click="openCreate">
+        <t-button v-if="can(PermissionCodes.API_KEY_MANAGE)" theme="primary" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
           创建密钥
         </t-button>
@@ -82,9 +82,11 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import { extractApiError } from '@/api/apiError'
+import { usePermission } from '@/composables/usePermission'
+import { PermissionCodes } from '@/constants/permissions'
 import {
   createApiKey,
   deleteApiKey,
@@ -94,6 +96,8 @@ import {
   rotateApiKey,
   type ApiKeyVO,
 } from '@/api/apiKey'
+
+const { can } = usePermission()
 
 const loading = ref(false)
 const creating = ref(false)
@@ -184,14 +188,24 @@ async function rotateKey(id: number) {
   }
 }
 
-async function removeKey(id: number) {
-  try {
-    await deleteApiKey(id)
-    await loadKeys()
-    MessagePlugin.success('已删除')
-  } catch (error) {
-    MessagePlugin.error(extractApiError(error, '删除失败'))
-  }
+function removeKey(id: number) {
+  const dialog = DialogPlugin.confirm({
+    header: '确认删除',
+    body: '删除后使用该密钥的集成将立即失效，此操作不可恢复。',
+    confirmBtn: '删除',
+    cancelBtn: '取消',
+    theme: 'warning',
+    onConfirm: async () => {
+      try {
+        await deleteApiKey(id)
+        dialog.hide()
+        await loadKeys()
+        MessagePlugin.success('已删除')
+      } catch (error) {
+        MessagePlugin.error(extractApiError(error, '删除失败'))
+      }
+    },
+  })
 }
 
 onMounted(loadKeys)

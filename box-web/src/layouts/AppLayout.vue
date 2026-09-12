@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import AppShellLayout from '@box/ui/layouts/AppShellLayout.vue'
@@ -46,10 +46,12 @@ import { useAgentSelection } from '@/composables/useAgentSelection'
 import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
 import { loadAppPreferencesFromServer } from '@/composables/useAppPreferences'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionStore } from '@/stores/permission'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const permissionStore = usePermissionStore()
 const searchVisible = ref(false)
 const { refresh: refreshAgents } = useAgentSelection()
 
@@ -103,8 +105,18 @@ function onLogout() {
 onMounted(() => {
   if (auth.token) {
     loadAppPreferencesFromServer()
+    void permissionStore.load()
   }
 })
+
+watch(
+  () => auth.currentWorkspaceId,
+  () => {
+    if (auth.token) {
+      void permissionStore.load(true)
+    }
+  },
+)
 </script>
 
 <style scoped>

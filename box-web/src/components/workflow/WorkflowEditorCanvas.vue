@@ -238,6 +238,27 @@
           <t-alert theme="info" message="右侧两个连接点：上方为 true 分支，下方为 false 分支" />
         </template>
 
+        <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Switch'">
+          <t-form-item label="变量名">
+            <t-input v-model="inspector.switchVariable" placeholder="如 input.type" />
+          </t-form-item>
+          <t-form-item label="运算符">
+            <t-select v-model="inspector.switchOperator" :options="conditionOperators" />
+          </t-form-item>
+          <t-form-item label="默认分支 ID">
+            <t-input v-model="inspector.switchDefaultCase" placeholder="default" />
+          </t-form-item>
+          <div class="switch-cases">
+            <div v-for="(caseItem, index) in inspector.switchCases" :key="index" class="switch-case-row">
+              <t-input v-model="caseItem.id" placeholder="分支 ID" />
+              <t-input v-model="caseItem.value" placeholder="匹配值" />
+              <t-button variant="text" theme="danger" @click="removeSwitchCase(index)">删除</t-button>
+            </div>
+            <t-button variant="dashed" block @click="addSwitchCase">添加分支</t-button>
+          </div>
+          <t-alert theme="info" message="右侧每个连接点对应一个 case ID，最下方为默认分支" />
+        </template>
+
         <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Delay'">
           <t-form-item label="延迟 (ms)">
             <t-input-number v-model="inspector.delayMs" :min="0" theme="column" />
@@ -391,6 +412,20 @@ const loopModeOptions = [
   { label: 'While', value: 'WHILE' },
 ]
 
+function addSwitchCase() {
+  inspector.switchCases.push({ id: `case${inspector.switchCases.length + 1}`, value: '' })
+  if (selectedNode.value) {
+    syncNodeFromInspector(selectedNode.value)
+  }
+}
+
+function removeSwitchCase(index: number) {
+  inspector.switchCases.splice(index, 1)
+  if (selectedNode.value) {
+    syncNodeFromInspector(selectedNode.value)
+  }
+}
+
 function nodeLabel(id: string) {
   const node = nodes.value.find((item) => item.id === id)
   const data = node?.data as WorkflowNodeData | undefined
@@ -455,6 +490,10 @@ const inspector = reactive({
   conditionVariable: '',
   conditionOperator: 'equals',
   conditionValue: '',
+  switchVariable: '',
+  switchOperator: 'equals',
+  switchDefaultCase: 'default',
+  switchCases: [{ id: 'case1', value: '' }] as Array<{ id: string; value: string }>,
   delayMs: 1000,
   templateContent: '',
   knowledgeBaseId: undefined as number | undefined,
@@ -546,6 +585,15 @@ function syncInspectorFromNode(node: any) {
   inspector.conditionVariable = String(config.variable || '')
   inspector.conditionOperator = String(config.operator || 'equals')
   inspector.conditionValue = String(config.value || '')
+  inspector.switchVariable = String(config.variable || '')
+  inspector.switchOperator = String(config.operator || 'equals')
+  inspector.switchDefaultCase = String(config.defaultCase || 'default')
+  inspector.switchCases = Array.isArray(config.cases)
+    ? (config.cases as Array<{ id?: string; value?: string }>).map((item) => ({
+        id: String(item.id || ''),
+        value: String(item.value || ''),
+      }))
+    : [{ id: 'case1', value: '' }]
   inspector.delayMs = Number(config.delayMs ?? 1000)
   inspector.templateContent = String(config.template || '')
   inspector.knowledgeBaseId = config.knowledgeBaseId as number | undefined
@@ -595,9 +643,19 @@ function syncNodeFromInspector(node: any) {
   } else {
     config.url = inspector.httpUrl
   }
-  config.variable = inspector.conditionVariable
-  config.operator = inspector.conditionOperator
-  config.value = inspector.conditionValue
+  if (nodeType === 'Condition') {
+    config.variable = inspector.conditionVariable
+    config.operator = inspector.conditionOperator
+    config.value = inspector.conditionValue
+  }
+  if (nodeType === 'Switch') {
+    config.variable = inspector.switchVariable
+    config.operator = inspector.switchOperator
+    config.defaultCase = inspector.switchDefaultCase || 'default'
+    config.cases = inspector.switchCases
+      .filter((item) => item.id.trim())
+      .map((item) => ({ id: item.id.trim(), value: item.value }))
+  }
   config.delayMs = inspector.delayMs
   config.template = inspector.templateContent
   config.knowledgeBaseId = inspector.knowledgeBaseId
@@ -974,5 +1032,46 @@ defineExpose({
 
 .inspector {
   width: 300px;
+}
+
+@media (min-width: 1920px) {
+  .editor__layout {
+    grid-template-columns: 240px minmax(0, 1fr) 360px;
+    gap: 20px;
+    min-height: 720px;
+  }
+
+  .palette,
+  .inspector {
+    padding: 16px;
+  }
+
+  .canvas-wrap,
+  .canvas-wrap :deep(.vue-flow) {
+    min-height: 720px;
+  }
+
+  .canvas-wrap :deep(.vue-flow__minimap) {
+    width: 180px;
+    height: 120px;
+  }
+
+  .inspector {
+    width: 360px;
+  }
+}
+
+.switch-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.switch-case-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
 }
 </style>

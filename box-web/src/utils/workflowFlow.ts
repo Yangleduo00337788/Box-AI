@@ -17,6 +17,7 @@ export const PALETTE_ITEMS = [
   { type: 'SubWorkflow', label: '子工作流', icon: 'tree-square-dot' },
   { type: 'Tool', label: '工具', icon: 'tools' },
   { type: 'Condition', label: '条件', icon: 'chart-bubble' },
+  { type: 'Switch', label: '分支', icon: 'tree-square-dot-vertical' },
   { type: 'Delay', label: '延迟', icon: 'time' },
   { type: 'Variable', label: '变量', icon: 'data' },
   { type: 'Template', label: '模板', icon: 'file-1' },
@@ -157,6 +158,15 @@ export function createFlowNode(type: string, label: string, position: { x: numbe
     config.outputVariable = 'parallelResults'
     config.tasks = [
       { type: 'TEMPLATE', template: '{{input}}' },
+    ]
+  }
+  if (type === 'Switch') {
+    config.variable = 'input.type'
+    config.operator = 'equals'
+    config.defaultCase = 'default'
+    config.cases = [
+      { id: 'case1', value: '' },
+      { id: 'case2', value: '' },
     ]
   }
   return {

@@ -50,6 +50,22 @@ export interface AnalyticsOverviewVO {
   topAgents: TopAgentVO[]
 }
 
+export interface AnalyticsTrendPointVO {
+  date: string
+  executionCount: number
+  successRate: number
+  avgLatencyMs: number
+}
+
+export interface AnalyticsTrendsVO {
+  periodDays: number
+  points: AnalyticsTrendPointVO[]
+}
+
 export function fetchAnalyticsOverview(days = 7) {
   return http.get<Result<AnalyticsOverviewVO>>('/analytics/overview', { params: { days } })
+}
+
+export function fetchAnalyticsTrends(days = 7) {
+  return http.get<Result<AnalyticsTrendsVO>>('/analytics/trends', { params: { days } })
 }

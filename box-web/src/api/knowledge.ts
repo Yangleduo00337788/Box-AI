@@ -5,6 +5,8 @@ export interface KnowledgeBaseVO {
   name: string
   description?: string
   icon?: string
+  embeddingModelId?: number
+  rerankModelId?: number
   documentCount: number
   chunkCount: number
   status: string
@@ -63,6 +65,22 @@ export function searchKnowledge(knowledgeBaseId: number, query: string, topK = 5
     `/knowledge-bases/${knowledgeBaseId}/search`,
     { query, topK },
   )
+}
+
+export interface KnowledgeTestAnswerVO {
+  answer: string
+  citations: KnowledgeSearchHit[]
+}
+
+export function testKnowledgeAnswer(knowledgeBaseId: number, query: string, topK = 5) {
+  return http.post<Result<KnowledgeTestAnswerVO>>(
+    `/knowledge-bases/${knowledgeBaseId}/test-answer`,
+    { query, topK },
+  )
+}
+
+export function retryKnowledgeDocument(documentId: number) {
+  return http.post<Result<KnowledgeDocumentVO>>(`/documents/${documentId}/retry`)
 }
 
 export interface KnowledgeChunkVO {

@@ -2,7 +2,7 @@
   <div>
     <page-header title="分析" desc="查看工作空间内的智能体、对话与资源使用情况">
       <template #actions>
-        <t-radio-group v-model="periodDays" variant="default-filled" size="small" @change="loadOverview">
+        <t-radio-group v-model="periodDays" variant="default-filled" size="small" @change="loadData">
           <t-radio-button :value="1">今天</t-radio-button>
           <t-radio-button :value="7">7 天</t-radio-button>
           <t-radio-button :value="30">30 天</t-radio-button>
@@ -20,6 +20,25 @@
         </article>
       </div>
     </t-loading>
+
+    <section v-if="trends?.points?.length" class="section charts-grid">
+      <article class="chart-card">
+        <h3 class="section__title">执行量趋势</h3>
+        <div ref="executionChartRef" class="chart-box" />
+      </article>
+      <article class="chart-card">
+        <h3 class="section__title">成功率趋势</h3>
+        <div ref="successChartRef" class="chart-box" />
+      </article>
+      <article class="chart-card">
+        <h3 class="section__title">平均延迟趋势</h3>
+        <div ref="latencyChartRef" class="chart-box" />
+      </article>
+      <article v-if="overview?.topAgents?.length" class="chart-card">
+        <h3 class="section__title">热门智能体</h3>
+        <div ref="topAgentsChartRef" class="chart-box" />
+      </article>
+    </section>
 
     <section v-if="overview?.topAgents?.length" class="section">
       <h3 class="section__title">热门智能体（近 {{ overview.periodDays }} 天）</h3>
@@ -48,15 +67,33 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import * as echarts from 'echarts'
+import type { ECharts } from 'echarts'
 import PageHeader from '@/components/PageHeader.vue'
-import { fetchAnalyticsOverview, type AnalyticsOverviewVO } from '@/api/analytics'
+import {
+  fetchAnalyticsOverview,
+  fetchAnalyticsTrends,
+  type AnalyticsOverviewVO,
+  type AnalyticsTrendsVO,
+} from '@/api/analytics'
 
 const router = useRouter()
 const loading = ref(false)
 const overview = ref<AnalyticsOverviewVO | null>(null)
+const trends = ref<AnalyticsTrendsVO | null>(null)
 const periodDays = ref(7)
+
+const executionChartRef = ref<HTMLElement | null>(null)
+const successChartRef = ref<HTMLElement | null>(null)
+const latencyChartRef = ref<HTMLElement | null>(null)
+const topAgentsChartRef = ref<HTMLElement | null>(null)
+
+let executionChart: ECharts | null = null
+let successChart: ECharts | null = null
+let latencyChart: ECharts | null = null
+let topAgentsChart: ECharts | null = null
 
 const stats = computed(() => {
   if (!overview.value) return []
@@ -113,17 +150,93 @@ const topAgentColumns = [
   { colKey: 'op', title: '操作', width: 80 },
 ]
 
-async function loadOverview() {
+function formatDateLabel(date: string) {
+  const parts = date.split('-')
+  return parts.length === 3 ? `${parts[1]}/${parts[2]}` : date
+}
+
+function renderCharts() {
+  const points = trends.value?.points || []
+  const dates = points.map((item) => formatDateLabel(item.date))
+
+  if (executionChartRef.value) {
+    executionChart?.dispose()
+    executionChart = echarts.init(executionChartRef.value)
+    executionChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 40, right: 16, top: 24, bottom: 28 },
+      xAxis: { type: 'category', data: dates },
+      yAxis: { type: 'value', minInterval: 1 },
+      series: [{ type: 'bar', data: points.map((item) => item.executionCount), itemStyle: { color: '#0052d9' } }],
+    })
+  }
+
+  if (successChartRef.value) {
+    successChart?.dispose()
+    successChart = echarts.init(successChartRef.value)
+    successChart.setOption({
+      tooltip: { trigger: 'axis', valueFormatter: (value: number) => `${value.toFixed(1)}%` },
+      grid: { left: 40, right: 16, top: 24, bottom: 28 },
+      xAxis: { type: 'category', data: dates },
+      yAxis: { type: 'value', max: 100 },
+      series: [{ type: 'line', smooth: true, data: points.map((item) => item.successRate), itemStyle: { color: '#2ba471' } }],
+    })
+  }
+
+  if (latencyChartRef.value) {
+    latencyChart?.dispose()
+    latencyChart = echarts.init(latencyChartRef.value)
+    latencyChart.setOption({
+      tooltip: { trigger: 'axis', valueFormatter: (value: number) => `${value} ms` },
+      grid: { left: 48, right: 16, top: 24, bottom: 28 },
+      xAxis: { type: 'category', data: dates },
+      yAxis: { type: 'value' },
+      series: [{ type: 'line', smooth: true, data: points.map((item) => item.avgLatencyMs), itemStyle: { color: '#e37318' } }],
+    })
+  }
+
+  const topAgents = overview.value?.topAgents || []
+  if (topAgentsChartRef.value && topAgents.length) {
+    topAgentsChart?.dispose()
+    topAgentsChart = echarts.init(topAgentsChartRef.value)
+    topAgentsChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 100, right: 16, top: 16, bottom: 28 },
+      xAxis: { type: 'value', minInterval: 1 },
+      yAxis: { type: 'category', data: topAgents.map((item) => item.agentName) },
+      series: [{ type: 'bar', data: topAgents.map((item) => item.executionCount), itemStyle: { color: '#7c4dff' } }],
+    })
+  }
+}
+
+async function loadData() {
   loading.value = true
   try {
-    const { data } = await fetchAnalyticsOverview(periodDays.value)
-    overview.value = data.data
+    const [overviewRes, trendsRes] = await Promise.all([
+      fetchAnalyticsOverview(periodDays.value),
+      fetchAnalyticsTrends(periodDays.value),
+    ])
+    overview.value = overviewRes.data.data
+    trends.value = trendsRes.data.data
+    await nextTick()
+    renderCharts()
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadOverview)
+watch(periodDays, () => {
+  loadData()
+})
+
+onMounted(loadData)
+
+onBeforeUnmount(() => {
+  executionChart?.dispose()
+  successChart?.dispose()
+  latencyChart?.dispose()
+  topAgentsChart?.dispose()
+})
 </script>
 
 <style scoped>
@@ -161,9 +274,31 @@ onMounted(loadOverview)
   color: var(--box-muted);
 }
 
+.section {
+  margin-bottom: 28px;
+}
+
 .section__title {
   margin: 0 0 12px;
   font: var(--td-font-title-medium);
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.chart-card {
+  padding: 16px;
+  border: 1px solid var(--box-border);
+  border-radius: var(--box-radius-lg);
+  background: var(--box-surface);
+}
+
+.chart-box {
+  width: 100%;
+  height: 280px;
 }
 
 .usage-grid {
@@ -194,8 +329,9 @@ onMounted(loadOverview)
 
 @media (max-width: 960px) {
   .stats-grid,
-  .usage-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .usage-grid,
+  .charts-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }
 </style>
