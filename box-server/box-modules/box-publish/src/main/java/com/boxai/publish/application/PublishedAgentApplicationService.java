@@ -16,7 +16,10 @@ import com.boxai.domain.agent.AgentVersionRepository;
 import com.boxai.domain.publish.PublishRepository;
 import com.boxai.domain.trace.Execution;
 import com.boxai.agent.api.AgentEmbedConfigVO;
+import com.boxai.agent.api.PublishedEmbedResolveVO;
+import com.boxai.agent.application.EmbedDomainApplicationService;
 import com.boxai.agent.support.AgentEmbedConfigSupport;
+import com.boxai.domain.publish.EmbedCustomDomain;
 import com.boxai.knowledge.application.KnowledgeRetrievalResult;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.trace.application.ExecutionRecorder;
@@ -39,6 +42,7 @@ public class PublishedAgentApplicationService {
     private final AgentChatExecutor agentChatExecutor;
     private final ExecutionRecorder executionRecorder;
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
+    private final EmbedDomainApplicationService embedDomainApplicationService;
 
     public PublishedAgentApplicationService(AgentRepository agentRepository,
                                             AgentVersionRepository agentVersionRepository,
@@ -46,7 +50,8 @@ public class PublishedAgentApplicationService {
                                             AgentChatPreparer agentChatPreparer,
                                             AgentChatExecutor agentChatExecutor,
                                             ExecutionRecorder executionRecorder,
-                                            AgentLongTermMemoryApplicationService longTermMemoryApplicationService) {
+                                            AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
+                                            EmbedDomainApplicationService embedDomainApplicationService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.publishRepository = publishRepository;
@@ -54,6 +59,7 @@ public class PublishedAgentApplicationService {
         this.agentChatExecutor = agentChatExecutor;
         this.executionRecorder = executionRecorder;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
+        this.embedDomainApplicationService = embedDomainApplicationService;
     }
 
     public AgentEmbedConfigVO getEmbedConfig(Long agentId) {
@@ -66,7 +72,17 @@ public class PublishedAgentApplicationService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体发布记录不存在"));
         AgentVersion version = agentVersionRepository.findById(agent.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "发布版本不存在"));
-        return AgentEmbedConfigSupport.toVO(version.getConfigJson(), agent.getName());
+        return embedDomainApplicationService.attach(
+                AgentEmbedConfigSupport.toVO(version.getConfigJson(), agent.getName()),
+                agent.getId(),
+                false);
+    }
+
+    public PublishedEmbedResolveVO resolveByHost(String host) {
+        EmbedCustomDomain domain = embedDomainApplicationService.findVerifiedByHost(host)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "未找到已验证的自定义域名"));
+        AgentEmbedConfigVO embed = getEmbedConfig(domain.getAgentId());
+        return new PublishedEmbedResolveVO(domain.getAgentId(), domain.getDomain(), embed);
     }
 
     public AgentChatVO chat(Long agentId, AgentChatRequest request) {

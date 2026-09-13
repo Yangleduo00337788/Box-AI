@@ -25,6 +25,7 @@ public class PublishedApiSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/published/agents/*/embed-config").permitAll()
+                        .requestMatchers("/api/v1/published/embed/resolve").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

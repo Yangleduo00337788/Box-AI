@@ -82,6 +82,7 @@ public class AgentApplicationService {
     private final ResourceDeleteGuard resourceDeleteGuard;
     private final ToolConfirmationService toolConfirmationService;
     private final AgentToolRuntimeService agentToolRuntimeService;
+    private final EmbedDomainApplicationService embedDomainApplicationService;
 
     public AgentApplicationService(AgentRepository agentRepository,
                                    AgentVersionRepository agentVersionRepository,
@@ -99,7 +100,8 @@ public class AgentApplicationService {
                                    AuditLogService auditLogService,
                                    ResourceDeleteGuard resourceDeleteGuard,
                                    ToolConfirmationService toolConfirmationService,
-                                   AgentToolRuntimeService agentToolRuntimeService) {
+                                   AgentToolRuntimeService agentToolRuntimeService,
+                                   EmbedDomainApplicationService embedDomainApplicationService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.modelDefinitionRepository = modelDefinitionRepository;
@@ -117,6 +119,7 @@ public class AgentApplicationService {
         this.resourceDeleteGuard = resourceDeleteGuard;
         this.toolConfirmationService = toolConfirmationService;
         this.agentToolRuntimeService = agentToolRuntimeService;
+        this.embedDomainApplicationService = embedDomainApplicationService;
     }
 
     public List<AgentVO> list() {
@@ -264,7 +267,10 @@ public class AgentApplicationService {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(id);
         AgentVersion draft = requireDraft(agent);
-        return AgentEmbedConfigSupport.toVO(draft.getConfigJson(), agent.getName());
+        return embedDomainApplicationService.attach(
+                AgentEmbedConfigSupport.toVO(draft.getConfigJson(), agent.getName()),
+                agent.getId(),
+                true);
     }
 
     @Transactional
@@ -278,7 +284,23 @@ public class AgentApplicationService {
         agentVersionRepository.update(draft);
         agent.setUpdatedBy(userId);
         agentRepository.update(agent);
-        return AgentEmbedConfigSupport.toVO(draft.getConfigJson(), agent.getName());
+        embedDomainApplicationService.syncDomain(agent, request.customDomain());
+        return embedDomainApplicationService.attach(
+                AgentEmbedConfigSupport.toVO(draft.getConfigJson(), agent.getName()),
+                agent.getId(),
+                true);
+    }
+
+    @Transactional
+    public AgentEmbedConfigVO verifyEmbedDomain(Long id) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
+        Agent agent = requireAgent(id);
+        embedDomainApplicationService.verify(agent.getId());
+        AgentVersion draft = requireDraft(agent);
+        return embedDomainApplicationService.attach(
+                AgentEmbedConfigSupport.toVO(draft.getConfigJson(), agent.getName()),
+                agent.getId(),
+                true);
     }
 
     @Transactional

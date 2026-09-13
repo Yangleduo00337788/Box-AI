@@ -43,7 +43,16 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/api/v1/published/");
+        String uri = request.getRequestURI();
+        if (!uri.startsWith("/api/v1/published/")) {
+            return true;
+        }
+        if ("GET".equalsIgnoreCase(request.getMethod())
+                && (uri.equals("/api/v1/published/embed/resolve")
+                || uri.matches("/api/v1/published/agents/\\d+/embed-config"))) {
+            return true;
+        }
+        return false;
     }
 
     @Override

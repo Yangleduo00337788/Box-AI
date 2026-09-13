@@ -7,6 +7,9 @@ public record AgentEmbedConfigVO(
         String logoUrl,
         String welcomeMessage,
         List<String> suggestedQuestions,
-        String agentName
+        String agentName,
+        String customDomain,
+        Boolean domainVerified,
+        String domainVerifyToken
 ) {
 }

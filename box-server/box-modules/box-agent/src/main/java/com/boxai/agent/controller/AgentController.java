@@ -129,6 +129,11 @@ public class AgentController {
         return Result.success(agentApplicationService.updateEmbedConfig(id, request));
     }
 
+    @PostMapping("/{id}/embed-domain/verify")
+    public Result<AgentEmbedConfigVO> verifyEmbedDomain(@PathVariable Long id) {
+        return Result.success(agentApplicationService.verifyEmbedDomain(id));
+    }
+
     @PostMapping("/{id}/chat")
     public Object chat(@PathVariable Long id,
                        @Valid @RequestBody AgentChatRequest request,

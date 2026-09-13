@@ -2,6 +2,7 @@ package com.boxai.agent.support;
 
 import com.boxai.agent.api.AgentEmbedConfigVO;
 import com.boxai.agent.api.UpdateAgentEmbedConfigRequest;
+import com.boxai.common.security.EmbedDomainNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -23,14 +24,35 @@ public final class AgentEmbedConfigSupport {
         ObjectNode root = readRoot(configJson);
         JsonNode embed = root.get("embed");
         if (embed == null || embed.isNull()) {
-            return new AgentEmbedConfigVO(DEFAULT_THEME, "", "", List.of(), agentName);
+            return new AgentEmbedConfigVO(DEFAULT_THEME, "", "", List.of(), agentName, "", false, null);
         }
         return new AgentEmbedConfigVO(
                 textOrDefault(embed.get("themeColor"), DEFAULT_THEME),
                 textOrDefault(embed.get("logoUrl"), ""),
                 textOrDefault(embed.get("welcomeMessage"), ""),
                 readQuestions(embed.get("suggestedQuestions")),
-                agentName);
+                agentName,
+                textOrDefault(embed.get("customDomain"), ""),
+                embed.path("domainVerified").asBoolean(false),
+                null);
+    }
+
+    public static AgentEmbedConfigVO withDomain(AgentEmbedConfigVO vo,
+                                                String customDomain,
+                                                boolean verified,
+                                                String verifyToken) {
+        if (vo == null) {
+            return new AgentEmbedConfigVO(DEFAULT_THEME, "", "", List.of(), null, customDomain, verified, verifyToken);
+        }
+        return new AgentEmbedConfigVO(
+                vo.themeColor(),
+                vo.logoUrl(),
+                vo.welcomeMessage(),
+                vo.suggestedQuestions(),
+                vo.agentName(),
+                customDomain,
+                verified,
+                verifyToken);
     }
 
     public static String merge(String configJson, UpdateAgentEmbedConfigRequest request) {
@@ -43,6 +65,8 @@ public final class AgentEmbedConfigSupport {
         for (String question : normalizeQuestions(request.suggestedQuestions())) {
             questions.add(question);
         }
+        String domain = EmbedDomainNormalizer.normalize(request.customDomain());
+        embed.put("customDomain", domain);
         root.set("embed", embed);
         return root.toString();
     }

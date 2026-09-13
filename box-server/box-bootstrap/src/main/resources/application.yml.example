@@ -56,6 +56,8 @@ box:
       expire-seconds: 86400
     crypto:
       aes-key: box-dev-aes-256-key-change-me!!
+  embed:
+    skip-domain-verify: true
   minio:
     endpoint: http://127.0.0.1:9000
     access-key: box
