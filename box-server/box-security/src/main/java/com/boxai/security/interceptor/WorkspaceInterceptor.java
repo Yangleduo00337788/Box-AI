@@ -86,7 +86,8 @@ public class WorkspaceInterceptor implements HandlerInterceptor {
         return uri.startsWith("/api/v1/auth/")
                 || uri.startsWith("/api/v1/admin/")
                 || uri.equals("/api/v1/system/health")
-                || uri.equals("/api/v1/system/content");
+                || uri.equals("/api/v1/system/content")
+                || uri.startsWith("/api/v1/public-assets/");
     }
 
     private LoginUser currentUserOrNull() {

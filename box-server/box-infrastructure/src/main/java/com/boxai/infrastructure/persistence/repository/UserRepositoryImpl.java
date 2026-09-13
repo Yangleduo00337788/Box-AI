@@ -67,7 +67,7 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public void updateProfile(Long userId, String nickname, String bio) {
+    public void updateProfile(Long userId, String nickname, String bio, String avatarUrl) {
         UserDO patch = new UserDO();
         patch.setId(userId);
         if (nickname != null) {
@@ -75,6 +75,9 @@ public class UserRepositoryImpl implements UserRepository {
         }
         if (bio != null) {
             patch.setBio(bio);
+        }
+        if (avatarUrl != null) {
+            patch.setAvatarUrl(avatarUrl);
         }
         patch.setUpdatedAt(LocalDateTime.now());
         userMapper.update(patch);

@@ -162,20 +162,27 @@ public class AuthApplicationService {
     public AuthVO updateProfile(LoginUser loginUser, UpdateProfileRequest request) {
         User user = userRepository.findById(loginUser.userId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在"));
-        if (request.nickname() == null && request.bio() == null) {
+        if (request.nickname() == null && request.bio() == null && request.avatarUrl() == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请至少填写一项资料");
         }
         String nickname = request.nickname() == null ? null : request.nickname().trim();
         String bio = request.bio() == null ? null : request.bio().trim();
+        String avatarUrl = request.avatarUrl() == null ? null : request.avatarUrl().trim();
         if (nickname != null && nickname.isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "昵称不能为空");
         }
-        userRepository.updateProfile(user.getId(), nickname, bio);
+        if (avatarUrl != null && avatarUrl.isEmpty()) {
+            avatarUrl = "";
+        }
+        userRepository.updateProfile(user.getId(), nickname, bio, avatarUrl);
         if (nickname != null) {
             user.setNickname(nickname);
         }
         if (bio != null) {
             user.setBio(bio);
+        }
+        if (avatarUrl != null) {
+            user.setAvatarUrl(avatarUrl.isEmpty() ? null : avatarUrl);
         }
         return issue(user);
     }

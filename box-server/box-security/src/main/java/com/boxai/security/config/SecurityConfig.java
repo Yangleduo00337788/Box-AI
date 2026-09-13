@@ -58,6 +58,7 @@ public class SecurityConfig {
                                 "/api/v1/admin/auth/login",
                                 "/api/v1/system/health",
                                 "/api/v1/system/content",
+                                "/api/v1/public-assets/**",
                                 "/api/v1/hooks/**")
                         .permitAll()
                         .anyRequest().authenticated())
@@ -70,7 +71,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("X-Request-Id"));

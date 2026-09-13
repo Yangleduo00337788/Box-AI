@@ -13,8 +13,10 @@ import com.boxai.user.api.SendVerificationCodeResponse;
 import com.boxai.user.api.UpdateProfileRequest;
 import com.boxai.user.api.UpdateUserPreferenceRequest;
 import com.boxai.user.api.UserPreferenceVO;
+import com.boxai.user.api.ImageAssetVO;
 import com.boxai.user.application.AuthApplicationService;
 import com.boxai.user.application.OAuthApplicationService;
+import com.boxai.user.application.PublicImageAssetService;
 import com.boxai.user.application.UserPreferenceApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +26,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -35,13 +39,16 @@ public class AuthController {
     private final AuthApplicationService authApplicationService;
     private final OAuthApplicationService oauthApplicationService;
     private final UserPreferenceApplicationService userPreferenceApplicationService;
+    private final PublicImageAssetService publicImageAssetService;
 
     public AuthController(AuthApplicationService authApplicationService,
                           OAuthApplicationService oauthApplicationService,
-                          UserPreferenceApplicationService userPreferenceApplicationService) {
+                          UserPreferenceApplicationService userPreferenceApplicationService,
+                          PublicImageAssetService publicImageAssetService) {
         this.authApplicationService = authApplicationService;
         this.oauthApplicationService = oauthApplicationService;
         this.userPreferenceApplicationService = userPreferenceApplicationService;
+        this.publicImageAssetService = publicImageAssetService;
     }
 
     @PostMapping("/register")
@@ -93,6 +100,14 @@ public class AuthController {
     @PutMapping("/profile")
     public Result<AuthVO> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         return Result.success(authApplicationService.updateProfile(SecurityContexts.currentUser(), request));
+    }
+
+    @PostMapping("/avatar")
+    public Result<AuthVO> uploadAvatar(@RequestPart("file") MultipartFile file) {
+        ImageAssetVO asset = publicImageAssetService.upload(file);
+        return Result.success(authApplicationService.updateProfile(
+                SecurityContexts.currentUser(),
+                new UpdateProfileRequest(null, null, asset.url())));
     }
 
     @PutMapping("/password")

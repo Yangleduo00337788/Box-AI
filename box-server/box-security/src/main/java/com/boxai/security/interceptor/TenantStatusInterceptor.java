@@ -40,7 +40,8 @@ public class TenantStatusInterceptor implements HandlerInterceptor {
                 || uri.startsWith("/api/v1/published/")
                 || uri.startsWith("/api/v1/hooks/")
                 || uri.equals("/api/v1/system/health")
-                || uri.equals("/api/v1/system/content");
+                || uri.equals("/api/v1/system/content")
+                || uri.startsWith("/api/v1/public-assets/");
     }
 
     private LoginUser currentUserOrNull() {
