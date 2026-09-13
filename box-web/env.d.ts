@@ -1,4 +1,7 @@
-/// <reference types="vite/client" />
+declare module '*.svg?url' {
+  const src: string
+  export default src
+}
 
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'

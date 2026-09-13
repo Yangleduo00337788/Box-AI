@@ -66,6 +66,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps } from 'tdesign-vue-next'
 import { createAgent } from '@/api/agent'
 import { extractApiError } from '@/api/apiError'
+import { groupedPlatformModelOptions } from '@/utils/modelOptions'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { enableMarketTemplate, listMarketTemplates, type AgentTemplateVO } from '@/api/market'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
@@ -96,14 +97,7 @@ const rules: FormProps['rules'] = {
   platformModelId: [{ required: true, message: '请选择平台模型' }],
 }
 
-const platformModelOptions = computed(() =>
-  platformModels.value
-    .filter((item) => item.status === 1)
-    .map((item) => ({
-      label: item.providerName ? `${item.modelName}（${item.providerName}）` : item.modelName,
-      value: item.id,
-    })),
-)
+const platformModelOptions = computed(() => groupedPlatformModelOptions(platformModels.value))
 
 const confirmLabel = computed(() => (createMode.value === 'template' ? '启用模板' : '创建'))
 
@@ -118,7 +112,7 @@ watch(visible, async (open) => {
     const { data } = await listPlatformModels()
     platformModels.value = data.data || []
   }
-  form.platformModelId = platformModelOptions.value[0]?.value
+  form.platformModelId = platformModelOptions.value[0]?.children?.[0]?.value
 })
 
 watch(createMode, async (mode) => {

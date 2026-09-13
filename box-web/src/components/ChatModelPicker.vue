@@ -39,7 +39,7 @@
           </button>
         </div>
 
-        <p class="model-picker__group">内置模型</p>
+        <p class="model-picker__group">{{ tab === 'multi' ? '视觉、生图、语音及其他模态' : '文本对话' }}</p>
         <div class="model-picker__list">
           <t-popup
             v-for="item in visibleModels"
@@ -60,19 +60,25 @@
               <span v-if="item.value === 'auto'" class="model-picker__logo model-picker__logo--auto">
                 <t-icon name="view-module" size="14px" />
               </span>
+              <img
+                v-else-if="item.logo"
+                :src="item.logo"
+                alt=""
+                class="model-picker__brand"
+              />
               <span v-else class="model-picker__logo" :style="{ background: item.color }">
                 {{ item.label.slice(0, 1) }}
               </span>
               <span class="model-picker__name">{{ item.label }}</span>
               <t-tag v-if="item.streaming" size="small" variant="light" class="model-picker__tag">流式</t-tag>
-              <span v-if="modelValue !== item.value" class="model-picker__bars" :title="item.speedLabel">
-                <i v-for="n in 3" :key="n" :class="{ 'is-on': n <= item.speed }" />
-              </span>
-              <t-icon v-else name="check" class="model-picker__check" />
+              <t-icon v-if="modelValue === item.value" name="check" class="model-picker__check" />
             </button>
             <template #content>
               <div class="model-picker__tip">
-                <strong>{{ item.label }}</strong>
+                <div class="model-picker__tip-head">
+                  <strong>{{ item.label }}</strong>
+                  <t-tag v-if="item.kindLabel" size="small" variant="light" theme="primary">{{ item.kindLabel }}</t-tag>
+                </div>
                 <p>{{ item.description }}</p>
                 <div class="model-picker__meta">
                   <span v-if="item.provider">{{ item.provider }}</span>
@@ -85,7 +91,7 @@
           <t-empty
             v-if="!visibleModels.length"
             size="small"
-            description="暂无可用模型，请在管理端配置密钥并上架模型"
+            :description="tab === 'multi' ? '暂无多模态模型' : '暂无可用的文本对话模型'"
           />
         </div>
 
@@ -103,6 +109,8 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { PlatformModelVO } from '@/api/platform'
 import { getAvatarColor } from '@/utils/format'
+import { resolveModelBrandLogo } from '@/utils/modelBrandLogo'
+import { classifyModelChatKind, isMultimodalCapability, modelCapabilityLabel } from '@/utils/modelCapability'
 
 const props = withDefaults(
   defineProps<{
@@ -128,10 +136,10 @@ interface PickerItem {
   description: string
   contextWindow?: number
   color: string
-  multimodal: boolean
+  logo?: string
+  kind: ReturnType<typeof classifyModelChatKind>
+  kindLabel: string
   streaming: boolean
-  speed: number
-  speedLabel: string
 }
 
 const autoItem: PickerItem = {
@@ -140,15 +148,14 @@ const autoItem: PickerItem = {
   provider: '',
   description: '自动选用当前可用、已配置密钥的平台模型。',
   color: '#1f2329',
-  multimodal: false,
+  kind: 'text',
+  kindLabel: '自动调度',
   streaming: true,
-  speed: 3,
-  speedLabel: '自动调度',
 }
 
 const mapped = computed<PickerItem[]>(() =>
   props.models.map((item) => {
-    const speed = speedFromContext(item.contextWindow)
+    const kind = classifyModelChatKind(item.modelCode, item.modelName, item.description)
     return {
       value: String(item.id),
       label: item.modelName,
@@ -156,38 +163,25 @@ const mapped = computed<PickerItem[]>(() =>
       description: item.description || '平台托管模型，对话将扣减工作空间配额。',
       contextWindow: item.contextWindow,
       color: getAvatarColor(item.modelName),
-      multimodal: isMultimodal(item),
+      logo: resolveModelBrandLogo(item.modelCode, item.modelName, item.providerName),
+      kind,
+      kindLabel: modelCapabilityLabel(kind),
       streaming: Boolean(item.supportStreaming),
-      speed,
-      speedLabel: speed >= 3 ? '响应较快' : speed === 2 ? '均衡' : '适合长上下文',
     }
   }),
 )
 
 const visibleModels = computed(() => {
-  const list = [autoItem, ...mapped.value]
   if (tab.value === 'multi') {
-    return mapped.value.filter((item) => item.multimodal)
+    return mapped.value.filter((item) => isMultimodalCapability(item.kind))
   }
-  return list
+  return [autoItem, ...mapped.value.filter((item) => item.kind === 'text')]
 })
 
 const currentLabel = computed(() => {
   if (props.modelValue === 'auto') return 'Auto'
   return mapped.value.find((item) => item.value === props.modelValue)?.label || 'Auto'
 })
-
-function isMultimodal(item: PlatformModelVO) {
-  const text = `${item.modelCode} ${item.modelName} ${item.description || ''}`.toLowerCase()
-  return /vision|vl\b|image|gpt-4o|多模态|omni/.test(text)
-}
-
-function speedFromContext(contextWindow?: number) {
-  if (!contextWindow) return 2
-  if (contextWindow >= 100000) return 1
-  if (contextWindow >= 32000) return 2
-  return 3
-}
 
 function formatTokens(value: number) {
   if (value >= 1000) return `${Math.round(value / 1000)}K`
@@ -276,6 +270,14 @@ function goCustom() {
 .model-picker__list {
   max-height: 280px;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.model-picker__list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .model-picker__item {
@@ -316,6 +318,14 @@ function goCustom() {
   background: #1f2329;
 }
 
+.model-picker__brand {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
 .model-picker__name {
   flex: 1;
   min-width: 0;
@@ -331,35 +341,6 @@ function goCustom() {
 .model-picker__check {
   color: #1f2329;
   font-size: 16px;
-}
-
-.model-picker__bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 12px;
-}
-
-.model-picker__bars i {
-  width: 3px;
-  border-radius: 1px;
-  background: #d0d3d6;
-}
-
-.model-picker__bars i:nth-child(1) {
-  height: 5px;
-}
-
-.model-picker__bars i:nth-child(2) {
-  height: 8px;
-}
-
-.model-picker__bars i:nth-child(3) {
-  height: 12px;
-}
-
-.model-picker__bars i.is-on {
-  background: #34c759;
 }
 
 .model-picker__custom {
@@ -389,8 +370,22 @@ function goCustom() {
 
 .model-picker__tip strong {
   display: block;
-  margin-bottom: 6px;
+  margin: 0;
   font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.model-picker__tip-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.model-picker__tip-head .t-tag {
+  flex-shrink: 0;
 }
 
 .model-picker__tip p {

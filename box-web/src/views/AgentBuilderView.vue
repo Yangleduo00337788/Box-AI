@@ -570,6 +570,7 @@ import { listKnowledgeBases, type KnowledgeBaseVO } from '@/api/knowledge'
 import { listMcpServers, type McpServerVO } from '@/api/mcp'
 import { listTools, type ToolVO } from '@/api/tool'
 import { listModels, type ModelVO } from '@/api/model'
+import { groupedPlatformModelOptions } from '@/utils/modelOptions'
 import {
   fetchPlatformCapabilities,
   listPlatformModels,
@@ -814,14 +815,7 @@ const modelRules: FormProps['rules'] = {
   maxTokens: [{ required: true, message: '请输入 Max Tokens' }],
 }
 
-const platformModelOptions = computed(() =>
-  platformModels.value
-    .filter((item) => item.status === 1)
-    .map((item) => ({
-      label: item.providerName ? `${item.modelName}（${item.providerName}）` : item.modelName,
-      value: item.id,
-    })),
-)
+const platformModelOptions = computed(() => groupedPlatformModelOptions(platformModels.value))
 
 const byokModelOptions = computed(() =>
   models.value
