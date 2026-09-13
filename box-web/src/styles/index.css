@@ -180,7 +180,6 @@ a:hover {
 
 .coze-sidebar,
 .coze-sidebar__scroll,
-.chat-messages,
 .coze-main__panel--padded {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
@@ -188,14 +187,12 @@ a:hover {
 
 .coze-sidebar::-webkit-scrollbar,
 .coze-sidebar__scroll::-webkit-scrollbar,
-.chat-messages::-webkit-scrollbar,
 .coze-main__panel--padded::-webkit-scrollbar {
   width: 6px;
 }
 
 .coze-sidebar::-webkit-scrollbar-thumb,
 .coze-sidebar__scroll::-webkit-scrollbar-thumb,
-.chat-messages::-webkit-scrollbar-thumb,
 .coze-main__panel--padded::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.12);
@@ -203,9 +200,19 @@ a:hover {
 
 .coze-sidebar::-webkit-scrollbar-track,
 .coze-sidebar__scroll::-webkit-scrollbar-track,
-.chat-messages::-webkit-scrollbar-track,
 .coze-main__panel--padded::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.box-hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.box-hide-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 html[data-box-theme='dark'] {

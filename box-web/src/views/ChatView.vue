@@ -4,12 +4,22 @@
       <div class="chat-stage">
       <h1 class="chat-new__title">
         有什么想交给
-        <span v-if="selectedAgent" class="chat-new__agent">
-          <t-avatar size="24px" class="chat-new__agent-avatar" :style="{ background: agentAvatarColor }">
-            {{ selectedAgent.name.slice(0, 1) }}
-          </t-avatar>
-          {{ selectedAgent.name }}
-        </span>
+        <t-dropdown
+          v-if="selectedAgent"
+          :options="agentOptions"
+          trigger="click"
+          :min-column-width="180"
+          :popup-props="{ overlayInnerClassName: 'chat-agent-switch' }"
+          @click="onAgentDropdown"
+        >
+          <button type="button" class="chat-new__agent" aria-haspopup="listbox" aria-label="切换智能体">
+            <t-avatar size="24px" class="chat-new__agent-avatar" :style="{ background: agentAvatarColor }">
+              {{ selectedAgent.name.slice(0, 1) }}
+            </t-avatar>
+            {{ selectedAgent.name }}
+            <t-icon name="chevron-down" class="chat-new__agent-arrow" />
+          </button>
+        </t-dropdown>
         <template v-else> Box </template>
         ？
       </h1>
@@ -24,16 +34,26 @@
           :disabled="chatting"
           @keydown="onComposerKeydown"
         />
+        <div v-if="composerAttachments.length" class="composer__files">
+          <div v-for="file in composerAttachments" :key="file.id" class="composer-file">
+            <img v-if="file.previewUrl" :src="file.previewUrl" alt="" class="composer-file__thumb" />
+            <t-icon v-else name="file-1" size="18px" />
+            <span class="composer-file__name">{{ file.uploading ? '正在上传…' : file.name }}</span>
+            <button type="button" class="composer-file__remove" aria-label="移除文件" @click="removeComposerAttachment(file.id)">
+              <t-icon name="close" size="14px" />
+            </button>
+          </div>
+        </div>
         <input
           ref="fileInputRef"
           type="file"
           class="composer__file-input"
-          accept=".txt,.md,.json,.csv,.log,text/plain"
+          accept=".txt,.md,.json,.csv,.log,.png,.jpg,.jpeg,text/plain,image/png,image/jpeg"
           @change="onFileSelected"
         />
         <div class="composer__toolbar">
           <div class="composer__left">
-            <t-tooltip content="添加文本文件" placement="top" theme="light" :show-arrow="false">
+            <t-tooltip content="添加文件" placement="top" theme="light" :show-arrow="false">
               <t-button variant="text" shape="square" size="small" @click="openFilePicker">
                 <template #icon><t-icon name="add" /></template>
               </t-button>
@@ -126,7 +146,7 @@
         </t-tooltip>
       </div>
 
-      <div ref="chatListRef" class="chat-messages">
+      <div ref="chatListRef" class="chat-messages box-hide-scrollbar">
         <div
           v-for="(item, index) in messages"
           :key="item.id ?? index"
@@ -138,26 +158,23 @@
               <span v-if="isLoadingBubble(item, index)" class="typing-dots" aria-label="思考中">
                 <i /><i /><i />
               </span>
-              <template v-else>
-                <template v-for="(segment, segIndex) in contentSegments(item, index)" :key="segIndex">
-                  <span v-if="segment.type === 'text'">{{ segment.text }}</span>
-                  <t-popup
-                    v-else
-                    placement="top"
-                    trigger="click"
-                    show-arrow
-                    destroy-on-close
+              <template v-else-if="item.role === 'USER'">
+                <div v-if="userMessageParts(item, index).images.length" class="chat-message__images">
+                  <a
+                    v-for="(image, imageIndex) in userMessageParts(item, index).images"
+                    :key="`${image.url}-${imageIndex}`"
+                    class="chat-message__image"
+                    :href="image.url"
+                    target="_blank"
+                    rel="noreferrer"
+                    @click.stop
                   >
-                    <template #content>
-                      <div class="chat-citation-popup">
-                        <div class="chat-citation-popup__title">{{ segment.citation?.documentName }}</div>
-                        <div class="chat-citation-popup__body">{{ segment.citation?.content }}</div>
-                      </div>
-                    </template>
-                    <button type="button" class="chat-citation-inline">{{ segment.text }}</button>
-                  </t-popup>
-                </template>
+                    <t-image :src="image.url" :alt="image.name" fit="cover" shape="round" />
+                  </a>
+                </div>
+                <span v-if="userMessageParts(item, index).text">{{ userMessageParts(item, index).text }}</span>
               </template>
+              <chat-markdown v-else :content="displayContent(item, index)" />
             </div>
             <div v-if="messageCitations(item).length" class="chat-citations">
               <span class="chat-citations__label">引用来源</span>
@@ -229,16 +246,26 @@
           :disabled="chatting"
           @keydown="onComposerKeydown"
         />
+        <div v-if="composerAttachments.length" class="composer__files">
+          <div v-for="file in composerAttachments" :key="file.id" class="composer-file">
+            <img v-if="file.previewUrl" :src="file.previewUrl" alt="" class="composer-file__thumb" />
+            <t-icon v-else name="file-1" size="18px" />
+            <span class="composer-file__name">{{ file.uploading ? '正在上传…' : file.name }}</span>
+            <button type="button" class="composer-file__remove" aria-label="移除文件" @click="removeComposerAttachment(file.id)">
+              <t-icon name="close" size="14px" />
+            </button>
+          </div>
+        </div>
         <input
           ref="activeFileInputRef"
           type="file"
           class="composer__file-input"
-          accept=".txt,.md,.json,.csv,.log,text/plain"
+          accept=".txt,.md,.json,.csv,.log,.png,.jpg,.jpeg,text/plain,image/png,image/jpeg"
           @change="onFileSelected"
         />
         <div class="composer__toolbar">
           <div class="composer__left">
-            <t-tooltip content="添加文本文件" placement="top" theme="light" :show-arrow="false">
+            <t-tooltip content="添加文件" placement="top" theme="light" :show-arrow="false">
               <t-button variant="text" shape="square" size="small" @click="openActiveFilePicker">
                 <template #icon><t-icon name="add" /></template>
               </t-button>
@@ -305,10 +332,13 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
+import ChatMarkdown from '@/components/ChatMarkdown.vue'
 import ChatModelPicker from '@/components/ChatModelPicker.vue'
+import { parseUserContent } from '@/utils/chatContent'
 import { extractApiError } from '@/api/apiError'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
+import { uploadImageAsset } from '@/api/asset'
 import { appPreferences } from '@/composables/useAppPreferences'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { useChatSuggestions } from '@/composables/useChatSuggestions'
@@ -342,11 +372,22 @@ const { suggestions, loading: suggestionsLoading, refresh: refreshSuggestions } 
 
 const chatting = ref(false)
 const composerText = ref('')
+const composerAttachments = ref<ComposerAttachment[]>([])
 const messages = ref<MessageVO[]>([])
 const chatListRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const activeFileInputRef = ref<HTMLInputElement | null>(null)
 const listening = ref(false)
+
+interface ComposerAttachment {
+  id: string
+  name: string
+  kind: 'image' | 'text'
+  uploading?: boolean
+  previewUrl?: string
+  remoteUrl?: string
+  textContent?: string
+}
 
 interface BrowserSpeechRecognition {
   lang: string
@@ -405,12 +446,23 @@ const latestExecution = ref<ExecutionVO | null>(null)
 
 const agentAvatarColor = computed(() => getAvatarColor(selectedAgent.value?.name || 'Box'))
 
+const attachmentsReady = computed(() =>
+  composerAttachments.value.some(
+    (item) => !item.uploading && (item.kind === 'text' ? !!item.textContent : !!item.remoteUrl),
+  ),
+)
+const attachmentsUploading = computed(() => composerAttachments.value.some((item) => item.uploading))
+
 const canSendNewChat = computed(
-  () => !!composerText.value.trim() && !chatting.value && !!selectedAgent.value,
+  () =>
+    (!!composerText.value.trim() || attachmentsReady.value) &&
+    !chatting.value &&
+    !attachmentsUploading.value &&
+    !!selectedAgent.value,
 )
 
 const canSendMessage = computed(
-  () => !!composerText.value.trim() && !chatting.value,
+  () => (!!composerText.value.trim() || attachmentsReady.value) && !chatting.value && !attachmentsUploading.value,
 )
 
 const BRAND_SUGGESTION_TITLES = new Set(['box', 'coze', '扣子', '盒子'])
@@ -423,6 +475,7 @@ const agentOptions = computed<DropdownOption[]>(() =>
   agents.value.map((agent) => ({
     content: agent.name,
     value: agent.id,
+    active: agent.id === selectedAgent.value?.id,
   })),
 )
 
@@ -447,12 +500,6 @@ function applyStreamCitations(index: number, citations: KnowledgeCitation[]) {
   messages.value[index].citations = citations
 }
 
-interface ContentSegment {
-  type: 'text' | 'cite'
-  text: string
-  citation?: KnowledgeCitation
-}
-
 function displayContent(item: MessageVO, index: number) {
   if (item.content) return item.content
   if (chatting.value && index === messages.value.length - 1 && item.role === 'ASSISTANT') {
@@ -461,36 +508,8 @@ function displayContent(item: MessageVO, index: number) {
   return ''
 }
 
-function contentSegments(item: MessageVO, index: number): ContentSegment[] {
-  const content = displayContent(item, index)
-  if (!content || content === '思考中…') {
-    return [{ type: 'text', text: content }]
-  }
-  const citations = messageCitations(item)
-  if (!citations.length) {
-    return [{ type: 'text', text: content }]
-  }
-  const citeMap = new Map(citations.map((cite) => [cite.index, cite]))
-  const segments: ContentSegment[] = []
-  const pattern = /\[(\d+)\]/g
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-  while ((match = pattern.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({ type: 'text', text: content.slice(lastIndex, match.index) })
-    }
-    const citation = citeMap.get(Number(match[1]))
-    if (citation) {
-      segments.push({ type: 'cite', text: match[0], citation })
-    } else {
-      segments.push({ type: 'text', text: match[0] })
-    }
-    lastIndex = pattern.lastIndex
-  }
-  if (lastIndex < content.length) {
-    segments.push({ type: 'text', text: content.slice(lastIndex) })
-  }
-  return segments.length ? segments : [{ type: 'text', text: content }]
+function userMessageParts(item: MessageVO, index: number) {
+  return parseUserContent(displayContent(item, index))
 }
 
 function isLoadingBubble(item: MessageVO, index: number) {
@@ -626,7 +645,7 @@ async function scrollChatToBottom() {
 }
 
 async function startNewChat(text: string) {
-  const prompt = text.trim()
+  const prompt = buildComposerPayload(text)
   if (!prompt || chatting.value) return
   const agentId = selectedAgent.value?.id
   if (!agentId) {
@@ -645,6 +664,8 @@ async function startNewChat(text: string) {
     await router.push(`/chat/${id}`)
     await loadConversationMeta(id)
     await sendChat(id, prompt)
+    composerText.value = ''
+    clearComposerAttachments()
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '创建对话失败'))
   } finally {
@@ -655,7 +676,7 @@ async function startNewChat(text: string) {
 async function sendChat(id?: number, preset?: string) {
   const targetId = id ?? conversationId.value
   if (!targetId) return
-  const text = (preset ?? composerText.value).trim()
+  const text = (preset ?? buildComposerPayload()).trim()
   if (!text || chatting.value) return
 
   chatting.value = true
@@ -673,6 +694,7 @@ async function sendChat(id?: number, preset?: string) {
   })
   if (!usedPreset) {
     composerText.value = ''
+    clearComposerAttachments()
   }
   await scrollChatToBottom()
 
@@ -823,15 +845,71 @@ function openActiveFilePicker() {
   activeFileInputRef.value?.click()
 }
 
+function buildComposerPayload(raw?: string) {
+  const parts: string[] = []
+  const text = (raw ?? composerText.value).trim()
+  if (text) parts.push(text)
+  for (const file of composerAttachments.value) {
+    if (file.uploading) continue
+    if (file.kind === 'image' && file.remoteUrl) {
+      parts.push(`[图片: ${file.name}]\n${file.remoteUrl}`)
+    } else if (file.kind === 'text' && file.textContent) {
+      parts.push(`--- ${file.name} ---\n${file.textContent.slice(0, 8000)}`)
+    }
+  }
+  return parts.join('\n\n')
+}
+
+function clearComposerAttachments() {
+  for (const file of composerAttachments.value) {
+    if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+  }
+  composerAttachments.value = []
+}
+
+function removeComposerAttachment(id: string) {
+  const current = composerAttachments.value.find((item) => item.id === id)
+  if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
+  composerAttachments.value = composerAttachments.value.filter((item) => item.id !== id)
+}
+
 async function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  const name = file.name
+  const id = `${Date.now()}-${name}`
+  const isImage = /\.(png|jpe?g)$/i.test(name) || file.type.startsWith('image/')
+  const isText = /\.(txt|md|json|csv|log)$/i.test(name) || file.type.startsWith('text/')
   try {
-    const text = await file.text()
-    const prefix = composerText.value.trim() ? '\n\n' : ''
-    composerText.value += `${prefix}--- ${file.name} ---\n${text.slice(0, 8000)}`
-    MessagePlugin.success('已添加文件内容')
+    if (isImage) {
+      if (file.size > 2 * 1024 * 1024) {
+        MessagePlugin.warning('图片不能超过 2MB')
+        return
+      }
+      const previewUrl = URL.createObjectURL(file)
+      composerAttachments.value.push({ id, name, kind: 'image', previewUrl, uploading: true })
+      try {
+        const { data } = await uploadImageAsset(file)
+        const item = composerAttachments.value.find((entry) => entry.id === id)
+        if (item) {
+          item.remoteUrl = data.data.url
+          item.uploading = false
+        }
+        MessagePlugin.success('已添加图片')
+      } catch (error) {
+        removeComposerAttachment(id)
+        MessagePlugin.error(extractApiError(error, '图片上传失败'))
+      }
+      return
+    }
+    if (isText) {
+      const textContent = await file.text()
+      composerAttachments.value.push({ id, name, kind: 'text', textContent })
+      MessagePlugin.success('已添加文本文件')
+      return
+    }
+    MessagePlugin.warning('请上传 PNG/JPG 图片，或 TXT、MD、JSON、CSV 文本')
   } catch {
     MessagePlugin.error('读取文件失败')
   } finally {
@@ -902,6 +980,15 @@ watch(
   },
   { immediate: true },
 )
+
+watch(conversations, (list) => {
+  const id = conversationId.value
+  if (!id) return
+  const found = list.find((item) => item.id === id)
+  if (found) {
+    activeConversationTitle.value = found.title || ''
+  }
+})
 
 watch(
   () => route.query.prompt,
@@ -982,12 +1069,30 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  margin: 0 2px;
+  padding: 0 4px 0 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.chat-new__agent:hover {
+  background: rgba(15, 23, 42, 0.04);
 }
 
 .chat-new__agent-avatar {
   color: #fff;
   font-size: 13px;
   font-weight: 600;
+}
+
+.chat-new__agent-arrow {
+  font-size: 18px;
+  color: var(--box-ink-muted, #8f959e);
 }
 
 .composer {
@@ -1027,6 +1132,64 @@ onMounted(async () => {
 
 .composer__input :deep(.t-textarea__inner::placeholder) {
   color: #b0b4bc;
+}
+
+.composer__file-input {
+  display: none;
+}
+
+.composer__files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 6px 0;
+}
+
+.composer-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #e7e9ee;
+  border-radius: 10px;
+  background: #f7f8fa;
+}
+
+.composer-file__thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.composer-file__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--box-ink);
+}
+
+.composer-file__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8f959e;
+  cursor: pointer;
+}
+
+.composer-file__remove:hover {
+  background: #eceef1;
+  color: #1f2329;
 }
 
 .composer__toolbar {
@@ -1326,7 +1489,6 @@ onMounted(async () => {
   border-radius: 16px;
   font-size: 15px;
   line-height: 1.65;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
@@ -1334,12 +1496,39 @@ onMounted(async () => {
   background: var(--box-hover);
   color: var(--box-ink);
   border-bottom-right-radius: 6px;
+  white-space: pre-wrap;
 }
 
 .chat-message--assistant .chat-message__content {
   background: transparent;
   color: #1f2329;
   padding-left: 0;
+  white-space: normal;
+}
+
+.chat-message__images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chat-message__images:last-child {
+  margin-bottom: 0;
+}
+
+.chat-message__image {
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.chat-message__image :deep(.t-image) {
+  width: 168px;
+  height: 168px;
+  border-radius: 12px;
 }
 
 .chat-citations {
@@ -1359,24 +1548,6 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.chat-citation-inline {
-  display: inline;
-  margin: 0 1px;
-  padding: 0 4px;
-  border: none;
-  border-radius: 4px;
-  background: rgba(0, 82, 217, 0.08);
-  color: var(--td-brand-color);
-  font: inherit;
-  line-height: 1.4;
-  cursor: pointer;
-  vertical-align: baseline;
-}
-
-.chat-citation-inline:hover {
-  background: rgba(0, 82, 217, 0.14);
 }
 
 .chat-citation-chip {
