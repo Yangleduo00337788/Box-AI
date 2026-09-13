@@ -52,6 +52,11 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
+    public void deleteByConversationId(Long conversationId) {
+        mapper.deleteByQuery(QueryWrapper.create().eq("conversation_id", conversationId));
+    }
+
+    @Override
     public Optional<Integer> findMaxSequenceNo(Long conversationId) {
         return mapper.selectListByQuery(
                         QueryWrapper.create()

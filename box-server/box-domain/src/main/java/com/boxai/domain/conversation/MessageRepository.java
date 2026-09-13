@@ -14,4 +14,6 @@ public interface MessageRepository {
     void deleteById(Long id);
 
     Optional<Integer> findMaxSequenceNo(Long conversationId);
+
+    void deleteByConversationId(Long conversationId);
 }

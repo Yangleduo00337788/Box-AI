@@ -5,6 +5,7 @@ import com.boxai.conversation.api.ConversationVO;
 import com.boxai.conversation.api.CreateConversationRequest;
 import com.boxai.conversation.api.MessageVO;
 import com.boxai.conversation.api.RegenerateMessageRequest;
+import com.boxai.conversation.api.RenameConversationRequest;
 import com.boxai.conversation.api.SendMessageRequest;
 import com.boxai.conversation.api.SendMessageVO;
 import com.boxai.conversation.application.ConversationApplicationService;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,6 +46,17 @@ public class ConversationController {
     @GetMapping("/{id}")
     public Result<ConversationVO> detail(@PathVariable Long id) {
         return Result.success(conversationApplicationService.detail(id));
+    }
+
+    @PutMapping("/{id}")
+    public Result<ConversationVO> rename(@PathVariable Long id, @Valid @RequestBody RenameConversationRequest request) {
+        return Result.success(conversationApplicationService.rename(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        conversationApplicationService.delete(id);
+        return Result.success();
     }
 
     @GetMapping("/{id}/messages")

@@ -9,6 +9,7 @@ import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.conversation.api.ConversationVO;
 import com.boxai.conversation.api.CreateConversationRequest;
+import com.boxai.conversation.api.RenameConversationRequest;
 import com.boxai.conversation.api.MessageVO;
 import com.boxai.conversation.api.SendMessageRequest;
 import com.boxai.conversation.api.SendMessageVO;
@@ -117,6 +118,24 @@ public class ConversationApplicationService {
         Conversation conversation = requireConversation(id);
         Agent agent = requireAgent(conversation.getAgentId());
         return toVO(conversation, agent.getName());
+    }
+
+    @Transactional
+    public ConversationVO rename(Long id, RenameConversationRequest request) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
+        Conversation conversation = requireConversation(id);
+        conversation.setTitle(request.title().trim());
+        conversationRepository.update(conversation);
+        Agent agent = requireAgent(conversation.getAgentId());
+        return toVO(conversation, agent.getName());
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
+        Conversation conversation = requireConversation(id);
+        messageRepository.deleteByConversationId(conversation.getId());
+        conversationRepository.delete(conversation.getId());
     }
 
     public List<MessageVO> listMessages(Long id) {
