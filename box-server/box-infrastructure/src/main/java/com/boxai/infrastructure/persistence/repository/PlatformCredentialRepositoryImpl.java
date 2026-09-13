@@ -78,6 +78,11 @@ public class PlatformCredentialRepositoryImpl implements PlatformCredentialRepos
     }
 
     @Override
+    public void deleteByProvider(Long providerId) {
+        mapper.deleteByQuery(QueryWrapper.create().eq("provider_id", providerId));
+    }
+
+    @Override
     public void touchLastUsed(Long id) {
         PlatformCredentialDO patch = new PlatformCredentialDO();
         patch.setId(id);

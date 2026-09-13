@@ -14,16 +14,33 @@ import com.boxai.domain.platform.PlatformProvider;
 import com.boxai.domain.platform.PlatformProviderRepository;
 import com.boxai.domain.tenant.Tenant;
 import com.boxai.domain.tenant.TenantRepository;
+import com.boxai.common.security.SsrfGuard;
+import com.boxai.common.security.SsrfSafeHttpClient;
 import com.boxai.model.api.platform.CreatePlatformCredentialRequest;
 import com.boxai.model.api.platform.CreatePlatformModelRequest;
 import com.boxai.model.api.platform.CreatePlatformProviderRequest;
+import com.boxai.model.api.platform.ImportPlatformModelsRequest;
 import com.boxai.model.api.platform.PlatformCredentialVO;
 import com.boxai.model.api.platform.PlatformModelVO;
 import com.boxai.model.api.platform.PlatformProviderVO;
+import com.boxai.model.api.platform.UpdatePlatformModelRequest;
+import com.boxai.model.api.platform.UpdatePlatformProviderRequest;
+import com.boxai.model.api.platform.UpstreamModelVO;
 import com.boxai.model.platform.ResolvedPlatformModel;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,19 +59,23 @@ public class PlatformModelApplicationService {
     private final TenantRepository tenantRepository;
     private final PlanRepository planRepository;
     private final SecretCipher secretCipher;
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient = SsrfSafeHttpClient.create(Duration.ofSeconds(5), false);
 
     public PlatformModelApplicationService(PlatformProviderRepository providerRepository,
                                            PlatformModelRepository modelRepository,
                                            PlatformCredentialRepository credentialRepository,
                                            TenantRepository tenantRepository,
                                            PlanRepository planRepository,
-                                           SecretCipher secretCipher) {
+                                           SecretCipher secretCipher,
+                                           ObjectMapper objectMapper) {
         this.providerRepository = providerRepository;
         this.modelRepository = modelRepository;
         this.credentialRepository = credentialRepository;
         this.tenantRepository = tenantRepository;
         this.planRepository = planRepository;
         this.secretCipher = secretCipher;
+        this.objectMapper = objectMapper;
     }
 
     public List<PlatformProviderVO> listProviders() {
@@ -63,21 +84,55 @@ public class PlatformModelApplicationService {
 
     @Transactional
     public PlatformProviderVO createProvider(CreatePlatformProviderRequest request) {
+        String code = request.providerCode().trim().toLowerCase(Locale.ROOT);
+        if (providerRepository.findByCode(code).isPresent()) {
+            throw new BusinessException(ErrorCode.CONFLICT, "服务商编码已存在");
+        }
         PlatformProvider provider = new PlatformProvider();
-        provider.setProviderCode(request.providerCode().trim().toLowerCase(Locale.ROOT));
+        provider.setProviderCode(code);
         provider.setProviderName(request.providerName().trim());
         provider.setProviderType(request.providerType() == null || request.providerType().isBlank()
                 ? "OPENAI_COMPATIBLE" : request.providerType());
-        provider.setBaseUrl(request.baseUrl());
+        provider.setBaseUrl(trimToNull(request.baseUrl()));
         provider.setStatus(1);
         providerRepository.save(provider);
         return toProviderVO(provider);
     }
 
-    public List<PlatformModelVO> listModelsAdmin() {
+    @Transactional
+    public PlatformProviderVO updateProvider(Long id, UpdatePlatformProviderRequest request) {
+        PlatformProvider provider = requireProvider(id);
+        if (request.providerName() != null && !request.providerName().isBlank()) {
+            provider.setProviderName(request.providerName().trim());
+        }
+        if (request.providerType() != null && !request.providerType().isBlank()) {
+            provider.setProviderType(request.providerType().trim());
+        }
+        if (request.baseUrl() != null) {
+            provider.setBaseUrl(trimToNull(request.baseUrl()));
+        }
+        if (request.status() != null) {
+            provider.setStatus(request.status() == 1 ? 1 : 0);
+        }
+        providerRepository.update(provider);
+        return toProviderVO(provider);
+    }
+
+    @Transactional
+    public void deleteProvider(Long id) {
+        requireProvider(id);
+        credentialRepository.deleteByProvider(id);
+        modelRepository.deleteByProvider(id);
+        providerRepository.delete(id);
+    }
+
+    public List<PlatformModelVO> listModelsAdmin(Long providerId) {
         Map<Long, PlatformProvider> providerMap = providerRepository.listAll().stream()
                 .collect(Collectors.toMap(PlatformProvider::getId, Function.identity()));
-        return modelRepository.listAll().stream()
+        List<PlatformModel> models = providerId == null
+                ? modelRepository.listAll()
+                : modelRepository.listByProvider(providerId);
+        return models.stream()
                 .map(model -> toModelVO(model, providerMap.get(model.getProviderId())))
                 .toList();
     }
@@ -108,8 +163,129 @@ public class PlatformModelApplicationService {
         model.setMaxOutputTokens(request.maxOutputTokens());
         model.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         model.setStatus(1);
+        Optional<PlatformModel> existing = modelRepository.findByProviderAndCodeIncludingDeleted(
+                request.providerId(), request.modelCode().trim());
+        if (existing.isPresent()) {
+            PlatformModel current = existing.get();
+            if (current.getDeleted() == null || current.getDeleted() == 0) {
+                throw new BusinessException(ErrorCode.CONFLICT, "该服务商下已存在相同模型编码");
+            }
+            current.setModelName(model.getModelName());
+            current.setDescription(model.getDescription());
+            current.setContextWindow(model.getContextWindow());
+            current.setMaxOutputTokens(model.getMaxOutputTokens());
+            current.setSortOrder(model.getSortOrder());
+            current.setStatus(1);
+            modelRepository.restore(current.getId());
+            modelRepository.update(current);
+            return toModelVO(current, requireProvider(current.getProviderId()));
+        }
         modelRepository.save(model);
         return toModelVO(model, requireProvider(model.getProviderId()));
+    }
+
+    @Transactional
+    public PlatformModelVO updateModel(Long id, UpdatePlatformModelRequest request) {
+        PlatformModel model = modelRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "平台模型不存在"));
+        if (request.modelName() != null && !request.modelName().isBlank()) {
+            model.setModelName(request.modelName().trim());
+        }
+        if (request.description() != null) {
+            model.setDescription(trimToNull(request.description()));
+        }
+        if (request.contextWindow() != null) {
+            model.setContextWindow(request.contextWindow());
+        }
+        if (request.maxOutputTokens() != null) {
+            model.setMaxOutputTokens(request.maxOutputTokens());
+        }
+        if (request.sortOrder() != null) {
+            model.setSortOrder(request.sortOrder());
+        }
+        if (request.status() != null) {
+            model.setStatus(request.status() == 1 ? 1 : 0);
+        }
+        modelRepository.update(model);
+        return toModelVO(model, requireProvider(model.getProviderId()));
+    }
+
+    @Transactional
+    public void deleteModel(Long id) {
+        modelRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "平台模型不存在"));
+        modelRepository.delete(id);
+    }
+
+    public List<UpstreamModelVO> listUpstreamModels(Long providerId) {
+        PlatformProvider provider = requireProvider(providerId);
+        Set<String> imported = modelRepository.listByProvider(providerId).stream()
+                .map(PlatformModel::getModelCode)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return fetchUpstreamModelSpecs(provider).stream()
+                .map(spec -> new UpstreamModelVO(
+                        spec.modelCode(),
+                        spec.modelCode(),
+                        imported.contains(spec.modelCode()),
+                        positiveOrNull(spec.contextWindow()),
+                        positiveOrNull(spec.maxOutputTokens())))
+                .toList();
+    }
+
+    @Transactional
+    public List<PlatformModelVO> importUpstreamModels(Long providerId, ImportPlatformModelsRequest request) {
+        PlatformProvider provider = requireProvider(providerId);
+        Map<String, UpstreamModelSpec> specs = indexSpecs(fetchUpstreamModelSpecs(provider));
+        List<PlatformModelVO> created = new ArrayList<>();
+        int sort = modelRepository.listByProvider(providerId).size();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String rawCode : request.modelCodes()) {
+            if (rawCode == null || rawCode.isBlank()) {
+                continue;
+            }
+            String code = rawCode.trim();
+            if (!seen.add(code.toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            UpstreamModelSpec spec = specs.get(code.toLowerCase(Locale.ROOT));
+            Optional<PlatformModel> existing = modelRepository.findByProviderAndCodeIncludingDeleted(providerId, code);
+            if (existing.isPresent()) {
+                PlatformModel current = existing.get();
+                boolean restored = current.getDeleted() != null && current.getDeleted() != 0;
+                if (restored) {
+                    current.setStatus(1);
+                    modelRepository.restore(current.getId());
+                }
+                applyUpstreamLimits(current, spec);
+                if (restored) {
+                    modelRepository.update(current);
+                }
+                modelRepository.updateLimits(current.getId(), current.getContextWindow(), current.getMaxOutputTokens());
+                if (restored) {
+                    created.add(toModelVO(current, provider));
+                }
+                continue;
+            }
+            PlatformModel model = new PlatformModel();
+            model.setProviderId(providerId);
+            model.setModelCode(code);
+            model.setModelName(code);
+            model.setModelType("CHAT");
+            model.setSupportStreaming(true);
+            model.setSortOrder(sort++);
+            model.setStatus(1);
+            applyUpstreamLimits(model, spec);
+            modelRepository.save(model);
+            created.add(toModelVO(model, provider));
+        }
+        syncLimitsFromUpstream(providerId, specs);
+        return created;
+    }
+
+    @Transactional
+    public int syncMissingModelLimits(Long providerId) {
+        PlatformProvider provider = requireProvider(providerId);
+        return syncLimitsFromUpstream(providerId, indexSpecs(fetchUpstreamModelSpecs(provider)));
     }
 
     public List<PlatformCredentialVO> listCredentials(Long providerId) {
@@ -127,6 +303,13 @@ public class PlatformModelApplicationService {
         credential.setStatus(1);
         credentialRepository.save(credential);
         return toCredentialVO(credential);
+    }
+
+    @Transactional
+    public void deleteCredential(Long id) {
+        credentialRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLATFORM_CREDENTIAL_MISSING, "平台密钥不存在"));
+        credentialRepository.delete(id);
     }
 
     public ResolvedPlatformModel resolveForChat(Long platformModelId) {
@@ -192,6 +375,156 @@ public class PlatformModelApplicationService {
             throw new BusinessException(ErrorCode.BYOK_NOT_ALLOWED, "当前套餐不支持自带密钥，请升级或使用平台模型");
         }
     }
+
+    private List<UpstreamModelSpec> fetchUpstreamModelSpecs(PlatformProvider provider) {
+        if (provider.getBaseUrl() == null || provider.getBaseUrl().isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请先填写服务商接口地址");
+        }
+        PlatformCredential credential = credentialRepository.findActiveByProvider(provider.getId())
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.PLATFORM_CREDENTIAL_MISSING,
+                        "请先为「" + provider.getProviderName() + "」配置平台密钥，再从上游拉取模型"));
+        String apiKey = secretCipher.decrypt(credential.getEncryptedApiKey());
+        URI endpoint = SsrfGuard.validateHttpUrl(modelsEndpoint(provider.getBaseUrl()));
+        HttpRequest request = HttpRequest.newBuilder(endpoint)
+                .timeout(Duration.ofSeconds(20))
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+        try {
+            HttpResponse<String> response = SsrfSafeHttpClient.send(httpClient, request, true, Duration.ofSeconds(20));
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "上游返回 " + response.statusCode() + "，请检查接口地址与密钥");
+            }
+            return parseUpstreamModels(response.body());
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "拉取上游模型失败：" + ex.getMessage());
+        }
+    }
+
+    private String modelsEndpoint(String baseUrl) {
+        String trimmed = baseUrl.trim();
+        if (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        if (trimmed.endsWith("/models")) {
+            return trimmed;
+        }
+        return trimmed + "/models";
+    }
+
+    private List<UpstreamModelSpec> parseUpstreamModels(String body) {
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode data = root.has("data") ? root.get("data") : root;
+            if (!data.isArray()) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "上游模型列表格式无法识别");
+            }
+            Map<String, UpstreamModelSpec> specs = new LinkedHashMap<>();
+            for (JsonNode item : data) {
+                String id = item.path("id").asText("");
+                if (id.isBlank() && item.isTextual()) {
+                    id = item.asText();
+                }
+                if (id.isBlank()) {
+                    continue;
+                }
+                Integer context = firstPositiveInt(item,
+                        "context_length", "context_window", "max_model_len", "max_context",
+                        "contextLength", "contextWindow");
+                if (context == null) {
+                    context = firstPositiveInt(item.path("top_provider"), "context_length", "max_model_len");
+                }
+                if (context == null) {
+                    context = firstPositiveInt(item.path("meta"), "context_length", "context_window");
+                }
+                Integer maxOutput = firstPositiveInt(item,
+                        "max_completion_tokens", "max_output_tokens", "max_tokens",
+                        "maxOutputTokens", "max_output");
+                if (maxOutput == null) {
+                    maxOutput = firstPositiveInt(item.path("top_provider"),
+                            "max_completion_tokens", "max_output_tokens");
+                }
+                specs.putIfAbsent(id, new UpstreamModelSpec(id, context, maxOutput));
+            }
+            return specs.values().stream()
+                    .sorted(Comparator.comparing(UpstreamModelSpec::modelCode, Comparator.naturalOrder()))
+                    .toList();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "解析上游模型列表失败");
+        }
+    }
+
+    private Map<String, UpstreamModelSpec> indexSpecs(List<UpstreamModelSpec> specs) {
+        Map<String, UpstreamModelSpec> index = new LinkedHashMap<>();
+        for (UpstreamModelSpec spec : specs) {
+            index.put(spec.modelCode().toLowerCase(Locale.ROOT), spec);
+        }
+        return index;
+    }
+
+    private int syncLimitsFromUpstream(Long providerId, Map<String, UpstreamModelSpec> specs) {
+        int updated = 0;
+        for (PlatformModel model : modelRepository.listByProvider(providerId)) {
+            if (model.getModelCode() == null || model.getId() == null) {
+                continue;
+            }
+            Integer previousContext = model.getContextWindow();
+            Integer previousMaxOutput = model.getMaxOutputTokens();
+            applyUpstreamLimits(model, specs.get(model.getModelCode().toLowerCase(Locale.ROOT)));
+            if (Objects.equals(previousContext, model.getContextWindow())
+                    && Objects.equals(previousMaxOutput, model.getMaxOutputTokens())) {
+                continue;
+            }
+            modelRepository.updateLimits(model.getId(), model.getContextWindow(), model.getMaxOutputTokens());
+            updated++;
+        }
+        return updated;
+    }
+
+    private void applyUpstreamLimits(PlatformModel model, UpstreamModelSpec spec) {
+        model.setContextWindow(spec == null ? null : positiveOrNull(spec.contextWindow()));
+        model.setMaxOutputTokens(spec == null ? null : positiveOrNull(spec.maxOutputTokens()));
+    }
+
+    private Integer positiveOrNull(Integer value) {
+        return value != null && value > 0 ? value : null;
+    }
+
+    private Integer firstPositiveInt(JsonNode node, String... fieldNames) {
+        if (node == null || node.isMissingNode() || node.isNull() || !node.isObject()) {
+            return null;
+        }
+        for (String fieldName : fieldNames) {
+            JsonNode value = node.get(fieldName);
+            if (value == null || value.isNull()) {
+                continue;
+            }
+            if (value.isNumber()) {
+                int number = value.asInt();
+                if (number > 0) {
+                    return number;
+                }
+            } else if (value.isTextual()) {
+                try {
+                    int number = Integer.parseInt(value.asText().trim());
+                    if (number > 0) {
+                        return number;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // ignore non-numeric metadata
+                }
+            }
+        }
+        return null;
+    }
+
+    private record UpstreamModelSpec(String modelCode, Integer contextWindow, Integer maxOutputTokens) {}
 
     private PlatformProvider requireProvider(Long id) {
         return providerRepository.findById(id)

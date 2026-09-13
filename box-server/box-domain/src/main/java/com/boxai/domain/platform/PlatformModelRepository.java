@@ -13,7 +13,19 @@ public interface PlatformModelRepository {
 
     Optional<PlatformModel> findById(Long id);
 
+    Optional<PlatformModel> findByProviderAndCode(Long providerId, String modelCode);
+
+    Optional<PlatformModel> findByProviderAndCodeIncludingDeleted(Long providerId, String modelCode);
+
+    void restore(Long id);
+
     List<PlatformModel> listActive();
 
     List<PlatformModel> listAll();
+
+    List<PlatformModel> listByProvider(Long providerId);
+
+    void updateLimits(Long id, Integer contextWindow, Integer maxOutputTokens);
+
+    void deleteByProvider(Long providerId);
 }

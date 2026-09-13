@@ -13,5 +13,7 @@ public interface PlatformProviderRepository {
 
     Optional<PlatformProvider> findById(Long id);
 
+    Optional<PlatformProvider> findByCode(String providerCode);
+
     List<PlatformProvider> listAll();
 }

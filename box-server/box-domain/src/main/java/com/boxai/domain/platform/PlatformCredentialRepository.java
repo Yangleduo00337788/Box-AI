@@ -19,5 +19,7 @@ public interface PlatformCredentialRepository {
 
     List<PlatformCredential> listByProvider(Long providerId);
 
+    void deleteByProvider(Long providerId);
+
     void touchLastUsed(Long id);
 }

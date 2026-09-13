@@ -53,6 +53,16 @@ public class PlatformProviderRepositoryImpl implements PlatformProviderRepositor
     }
 
     @Override
+    public Optional<PlatformProvider> findByCode(String providerCode) {
+        if (providerCode == null || providerCode.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(mapper.selectOneByQuery(
+                        QueryWrapper.create().eq("provider_code", providerCode.trim())))
+                .map(this::toDomain);
+    }
+
+    @Override
     public List<PlatformProvider> listAll() {
         return mapper.selectListByQuery(QueryWrapper.create().orderBy("id", true))
                 .stream().map(this::toDomain).toList();

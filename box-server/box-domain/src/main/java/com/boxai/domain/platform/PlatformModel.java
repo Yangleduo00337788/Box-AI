@@ -20,6 +20,7 @@ public class PlatformModel {
     private Integer maxOutputTokens;
     private Integer sortOrder;
     private Integer status;
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
