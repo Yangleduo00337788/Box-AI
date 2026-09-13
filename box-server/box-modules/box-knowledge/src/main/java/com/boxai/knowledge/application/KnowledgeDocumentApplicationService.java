@@ -13,6 +13,7 @@ import com.boxai.domain.storage.ObjectStorage;
 import com.boxai.knowledge.api.KnowledgeChunkVO;
 import com.boxai.knowledge.api.KnowledgeDocumentVO;
 import com.boxai.knowledge.support.DocumentTextExtractor;
+import com.boxai.common.security.FileSafetyPolicy;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.security.notification.NotificationPublisher;
 import com.boxai.security.permission.WorkspacePermissionService;
@@ -93,7 +94,15 @@ public class KnowledgeDocumentApplicationService {
         }
         KnowledgeBase kb = knowledgeBaseApplicationService.requireKnowledgeBase(knowledgeBaseId);
         Long userId = WorkspaceContext.require().userId();
-        String originalName = file.getOriginalFilename() == null ? "document.txt" : file.getOriginalFilename();
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "读取上传文件失败");
+        }
+        String originalName = FileSafetyPolicy.sanitizeFileName(
+                file.getOriginalFilename() == null ? "document.txt" : file.getOriginalFilename());
+        FileSafetyPolicy.validate(originalName, file.getContentType(), file.getSize(), bytes);
         String fileType = resolveFileType(originalName);
 
         KnowledgeDocument document = new KnowledgeDocument();
@@ -113,9 +122,8 @@ public class KnowledgeDocumentApplicationService {
         String storageKey = "knowledge/" + kb.getId() + "/" + document.getId() + "/" + originalName;
         document.setStorageKey(storageKey);
         try {
-            byte[] bytes = file.getBytes();
             document.setMd5(md5(bytes));
-            objectStorage.put(storageBucket, storageKey, file.getInputStream(), file.getSize(), file.getContentType());
+            objectStorage.put(storageBucket, storageKey, new java.io.ByteArrayInputStream(bytes), bytes.length, file.getContentType());
             document.setStatus("PARSING");
             knowledgeDocumentRepository.update(document);
             String text = documentTextExtractor.extract(bytes, originalName);

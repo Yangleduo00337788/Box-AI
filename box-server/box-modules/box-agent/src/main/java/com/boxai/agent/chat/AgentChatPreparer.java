@@ -18,6 +18,7 @@ import com.boxai.domain.model.ModelProvider;
 import com.boxai.domain.model.ModelProviderRepository;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.model.platform.ResolvedPlatformModel;
+import com.boxai.common.security.PromptInjectionGuard;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.agent.application.AgentLongTermMemoryApplicationService;
 import com.boxai.knowledge.application.KnowledgeRetrievalResult;
@@ -199,7 +200,8 @@ public class AgentChatPreparer {
             KnowledgeRetrievalResult retrieval = knowledgeRetrievalService.retrieve(draft.getId(), userMessage);
             String ragContext = retrieval.context();
             if (ragContext != null && !ragContext.isBlank()) {
-                String ragBlock = "以下是与用户问题相关的知识库内容，请优先参考，并在回答中标注引用编号：\n" + ragContext;
+                String ragBlock = "以下是与用户问题相关的知识库内容，请优先参考，并在回答中标注引用编号：\n"
+                        + PromptInjectionGuard.wrapUntrustedContext("knowledge", ragContext);
                 systemPrompt = systemPrompt == null || systemPrompt.isBlank()
                         ? ragBlock
                         : systemPrompt + "\n\n" + ragBlock;
@@ -208,12 +210,15 @@ public class AgentChatPreparer {
         if (Boolean.TRUE.equals(draft.getLongTermMemoryEnabled())) {
             String memoryContext = longTermMemoryApplicationService.buildContext(draft, agentId, userMessage);
             if (memoryContext != null && !memoryContext.isBlank()) {
-                String memoryBlock = "以下是关于该用户的长期记忆，可在回答时参考：\n" + memoryContext;
+                String memoryBlock = "以下是关于该用户的长期记忆，可在回答时参考：\n"
+                        + PromptInjectionGuard.wrapUntrustedContext("memory", memoryContext);
                 systemPrompt = systemPrompt == null || systemPrompt.isBlank()
                         ? memoryBlock
                         : systemPrompt + "\n\n" + memoryBlock;
             }
         }
+        String policy = PromptInjectionGuard.systemPolicy();
+        systemPrompt = systemPrompt == null || systemPrompt.isBlank() ? policy : policy + "\n\n" + systemPrompt;
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             turns.add(new ChatTurn("SYSTEM", systemPrompt));
         }
@@ -228,7 +233,7 @@ public class AgentChatPreparer {
                 }
             }
         }
-        turns.add(new ChatTurn("USER", userMessage.trim()));
+        turns.add(new ChatTurn("USER", PromptInjectionGuard.wrapUserMessage(userMessage)));
         return turns;
     }
 
