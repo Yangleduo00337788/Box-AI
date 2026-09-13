@@ -17,6 +17,7 @@
           <template #icon><t-icon name="rollfront" /></template>
           重做
         </t-button>
+        <t-button variant="outline" @click="onAutoLayout">自动布局</t-button>
         <span v-if="autoSaveStatusLabel" class="autosave-status" :class="`autosave-status--${autoSaveStatus}`">
           {{ autoSaveStatusLabel }}
         </span>
@@ -163,6 +164,7 @@ const canvasRef = ref<{
   getDefinitionJson: () => string
   handleUndo: () => boolean
   handleRedo: () => boolean
+  autoLayout: () => void
   canUndo: { value: boolean }
   canRedo: { value: boolean }
   autoSave: { status: { value: string }; cancelAutoSave: () => void }
@@ -231,6 +233,11 @@ function onRedo() {
   if (canvasRef.value?.handleRedo()) {
     MessagePlugin.info('已重做')
   }
+}
+
+function onAutoLayout() {
+  canvasRef.value?.autoLayout()
+  MessagePlugin.success('已按层级整理节点')
 }
 
 async function load() {

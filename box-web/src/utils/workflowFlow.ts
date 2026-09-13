@@ -176,3 +176,68 @@ export function createFlowNode(type: string, label: string, position: { x: numbe
     data: { label, nodeType: type, config },
   }
 }
+
+export function autoLayoutFlow<T extends { id: string; position: { x: number; y: number } }>(
+  nodes: T[],
+  edges: Array<{ source: string; target: string }>,
+  options?: { columnWidth?: number; rowHeight?: number; originX?: number; originY?: number },
+): T[] {
+  if (!nodes.length) {
+    return nodes
+  }
+  const columnWidth = options?.columnWidth ?? 280
+  const rowHeight = options?.rowHeight ?? 140
+  const originX = options?.originX ?? 80
+  const originY = options?.originY ?? 80
+  const incoming = new Map<string, number>()
+  const outgoing = new Map<string, string[]>()
+  for (const node of nodes) {
+    incoming.set(node.id, 0)
+    outgoing.set(node.id, [])
+  }
+  for (const edge of edges) {
+    if (!incoming.has(edge.target) || !outgoing.has(edge.source)) {
+      continue
+    }
+    incoming.set(edge.target, (incoming.get(edge.target) || 0) + 1)
+    outgoing.get(edge.source)!.push(edge.target)
+  }
+  const layer = new Map<string, number>()
+  const queue = nodes.filter((node) => (incoming.get(node.id) || 0) === 0).map((node) => node.id)
+  for (const id of queue) {
+    layer.set(id, 0)
+  }
+  while (queue.length) {
+    const id = queue.shift()!
+    const current = layer.get(id) || 0
+    for (const next of outgoing.get(id) || []) {
+      layer.set(next, Math.max(layer.get(next) || 0, current + 1))
+      const remain = (incoming.get(next) || 1) - 1
+      incoming.set(next, remain)
+      if (remain === 0) {
+        queue.push(next)
+      }
+    }
+  }
+  const columns = new Map<number, string[]>()
+  for (const node of nodes) {
+    const index = layer.get(node.id) ?? 0
+    const column = columns.get(index) || []
+    column.push(node.id)
+    columns.set(index, column)
+  }
+  const positionById = new Map<string, { x: number; y: number }>()
+  for (const [index, ids] of columns.entries()) {
+    ids.forEach((id, row) => {
+      positionById.set(id, {
+        x: originX + index * columnWidth,
+        y: originY + row * rowHeight,
+      })
+    })
+  }
+  return nodes.map((node) => {
+    const position = positionById.get(node.id) || node.position
+    return { ...node, position }
+  })
+}
+

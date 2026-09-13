@@ -317,7 +317,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, markRaw, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, markRaw, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
   VueFlow,
@@ -341,6 +341,7 @@ import {
   definitionToFlow,
   flowToDefinition,
   PALETTE_ITEMS,
+  autoLayoutFlow,
   type WorkflowNodeData,
 } from '@/utils/workflowFlow'
 import { listAgents, type AgentVO } from '@/api/agent'
@@ -366,7 +367,7 @@ const selectedEdge = ref<Edge | null>(null)
 const draggedPalette = ref<{ type: string; label: string } | null>(null)
 const isDraggingNode = ref(false)
 
-const { screenToFlowCoordinate, onConnect, getSelectedNodes, getSelectedEdges } = useVueFlow()
+const { screenToFlowCoordinate, onConnect, getSelectedNodes, getSelectedEdges, fitView } = useVueFlow()
 
 const { recordBeforeChange, resetHistory, undo, redo, canUndo, canRedo } = useWorkflowEditorHistory(nodes, edges)
 
@@ -871,6 +872,14 @@ function handleRedo() {
   return true
 }
 
+function autoLayout() {
+  recordBeforeChange()
+  nodes.value = autoLayoutFlow(nodes.value, edges.value)
+  clearSelection()
+  autoSave.scheduleAutoSave()
+  void nextTick(() => fitView({ padding: 0.2 }))
+}
+
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false
   const tag = target.tagName
@@ -953,6 +962,7 @@ defineExpose({
   getDefinitionJson,
   handleUndo,
   handleRedo,
+  autoLayout,
   canUndo,
   canRedo,
   autoSave,
