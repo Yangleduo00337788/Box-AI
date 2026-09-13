@@ -13,16 +13,12 @@
     <template #sidebar-nav>
       <consumer-sidebar-workspace :active="active" />
     </template>
-    <template #footer-extra="{ collapsed }">
-      <div v-if="!collapsed" class="app-layout__notifications">
-        <notification-center />
-      </div>
-    </template>
     <template #sidebar-footer="{ collapsed, userName: slotUserName, avatarText }">
       <consumer-sidebar-footer
         :collapsed="collapsed"
         :user-name="slotUserName"
         :avatar-text="avatarText"
+        :avatar-url="auth.user?.avatarUrl"
         @logout="onLogout"
       />
     </template>
@@ -41,7 +37,6 @@ import ConsumerSidebarFooter from '@/components/ConsumerSidebarFooter.vue'
 import ConsumerSidebarWorkspace from '@/components/ConsumerSidebarWorkspace.vue'
 import CreateAgentDialog from '@/components/CreateAgentDialog.vue'
 import GlobalSearchDialog from '@/components/GlobalSearchDialog.vue'
-import NotificationCenter from '@/components/NotificationCenter.vue'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
 import { loadAppPreferencesFromServer } from '@/composables/useAppPreferences'
@@ -118,11 +113,3 @@ watch(
   },
 )
 </script>
-
-<style scoped>
-.app-layout__notifications {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 12px 8px;
-}
-</style>

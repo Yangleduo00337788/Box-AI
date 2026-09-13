@@ -1,15 +1,23 @@
 <template>
   <div>
-    <page-header title="分析" desc="查看工作空间内的智能体、对话与资源使用情况">
+    <page-header v-if="!compact" title="分析" desc="查看工作空间内的智能体、对话与资源使用情况">
       <template #actions>
         <t-radio-group v-model="periodDays" variant="default-filled" size="small" @change="loadData">
           <t-radio-button :value="1">今天</t-radio-button>
           <t-radio-button :value="7">7 天</t-radio-button>
           <t-radio-button :value="30">30 天</t-radio-button>
         </t-radio-group>
-        <t-button variant="outline" @click="router.push('/executions')">查看执行记录</t-button>
+        <t-button variant="outline" @click="onViewExecutions">查看执行记录</t-button>
       </template>
     </page-header>
+    <div v-else class="dialog-toolbar">
+      <t-radio-group v-model="periodDays" variant="default-filled" size="small" @change="loadData">
+        <t-radio-button :value="1">今天</t-radio-button>
+        <t-radio-button :value="7">7 天</t-radio-button>
+        <t-radio-button :value="30">30 天</t-radio-button>
+      </t-radio-group>
+      <t-button variant="outline" @click="onViewExecutions">查看执行记录</t-button>
+    </div>
 
     <t-loading :loading="loading" size="small">
       <div v-if="overview" class="stats-grid">
@@ -80,6 +88,10 @@ import {
 } from '@/api/analytics'
 
 const router = useRouter()
+const props = defineProps<{ compact?: boolean }>()
+const emit = defineEmits<{
+  'view-executions': []
+}>()
 const loading = ref(false)
 const overview = ref<AnalyticsOverviewVO | null>(null)
 const trends = ref<AnalyticsTrendsVO | null>(null)
@@ -153,6 +165,14 @@ const topAgentColumns = [
 function formatDateLabel(date: string) {
   const parts = date.split('-')
   return parts.length === 3 ? `${parts[1]}/${parts[2]}` : date
+}
+
+function onViewExecutions() {
+  if (props.compact) {
+    emit('view-executions')
+    return
+  }
+  router.push('/executions')
 }
 
 function renderCharts() {
@@ -229,7 +249,15 @@ watch(periodDays, () => {
   loadData()
 })
 
-onMounted(loadData)
+onMounted(async () => {
+  await loadData()
+  window.setTimeout(() => {
+    executionChart?.resize()
+    successChart?.resize()
+    latencyChart?.resize()
+    topAgentsChart?.resize()
+  }, 80)
+})
 
 onBeforeUnmount(() => {
   executionChart?.dispose()
@@ -325,6 +353,13 @@ onBeforeUnmount(() => {
   margin: 8px 0 0;
   font-size: 12px;
   color: var(--box-muted);
+}
+
+.dialog-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 @media (max-width: 960px) {

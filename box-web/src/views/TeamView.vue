@@ -1,6 +1,7 @@
 <template>
   <div class="team-page">
     <page-header
+      v-if="!compact"
       title="团队"
       :desc="isEnterprise ? '管理企业租户成员，邀请同事加入协作。' : '个人版账号无需团队管理。'"
     />
@@ -88,6 +89,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+defineProps<{ compact?: boolean }>()
 const members = ref<TenantMemberVO[]>([])
 const loading = ref(false)
 const adding = ref(false)

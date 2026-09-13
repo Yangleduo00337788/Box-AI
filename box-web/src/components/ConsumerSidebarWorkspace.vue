@@ -103,7 +103,13 @@
               class="sidebar-line sidebar-line--item"
               @click="onPinnedItemClick(item)"
             >
-              <t-avatar size="20px" shape="circle" class="sidebar-line__avatar" :style="{ background: item.color }">
+              <t-avatar
+                size="20px"
+                shape="circle"
+                class="sidebar-line__avatar"
+                :image="item.avatarUrl || undefined"
+                :style="{ background: item.color }"
+              >
                 {{ item.avatarText }}
               </t-avatar>
               <span class="sidebar-line__label">{{ item.label }}</span>
@@ -159,6 +165,7 @@
                 size="20px"
                 shape="circle"
                 class="sidebar-line__avatar"
+                :image="agent.avatarUrl || undefined"
                 :style="{ background: getAvatarColor(agent.name) }"
               >
                 {{ agent.name.slice(0, 1) }}
@@ -352,6 +359,7 @@ interface PinnedSidebarItem {
   key: string
   label: string
   avatarText: string
+  avatarUrl?: string
   color: string
   meta: string
   to: string
@@ -369,6 +377,7 @@ const pinnedItems = computed<PinnedSidebarItem[]>(() => {
       key: `agent-${id}`,
       label: agent.name,
       avatarText: agent.name.slice(0, 1),
+      avatarUrl: agent.avatarUrl,
       color: getAvatarColor(agent.name),
       meta: formatRelativeTime(agent.updatedAt),
       to: '/chat',

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <page-header title="执行记录" desc="查看 Agent 与 Workflow 的运行历史、耗时与 Trace 详情" />
+    <page-header v-if="!compact" title="执行记录" desc="查看 Agent 与 Workflow 的运行历史、耗时与 Trace 详情" />
 
     <t-loading :loading="loading" size="small">
       <t-table
@@ -30,7 +30,7 @@
       </t-table>
     </t-loading>
 
-    <t-drawer v-model:visible="detailVisible" header="执行详情" size="480px" :footer="false">
+    <t-drawer v-model:visible="detailVisible" attach="body" header="执行详情" size="480px" :footer="false">
       <template v-if="detail">
         <t-descriptions :column="1" bordered>
           <t-descriptions-item label="编号">{{ detail.executionNo }}</t-descriptions-item>
@@ -83,6 +83,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { extractApiError } from '@/api/apiError'
 import { getExecution, getExecutionTrace, listExecutions, type ExecutionVO, type TraceSpanVO } from '@/api/execution'
 
+defineProps<{ compact?: boolean }>()
 const loading = ref(false)
 const executions = ref<ExecutionVO[]>([])
 const detailVisible = ref(false)

@@ -381,15 +381,13 @@ function onSearch() {
   overflow-x: hidden;
   overflow-y: auto;
   padding: 8px;
+  scrollbar-width: none;
 }
 
 .sidebar-nav::-webkit-scrollbar {
-  width: 4px;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb {
-  border-radius: 4px;
-  background: var(--td-scrollbar-color);
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .nav-group {

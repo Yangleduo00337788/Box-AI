@@ -1,6 +1,6 @@
 <template>
   <div>
-    <page-header title="概览" desc="Box 工作台 · 创建、编排、调试并发布 AI Agent">
+    <page-header v-if="!compact" title="概览" desc="Box 工作台 · 创建、编排、调试并发布 AI Agent">
       <template #actions>
         <t-radio-group v-model="periodDays" variant="default-filled" size="small" @change="loadOverview">
           <t-radio-button :value="1">今天</t-radio-button>
@@ -9,6 +9,13 @@
         </t-radio-group>
       </template>
     </page-header>
+    <div v-else class="dialog-toolbar">
+      <t-radio-group v-model="periodDays" variant="default-filled" size="small" @change="loadOverview">
+        <t-radio-button :value="1">今天</t-radio-button>
+        <t-radio-button :value="7">7 天</t-radio-button>
+        <t-radio-button :value="30">30 天</t-radio-button>
+      </t-radio-group>
+    </div>
 
     <t-loading :loading="loading" size="small">
       <div v-if="overview" class="stats-grid">
@@ -91,6 +98,7 @@ import { fetchAnalyticsOverview, type AnalyticsOverviewVO } from '@/api/analytic
 
 const router = useRouter()
 const { openCreateAgentDialog } = useCreateAgentDialog()
+defineProps<{ compact?: boolean }>()
 const loading = ref(false)
 const overview = ref<AnalyticsOverviewVO | null>(null)
 const periodDays = ref(7)
@@ -218,6 +226,12 @@ onMounted(loadOverview)
   margin: 0 0 16px;
   font: var(--td-font-body-medium);
   color: var(--box-muted);
+}
+
+.dialog-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
 }
 
 @media (max-width: 960px) {

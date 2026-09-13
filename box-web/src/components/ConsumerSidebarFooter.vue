@@ -5,18 +5,30 @@
         v-model:visible="menuVisible"
         placement="top-left"
         trigger="click"
-        :overlay-inner-style="{ padding: 0 }"
-        destroy-on-close
+        :overlay-inner-style="{ padding: 0, maxHeight: 'none', overflow: 'visible' }"
       >
         <button type="button" class="user-pill">
-          <t-avatar size="28px" shape="circle" class="user-pill__avatar">{{ avatarText }}</t-avatar>
+          <t-avatar
+            size="28px"
+            shape="circle"
+            class="user-pill__avatar"
+            :image="avatarUrl || undefined"
+          >
+            {{ avatarText }}
+          </t-avatar>
           <span v-if="!collapsed" class="user-pill__name">{{ userName }}</span>
         </button>
 
         <template #content>
           <div class="user-menu">
             <div class="user-menu__head">
-              <t-avatar size="40px" shape="circle">{{ avatarText }}</t-avatar>
+              <image-picker
+                :model-value="avatarUrl"
+                :fallback-text="avatarText"
+                hint="更换头像"
+                size="40px"
+                persist="avatar"
+              />
               <span class="user-menu__name">{{ userName }}</span>
             </div>
 
@@ -26,11 +38,11 @@
             </button>
 
             <div class="user-menu__section">
-              <button type="button" class="user-menu__item" @click="go('/dashboard')">
+              <button type="button" class="user-menu__item" @click="openDialog('overview')">
                 <t-icon name="dashboard" />
                 <span>概览</span>
               </button>
-              <button type="button" class="user-menu__item" @click="go('/analytics')">
+              <button type="button" class="user-menu__item" @click="openDialog('analytics')">
                 <t-icon name="chart" />
                 <span>分析</span>
               </button>
@@ -38,10 +50,33 @@
                 <t-icon name="setting" />
                 <span>设置</span>
               </button>
-              <button v-if="isEnterprise" type="button" class="user-menu__item" @click="go('/team')">
+              <button v-if="isEnterprise" type="button" class="user-menu__item" @click="openDialog('team')">
                 <t-icon name="usergroup" />
                 <span>团队</span>
               </button>
+              <t-popup
+                v-model:visible="inboxHover"
+                trigger="hover"
+                placement="right-top"
+                :delay="[120, 180]"
+                :z-index="5600"
+                :overlay-inner-style="{ padding: 0, maxHeight: 'none', overflow: 'visible', boxShadow: '0 8px 24px rgba(0,0,0,.12)', borderRadius: '12px' }"
+              >
+                <button type="button" class="user-menu__item">
+                  <t-icon name="mail" />
+                  <span>站内信</span>
+                  <t-badge
+                    v-if="unreadCount"
+                    :count="unreadCount"
+                    :max-count="99"
+                    class="user-menu__badge"
+                  />
+                  <t-icon name="chevron-right" class="user-menu__chevron" />
+                </button>
+                <template #content>
+                  <notification-center :active="inboxHover" @unread-change="unreadCount = $event" />
+                </template>
+              </t-popup>
             </div>
 
             <div class="user-menu__section">
@@ -61,26 +96,74 @@
           </div>
         </template>
       </t-popup>
-
-      <div v-if="!collapsed" class="consumer-footer__actions">
-        <t-tooltip content="设置" placement="top" theme="light" :show-arrow="false">
-          <button type="button" class="footer-icon-btn" @click="go('/settings/profile')">
-            <t-icon name="setting" />
-          </button>
-        </t-tooltip>
-      </div>
     </div>
 
     <create-workspace-dialog v-model:visible="workspaceDialogVisible" />
     <help-feedback-dialog v-model:visible="helpDialogVisible" />
+
+    <t-dialog
+      v-model:visible="overviewVisible"
+      attach="body"
+      header="概览"
+      :footer="false"
+      width="960px"
+      placement="center"
+    >
+      <dashboard-view v-if="overviewVisible" compact />
+    </t-dialog>
+    <t-dialog
+      v-model:visible="analyticsVisible"
+      attach="body"
+      :footer="false"
+      width="1080px"
+      placement="center"
+      @close="analyticsPane = 'analytics'"
+    >
+      <template #header>
+        <div class="analytics-dialog__header">
+          <t-button
+            v-if="analyticsPane === 'executions'"
+            variant="text"
+            size="small"
+            @click="analyticsPane = 'analytics'"
+          >
+            返回分析
+          </t-button>
+          <span>{{ analyticsPane === 'executions' ? '执行记录' : '分析' }}</span>
+        </div>
+      </template>
+      <analytics-view
+        v-if="analyticsVisible && analyticsPane === 'analytics'"
+        compact
+        @view-executions="analyticsPane = 'executions'"
+      />
+      <executions-view v-else-if="analyticsVisible" compact />
+    </t-dialog>
+    <t-dialog
+      v-model:visible="teamVisible"
+      attach="body"
+      header="团队"
+      :footer="false"
+      width="960px"
+      placement="center"
+    >
+      <team-view v-if="teamVisible" compact />
+    </t-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import AnalyticsView from '@/views/AnalyticsView.vue'
 import CreateWorkspaceDialog from '@/components/CreateWorkspaceDialog.vue'
+import DashboardView from '@/views/DashboardView.vue'
+import ExecutionsView from '@/views/ExecutionsView.vue'
 import HelpFeedbackDialog from '@/components/HelpFeedbackDialog.vue'
+import ImagePicker from '@/components/ImagePicker.vue'
+import NotificationCenter from '@/components/NotificationCenter.vue'
+import TeamView from '@/views/TeamView.vue'
+import { getUnreadNotificationCount } from '@/api/notification'
 import { useAuthStore } from '@/stores/auth'
 
 defineProps<{
@@ -88,6 +171,7 @@ defineProps<{
   userName: string
   userHint?: string
   avatarText: string
+  avatarUrl?: string
 }>()
 
 const emit = defineEmits<{
@@ -101,10 +185,26 @@ const isEnterprise = computed(() => auth.tenant?.tenantType === 'ENTERPRISE')
 const menuVisible = ref(false)
 const workspaceDialogVisible = ref(false)
 const helpDialogVisible = ref(false)
+const overviewVisible = ref(false)
+const analyticsVisible = ref(false)
+const teamVisible = ref(false)
+const inboxHover = ref(false)
+const unreadCount = ref(0)
+const analyticsPane = ref<'analytics' | 'executions'>('analytics')
 
 function go(path: string) {
   menuVisible.value = false
   router.push(path)
+}
+
+function openDialog(name: 'overview' | 'analytics' | 'team') {
+  menuVisible.value = false
+  overviewVisible.value = name === 'overview'
+  analyticsVisible.value = name === 'analytics'
+  teamVisible.value = name === 'team'
+  if (name === 'analytics') {
+    analyticsPane.value = 'analytics'
+  }
 }
 
 function onLogout() {
@@ -122,6 +222,21 @@ function onCreateWorkspace() {
   workspaceDialogVisible.value = true
 }
 
+async function refreshUnread() {
+  const { data } = await getUnreadNotificationCount()
+  unreadCount.value = data.data?.count || 0
+}
+
+let unreadTimer: ReturnType<typeof setInterval> | undefined
+
+onMounted(() => {
+  refreshUnread()
+  unreadTimer = setInterval(refreshUnread, 60_000)
+})
+
+onUnmounted(() => {
+  if (unreadTimer) clearInterval(unreadTimer)
+})
 </script>
 
 <style scoped>
@@ -180,38 +295,12 @@ function onCreateWorkspace() {
   color: var(--box-ink);
 }
 
-.consumer-footer__actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.footer-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #646a73;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-
-.footer-icon-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: #1f2329;
-}
-
 .user-menu {
   width: 260px;
   padding: 12px 0 8px;
   border-radius: 12px;
   background: #fff;
+  overflow: visible;
 }
 
 .user-menu__head {
@@ -283,8 +372,32 @@ function onCreateWorkspace() {
 }
 
 .user-menu__chevron {
-  margin-left: auto;
   font-size: 14px;
   color: #b0b4bc;
+}
+
+.user-menu :deep(.t-popup) {
+  display: block;
+  width: 100%;
+}
+
+.user-menu__item .user-menu__chevron:last-child {
+  margin-left: auto;
+}
+
+.user-menu__badge {
+  margin-left: auto;
+}
+
+.user-menu__badge + .user-menu__chevron {
+  margin-left: 0;
+}
+
+.analytics-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
 }
 </style>
