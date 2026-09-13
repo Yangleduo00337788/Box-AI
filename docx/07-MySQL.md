@@ -70,8 +70,8 @@ knowledge_document
 workflow
 workflow_version
 conversation
-conversation_message
-agent_execution
+message
+execution
 trace_span
 
 ---
@@ -1108,50 +1108,41 @@ CREATE TABLE conversation (
 
 ---
 
-三十二、Conversation Message
+三十二、Message
 
-这是高增长表。
+**实际表名 `message`**（`V4__conversation.sql`）。
 
-CREATE TABLE conversation_message (
+CREATE TABLE message (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 
-    message_id VARCHAR(64) NOT NULL,
-
     conversation_id BIGINT UNSIGNED NOT NULL,
+    workspace_id BIGINT UNSIGNED NOT NULL,
 
-    role VARCHAR(32) NOT NULL,
+    role VARCHAR(32) NOT NULL COMMENT 'SYSTEM/USER/ASSISTANT/TOOL',
 
     content LONGTEXT NULL,
 
     content_type VARCHAR(32) NOT NULL DEFAULT 'TEXT',
 
-    tool_calls JSON NULL,
-
-    citations JSON NULL,
-
-    attachments JSON NULL,
+    sequence_no INT NOT NULL,
 
     token_count INT NULL,
-
-    sequence_no INT NOT NULL,
+    model_id BIGINT UNSIGNED NULL,
+    metadata JSON NULL,
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (id),
 
-    UNIQUE KEY uk_message_id (
-        message_id
-    ),
-
-    KEY idx_conversation_sequence (
+    UNIQUE KEY uk_conversation_sequence (
         conversation_id,
         sequence_no
     ),
 
-    KEY idx_created_at (
-        created_at
-    )
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    KEY idx_conversation_id (conversation_id),
+    KEY idx_workspace_id (workspace_id),
+    KEY idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息';
 
 ---
 
@@ -1597,7 +1588,7 @@ Agent Execution
 22. workflow_version
 
 23. conversation
-24. conversation_message
+24. message
 
 25. agent_execution
 26. workflow_execution
@@ -1906,7 +1897,7 @@ trace_id
 
 agent_execution
 trace_span
-conversation_message
+message
 audit_log
 
 都是高增长表。
@@ -2002,7 +1993,7 @@ model_credential
     ↓
 conversation
     ↓
-conversation_message
+message
     ↓
 agent_execution
     ↓

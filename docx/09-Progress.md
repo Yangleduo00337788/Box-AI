@@ -1,6 +1,6 @@
 # Box V1 进度追踪
 
-文档版本：V1.5 · 整体完成度：**~95%**
+文档版本：V1.6 · 整体完成度：**~95%**
 
 > 未完成项与执行顺序见 [`10-Gaps.md`](./10-Gaps.md)。本文档反映代码库真实状态，不再使用「100%」表述。
 
@@ -10,7 +10,7 @@
 
 | 维度 | 完成度 | 说明 |
 |------|--------|------|
-| 文档规划 | ~96% | PRD / 架构 / 后端 / Runtime / 数据库 / 品牌；docker-compose 含 app profile |
+| 文档规划 | ~98% | 与代码库对齐：模块/路由/表名/Docker/SSE（2026-09 文档修订） |
 | 后端实现 | ~96% | OAuth stub、Embed 配置 API、Docker 镜像 |
 | 前端实现 | ~94% | Embed 定制、模板向导、Workflow 1920 布局 |
 | V1 可演示 | ~98% | **P0/P1/P2 主清单已全部完成** |
@@ -222,13 +222,33 @@
 | 分析 | `/analytics` | ✅ | ECharts 趋势图 + Top Agents 柱状图 |
 | 市场 | `/market` | ✅ | |
 | 团队 | `/team` | ✅ | 需 `member:manage` |
-| 设置 | `/settings/*` | ✅ | API 密钥 / 角色 / 审计日志等，按权限显隐 |
-| 审计日志 | `/settings/audit-logs` | ✅ | 需 `audit:read` |
+| 设置 · 个人信息 | `/settings/profile` | ✅ | |
+| 设置 · 外观 | `/settings/appearance` | ✅ | |
+| 设置 · 通用 | `/settings/general` | ✅ | |
+| 设置 · 账号与安全 | `/settings/security` | ✅ | |
+| 设置 · API 密钥 | `/settings/api-keys` | ✅ | 需 `api_key:manage` |
+| 设置 · 角色与权限 | `/settings/roles` | ✅ | 需 `role:manage` |
+| 设置 · 审计日志 | `/settings/audit-logs` | ✅ | 需 `audit:read` |
+| 设置 · 额度管理 | `/settings/quota` | ✅ | `box-tenant` |
+| 设置 · 账单概览 | `/settings/billing` | ✅ | `box-tenant` |
+| 设置 · 容量管理 | `/settings/capacity` | ✅ | |
+| 设置 · 关于 / 协议 | `/settings/about`、`/settings/legal` | ✅ | |
 | 无权限 | `/forbidden` | ✅ | |
 | 嵌入对话 | `/embed/agents/:id` | ✅ | 公开页 |
-| 管理后台 | `box-admin-web` | ✅ | 独立应用 |
+| 忘记密码 | `/forgot-password` | ✅ | 公开页 |
 
-已废弃或重定向：`/conversations`、`/chat/logs` → `/chat`
+**管理后台 `box-admin-web`**（独立 Vite 应用，默认 `/tenants`）：
+
+| 页面 | 路由 | 备注 |
+|------|------|------|
+| 租户管理 | `/tenants` | 租户创建、启停、成员 |
+| 套餐管理 | `/plans` | 套餐与配额 |
+| 平台模型池 | `/platform-models` | 平台级模型与密钥 |
+| 智能体市场 | `/agent-templates` | C 端模板上架 |
+| 插件市场 | `/plugin-catalog` | 插件分类与上架 |
+| 系统配置 | `/system-config` | 关于、协议、客服 |
+
+已废弃或重定向：`/conversations`、`/chat/logs`、`/agents` → `/chat`
 
 ---
 
@@ -257,7 +277,34 @@
 | MinIO | ✅ 文档存储 |
 | LangChain4j | ✅ Chat + Embedding + Tool |
 
-> `docker-compose` 仅起基础设施；`box-server` / `box-web` 本地启动（见 `03-Architecture.md`）。
+> **Docker Compose**（`deploy/docker-compose.yml`）：默认 `docker compose up -d` 起 MySQL / Redis / ES / MinIO；`docker compose --profile app up -d --build` 额外起 `box-server`（8080）。`box-web` / `box-admin-web` 仍本地 `npm run dev`（Vite 代理 `/api`）。
+
+---
+
+## 工程结构（已实现）
+
+| 工程 | 说明 |
+|------|------|
+| `box-server` | 后端 Modular Monolith，`BoxApplication` 启动 |
+| `box-web` | C 端 Vue 3 + TDesign，默认入口 `/chat` |
+| `box-admin-web` | 平台管理端，租户/套餐/模板/插件 |
+| `box-ui` | 共享 UI 组件与 Layout（`@box/ui`，供 web/admin 引用） |
+| `deploy/` | `docker-compose.yml` + 可选 `app` profile |
+
+### Workspace 与 Tenant 分工
+
+| 概念 | 模块 / 表 | 用途 |
+|------|-----------|------|
+| **Workspace** | `box-workspace` · `workspace` / `workspace_member` | C 端工作区隔离；Agent / 知识库 / 工具等资源归属 |
+| **Tenant** | `box-tenant` · `tenant` / `tenant_member` / `tenant_usage` | SaaS 租户、套餐、额度、账单（`/api/v1/billing`） |
+
+C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租户与套餐。
+
+### 后端模块（`box-modules`）
+
+`box-user` · `box-workspace` · `box-tenant` · `box-agent` · `box-model` · `box-knowledge` · `box-tool` · `box-workflow` · `box-conversation` · `box-runtime`（Workflow Runtime）· `box-publish` · `box-trace` · `box-analytics`
+
+**Agent 对话 Runtime** 主实现位于 `box-agent`（`AgentChatExecutor` / `AgentChatPreparer`），非 `box-runtime`。
 
 ---
 
@@ -265,8 +312,8 @@
 
 | PRD 项 | 优先级 | 状态 | 模块 / 路由 |
 |--------|--------|------|-------------|
-| 用户注册 / 登录 | P0 | ✅ | `box-identity` · `/login` |
-| Workspace | P0 | ✅ | `box-tenant` · 工作区切换 |
+| 用户注册 / 登录 | P0 | ✅ | `box-user` · `/login` |
+| Workspace | P0 | ✅ | `box-workspace` · 工作区切换 |
 | Agent CRUD + Version | P0 | ✅ | `box-agent` · `/agents/:id/builder` |
 | LLM 模型 | P0 | ✅ | `box-model` · `/models` |
 | Conversation | P0 | ✅ | `box-conversation` · `/chat/:id` |
@@ -283,7 +330,7 @@
 | Long-term Memory | P1 | ✅ | Agent Builder Memory |
 | Sub Agent / Webhook | P1 | ✅ | V18/V20 迁移 |
 | Plugin / Marketplace | P1 | ✅ | `/plugin-market` · `/market` |
-| Billing / Quota | P2 | ✅ | Settings Quota（超前实现） |
+| Billing / Quota | P2 | ✅ | `box-tenant` · `/settings/quota` · `/settings/billing` |
 | Team Collaboration | P2 | ✅ | `/team` |
 | Enterprise SSO | P2 | 🟡 | OAuth stub 已预留（B-17）；真实 IdP 对接待 backlog |
 
@@ -305,6 +352,10 @@
 | 审计 | `/api/v1/audit-logs` | ✅ | |
 | 发布/API Key | `/api/v1/published/*`、`/api-keys/*` | ✅ | 含 embed-config 公开读取 |
 | OAuth/SSO | `/api/v1/auth/oauth/*` | 🟡 | providers 列表 + authorize/callback stub（501） |
+| 通知 | `/api/v1/notifications/*` | ✅ | 未读角标、已读；顶栏 `NotificationCenter` |
+| 账单/额度 | `/api/v1/billing/*` | ✅ | `box-tenant` |
+| 侧栏 | `/api/v1/sidebar` | ✅ | C 端菜单与工作区上下文 |
+| 平台管理 | `/api/v1/admin/*` | ✅ | 租户、套餐、平台模型、插件目录、系统配置 |
 
 ---
 
@@ -322,7 +373,7 @@
 | 插件市场 / Agent 市场 | `/plugin-market` · `/market` | P1 |
 | Embed 对话 | `/embed/agents/:id` · 主题/Logo/欢迎语/推荐问题 | P1 |
 | 忘记密码 | `/forgot-password` | P1 |
-| 通知表与基础 API | V21 · `box-user` Notification | P1（UI/事件待完善 B-16） |
+| 通知中心 | V21 · `box-user` · `/notifications` · 顶栏 UI（B-16/F-18 ✅） | P1 |
 
 ---
 

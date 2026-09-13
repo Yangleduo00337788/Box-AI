@@ -2,7 +2,7 @@
 
 文档版本：V1.0  
 更新说明：对照 `02-PRD.md`、`03-Architecture.md`、`05-Backend.md`、`09-Progress.md` 与当前代码库梳理  
-整体完成度估算：后端 ~96% · 前端 ~94% · 文档同步 ~95%
+整体完成度估算：后端 ~96% · 前端 ~94% · **文档同步 ~98%**（2026-09 已与代码库对齐）
 
 ---
 
@@ -101,7 +101,7 @@
 | D-02 | ✅ | **修正前端路由表** | 进度文档与 `05-Backend.md` §55 对齐实际路由（`/chat` 默认、`/agents` redirect 等） |
 | D-03 | ✅ | **修正 Flyway 版本** | `09-Progress.md`、数据库文档改为 V1–V24（当前最新） |
 | D-04 | ✅ | **修正模块结构说明** | `03-Architecture.md` / `05-Backend.md`：删除或标注 `box-api`；说明 Agent Runtime 在 `box-agent`；`box-analytics` 现状 |
-| D-05 | ✅ | **修正 docker-compose 说明** | `03-Architecture.md` §51：仅基础设施，应用本地启动 |
+| D-05 | ✅ | **修正 docker-compose 说明** | `03-Architecture.md` §51：默认 infra + 可选 `--profile app` 起 `box-server` |
 
 ### P1 — 分期与实现对照
 

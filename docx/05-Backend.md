@@ -48,6 +48,7 @@ box-server
     │
     ├── box-user
     ├── box-workspace
+    ├── box-tenant
     ├── box-agent
     ├── box-model
     ├── box-knowledge
@@ -58,6 +59,10 @@ box-server
     ├── box-publish
     ├── box-trace
     └── box-analytics（工作空间统计：`/api/v1/analytics/*`）
+
+**Runtime 分工**：Agent 对话在 `box-agent`（`AgentChatExecutor`）；Workflow 节点执行在 `box-runtime`。
+
+**前端工程**：`box-web`（C 端）· `box-admin-web`（平台管理）· `box-ui`（共享 `@box/ui`）
 
 ---
 
@@ -172,6 +177,7 @@ box-infrastructure
 
         <module>box-modules/box-user</module>
         <module>box-modules/box-workspace</module>
+        <module>box-modules/box-tenant</module>
         <module>box-modules/box-agent</module>
         <module>box-modules/box-model</module>
         <module>box-modules/box-knowledge</module>
@@ -1792,37 +1798,62 @@ permissions
 
 ---
 
-五十五、前端路由
+五十五、前端路由（box-web）
 
-/login
+公开页：
 
-/register
+/login · /register · /forgot-password · /embed/agents/:id
 
-/dashboard
+登录后默认：`/` → `/chat`
 
-/agents
-/agents/:id
-/agents/:id/builder
+| 路由 | 说明 |
+|------|------|
+| `/chat`、`/chat/:id` | 对话工作台（默认首页） |
+| `/dashboard` | 概览 |
+| `/agents` | ↪️ 重定向 `/chat` |
+| `/agents/:id/builder` | Agent Builder |
+| `/workflows`、`/workflows/:id/editor` | 工作流 |
+| `/knowledge` · `/tools` · `/mcp` · `/models` | 资源管理 |
+| `/plugin-market` · `/market` | 插件 / Agent 市场 |
+| `/executions` · `/debug` · `/analytics` | 可观测 |
+| `/team` | 团队成员（`member:manage`） |
+| `/settings/profile` · `appearance` · `general` · `security` | 个人与通用 |
+| `/settings/api-keys` · `roles` · `audit-logs` | 需对应权限 |
+| `/settings/quota` · `billing` · `capacity` | 额度与账单 |
+| `/settings/about` · `legal` | 关于与协议 |
+| `/forbidden` | 无权限 |
 
-/workflows
-/workflows/:id
+已废弃重定向：`/conversations`、`/chat/logs` → `/chat`
 
-/knowledge
-/knowledge/:id
+**box-admin-web**（独立应用）：`/tenants` · `/plans` · `/platform-models` · `/agent-templates` · `/plugin-catalog` · `/system-config`
 
-/tools
+---
 
-/models
+五十五点一、平台 Admin API
 
-/conversations
+```
+GET/POST   /api/v1/admin/plans
+GET/PUT    /api/v1/admin/platform/models
+GET/POST   /api/v1/admin/plugins
+GET/PUT    /api/v1/admin/system/config
+```
 
-/analytics
+租户成员等见 `box-tenant` / `box-user` 下 Admin Controller。
 
-/settings
-/settings/workspace
-/settings/members
-/settings/roles
-/settings/api-keys
+---
+
+五十五点二、通知 / 账单 / 侧栏 API
+
+```
+GET        /api/v1/notifications
+GET        /api/v1/notifications/unread-count
+POST       /api/v1/notifications/{id}/read
+POST       /api/v1/notifications/read-all
+
+GET        /api/v1/billing/...
+
+GET        /api/v1/sidebar
+```
 
 ---
 
@@ -2183,6 +2214,7 @@ box-server
     │
     ├── user
     ├── workspace
+    ├── tenant
     ├── agent
     ├── model
     ├── knowledge

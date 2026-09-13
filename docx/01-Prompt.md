@@ -1570,6 +1570,7 @@ box-server
 └── box-modules
     ├── box-user
     ├── box-workspace
+    ├── box-tenant
     ├── box-agent
     ├── box-model
     ├── box-knowledge

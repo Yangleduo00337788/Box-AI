@@ -297,6 +297,7 @@ box-server
     │
     ├── box-user
     ├── box-workspace
+    ├── box-tenant
     ├── box-agent
     ├── box-model
     ├── box-knowledge
@@ -307,6 +308,17 @@ box-server
     ├── box-publish
     ├── box-trace
     └── box-analytics（`AnalyticsController` · `/api/v1/analytics/overview|trends`）
+
+**Runtime 分工（与代码一致）**：
+
+- **Agent 对话 Runtime**：`box-agent`（`AgentChatExecutor`、`AgentChatPreparer`、`ChatStreamEvent`）
+- **Workflow Runtime**：`box-runtime`（`WorkflowExecutor`、各 `*NodeExecutor`）
+
+**前端工程**：
+
+- `box-web` — C 端（对话工作台、Builder、知识库等）
+- `box-admin-web` — 平台管理端（租户、套餐、模板、插件）
+- `box-ui` — 共享组件库（`@box/ui` alias，Layout / 品牌 / 菜单类型）
 
 ---
 
@@ -649,9 +661,9 @@ public interface AgentExecutor {
 
 十六、Agent Runtime
 
-这是整个 Box 最核心的模块之一。
+Agent 对话执行是 Box 核心能力之一。
 
-box-runtime
+**主实现模块：`box-agent`**（`AgentChatExecutor` / `AgentChatPreparer`）。`box-runtime` 负责 **Workflow** 节点执行，二者不混用。
 
 运行流程：
 
@@ -1272,51 +1284,35 @@ CITATION
 
 三十一、SSE Streaming
 
-聊天默认使用：
+聊天默认使用 HTTP + SSE（非 WebSocket）。
 
-HTTP + SSE
+**入口**：
 
-而不是 WebSocket。
+- `POST /api/v1/agents/{id}/chat`（`stream=true`）
+- `POST /api/v1/conversations/{id}/messages`
+- `POST /api/v1/published/agents/{id}/chat`
 
-请求：
+响应：`Content-Type: text/event-stream`，每帧 `data: {json}\n\n`。
 
-POST /api/v1/chat
+**实现类**：`com.boxai.agent.api.ChatStreamEvent`（`AgentChatExecutor` 发送）
 
-响应：
+| type | 说明 |
+|------|------|
+| `citations` | RAG 引用 JSON 数组（流开始前） |
+| `delta` | 模型回答文本增量 |
+| `tool.start` / `tool.delta` / `tool.end` | Tool 执行生命周期 |
+| `tool.confirm` | 危险 Tool 需二次确认 |
+| `done` | 流结束（可含 `executionId`） |
+| `error` | 错误信息 |
 
-text/event-stream
+示例：
 
-事件：
+```json
+{"type":"delta","content":"你好"}
+{"type":"done","executionId":12345}
+```
 
-message.start
-
-message.delta
-
-tool.start
-
-tool.delta
-
-tool.end
-
-citation
-
-message.end
-
-error
-
-例如：
-
-event: message.delta
-data: {"content":"你好"}
-
-event: message.delta
-data: {"content":"，"}
-
-event: message.delta
-data: {"content":"我是 Box"}
-
-event: message.end
-data: {"messageId":"xxx"}
+详细字段见 `06-Runtime.md` §33。
 
 ---
 
@@ -1602,6 +1598,10 @@ sys_role_permission
 workspace
 workspace_member
 
+tenant
+tenant_member
+tenant_usage
+
 agent
 agent_version
 agent_variable
@@ -1609,8 +1609,8 @@ agent_knowledge
 agent_tool
 
 model_provider
-model
-model_api_key
+model_definition
+model_credential
 
 knowledge_base
 knowledge_document
@@ -1638,6 +1638,7 @@ trace_span
 publish
 api_key
 
+notification
 audit_log
 
 大约：
@@ -1754,44 +1755,34 @@ agent
 
 四十二、Frontend 项目结构
 
-box-web
-│
-├── src
-│   │
-│   ├── api
-│   │
-│   ├── assets
-│   │
-│   ├── components
-│   │
-│   ├── composables
-│   │
-│   ├── constants
-│   │
-│   ├── layouts
-│   │
-│   ├── router
-│   │
-│   ├── stores
-│   │
-│   ├── types
-│   │
-│   ├── utils
-│   │
-│   ├── views
-│   │   ├── dashboard
-│   │   ├── agent
-│   │   ├── workflow
-│   │   ├── knowledge
-│   │   ├── tools
-│   │   ├── models
-│   │   ├── conversation
-│   │   ├── analytics
-│   │   └── settings
-│   │
-│   └── App.vue
-│
-└── vite.config.ts
+**box-web**（C 端）
+
+```
+box-web/
+├── src/api · components · composables · layouts · router · stores · views
+└── vite.config.ts   # alias: @ → src, @box/ui → ../box-ui/src
+```
+
+默认入口 `/` → `/chat`；设置子路由在 `/settings/*`；成员管理在 `/team`（非 `/settings/members`）。
+
+**box-admin-web**（平台管理端）
+
+```
+box-admin-web/
+├── src/views/tenants · plans · platform-models · agent-templates · plugin-catalog · system-config
+└── 默认 / → /tenants
+```
+
+**box-ui**（共享 UI）
+
+```
+box-ui/src/
+├── components/   # BrandWordmark、PageHeader 等
+├── layouts/      # AppShellLayout、AuthLayout
+└── styles/       # theme.css、fonts.css
+```
+
+C 端与 admin 通过 `@box/ui` 复用 Layout 与品牌组件。
 
 ---
 
@@ -2083,27 +2074,28 @@ Content-Type: text/event-stream
 
 五十一、Docker Compose
 
-V1 开发环境（**当前仓库 `docker-compose.yml` 仅起基础设施**）：
+V1 开发环境（`deploy/docker-compose.yml`）：
 
-box
-│
-├── mysql
-├── redis
-├── elasticsearch
-└── minio
+**默认 profile（基础设施）**：
 
-**应用本地启动**：`box-server`（`BoxApplication`）、`box-web`（`npm run dev`）。将 `box-server` 纳入 Compose 为可选后续项（见 `10-Gaps.md` B-18）。
+```
+mysql · redis · elasticsearch · minio
+```
 
-不加入：
+**可选 profile `app`**：额外构建并启动 `box-server`（8080），依赖上述中间件。
 
-Kafka
-Zookeeper
-Nacos
-Kubernetes
+```bash
+cd deploy
+docker compose up -d                              # 仅中间件
+docker compose --profile app up -d --build        # 中间件 + box-server
+```
 
-开发阶段尽量保持：
+**本地进程**：
 
-4 个核心基础设施 + 本地应用进程
+- `box-web`：`npm run dev`（5173，代理 `/api` → 8080）
+- `box-admin-web`：独立 dev 端口
+
+不加入：Kafka、Zookeeper、Nacos、Kubernetes。
 
 ---
 

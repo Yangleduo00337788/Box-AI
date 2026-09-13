@@ -14,6 +14,8 @@ Box Database
 向量数据： Elasticsearch
 文件： MinIO
 
+> **与代码对齐**：Flyway 迁移见 `box-server/box-bootstrap/src/main/resources/db/migration/`，当前 **V1–V24**（完整列表见 `09-Progress.md`）。REST API 路径 `/api/v1/model-api-keys` 对应表 **`model_credential`**。
+
 ---
 
 一、数据库设计总览
@@ -46,6 +48,11 @@ Workspace
 ├── workspace
 └── workspace_member
 
+Tenant（SaaS）
+├── tenant
+├── tenant_member
+└── tenant_usage
+
 Agent
 ├── agent
 ├── agent_version
@@ -55,8 +62,8 @@ Agent
 
 Model
 ├── model_provider
-├── model
-├── model_api_key
+├── model_definition
+├── model_credential
 └── model_usage
 
 Knowledge
@@ -97,6 +104,7 @@ Publish
 
 System
 ├── audit_log
+├── notification
 └── system_config
 
 ---
@@ -650,27 +658,29 @@ COMMENT='模型提供商';
 
 ---
 
-十八、Model
+十八、Model Definition
 
-18.1 model
+18.1 model_definition
 
-CREATE TABLE model (
+CREATE TABLE model_definition (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 
     provider_id BIGINT UNSIGNED NOT NULL,
-    workspace_id BIGINT UNSIGNED DEFAULT NULL,
 
-    name VARCHAR(128) NOT NULL,
     model_code VARCHAR(128) NOT NULL,
+    model_name VARCHAR(128) NOT NULL,
 
     model_type VARCHAR(32) NOT NULL
         COMMENT 'CHAT/EMBEDDING/RERANK',
 
+    support_streaming TINYINT NOT NULL DEFAULT 0,
+    support_tool_calling TINYINT NOT NULL DEFAULT 0,
+    support_vision TINYINT NOT NULL DEFAULT 0,
+
     context_window INT DEFAULT NULL,
+    max_output_tokens INT DEFAULT NULL,
 
-    capabilities JSON DEFAULT NULL,
-
-    config JSON DEFAULT NULL,
+    config_json JSON DEFAULT NULL,
 
     status TINYINT NOT NULL DEFAULT 1,
 
@@ -680,32 +690,30 @@ CREATE TABLE model (
 
     PRIMARY KEY (id),
 
-    KEY idx_provider_id (provider_id),
-    KEY idx_workspace_id (workspace_id),
+    UNIQUE KEY uk_provider_model (provider_id, model_code),
     KEY idx_model_type (model_type)
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
-COMMENT='AI模型';
+COMMENT='AI模型定义';
 
 ---
 
-十九、Model API Key
+十九、Model Credential
 
-19.1 model_api_key
+19.1 model_credential
 
-API Key 必须加密。
+模型 API Key 必须加密存储。HTTP API 路径仍为 `/api/v1/model-api-keys`，表名为 `model_credential`。
 
-CREATE TABLE model_api_key (
+CREATE TABLE model_credential (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 
     workspace_id BIGINT UNSIGNED NOT NULL,
     provider_id BIGINT UNSIGNED NOT NULL,
 
-    name VARCHAR(128) NOT NULL,
+    credential_name VARCHAR(128) NOT NULL,
 
-    api_key_ciphertext TEXT NOT NULL,
-
-    api_key_masked VARCHAR(128) DEFAULT NULL,
+    encrypted_api_key TEXT NOT NULL,
+    encrypted_secret TEXT NULL,
 
     status TINYINT NOT NULL DEFAULT 1,
 
@@ -724,7 +732,7 @@ CREATE TABLE model_api_key (
     KEY idx_provider_id (provider_id)
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
-COMMENT='模型API Key';
+COMMENT='模型凭证（加密）';
 
 绝对不要：
 
@@ -2211,34 +2219,19 @@ execution
 
 六十、数据库目录建议
 
-后端：
+Flyway 迁移路径（与代码一致）：
 
-box-server
-└── box-infrastructure
-    └── src/main/resources
-        └── db
-            ├── migration
-            │   ├── V1__init.sql
-            │   ├── V2__rbac.sql
-            │   ├── V3__agent.sql
-            │   ├── V4__model.sql
-            │   ├── V5__knowledge.sql
-            │   ├── V6__tool.sql
-            │   ├── V7__workflow.sql
-            │   ├── V8__conversation.sql
-            │   ├── V9__runtime.sql
-            │   └── V10__publish.sql
-            │
-            └── seed
-                ├── roles.sql
-                ├── permissions.sql
-                └── models.sql
+```
+box-server/box-bootstrap/src/main/resources/db/migration/
+├── V1__init_identity.sql
+├── V2__model.sql
+├── …
+└── V24__execution_request_id.sql
+```
 
-推荐使用：
+完整 V1–V24 版本说明见 `09-Progress.md` § Flyway 迁移。表结构细节以各 `V*.sql` 为准；本文档 §十八–§十九 与 `V2__model.sql` 对齐。
 
-Flyway
-
-管理数据库版本。
+推荐使用 Flyway 管理数据库版本。
 
 ---
 
