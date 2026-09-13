@@ -46,6 +46,7 @@
           <router-link class="form-link" :to="registerLink">注册新账号</router-link>
         </div>
       </div>
+      <auth-agreement v-model:agreed="agreed" action-label="登录" />
       <t-form-item>
         <t-button theme="primary" type="submit" block size="large" shape="round" :loading="loading">
           登录
@@ -61,6 +62,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps } from 'tdesign-vue-next'
 import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
+import AuthAgreement from '@/components/AuthAgreement.vue'
 import { PORTAL_OPTIONS, type PortalType } from '@/constants/portal'
 import { extractApiError } from '@/api/apiError'
 import { useAuthStore } from '@/stores/auth'
@@ -70,6 +72,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(false)
 const remember = ref(false)
+const agreed = ref(false)
 const portal = ref<PortalType>('personal')
 
 const formData = reactive({
@@ -115,6 +118,10 @@ watch(
 
 const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   if (validateResult !== true) return
+  if (!agreed.value) {
+    MessagePlugin.warning('请先阅读并同意用户协议和隐私政策')
+    return
+  }
   loading.value = true
   try {
     await auth.login(

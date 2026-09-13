@@ -11,8 +11,8 @@
           <div><dt>定位</dt><dd>{{ content.about.positioning }}</dd></div>
         </dl>
         <t-space>
-          <t-button variant="outline" @click="router.push('/dashboard')">工作台概览</t-button>
-          <t-button variant="outline" @click="router.push('/settings/legal')">隐私与协议</t-button>
+          <t-button variant="outline" @click="router.push('/legal/terms')">用户协议</t-button>
+          <t-button variant="outline" @click="router.push('/legal/privacy')">隐私政策</t-button>
         </t-space>
       </div>
     </t-loading>

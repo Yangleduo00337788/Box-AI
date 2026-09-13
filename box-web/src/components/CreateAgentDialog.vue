@@ -14,6 +14,9 @@
     </t-radio-group>
 
     <t-form v-if="createMode === 'blank'" :data="form" :rules="rules" label-width="80px">
+      <t-form-item label="Logo">
+        <image-picker v-model="form.avatarUrl" :fallback-text="(form.name || '智').slice(0, 1)" hint="上传 Logo" />
+      </t-form-item>
       <t-form-item label="名称" name="name">
         <t-input v-model="form.name" placeholder="给你的智能体起个名字" maxlength="128" />
       </t-form-item>
@@ -66,6 +69,7 @@ import { extractApiError } from '@/api/apiError'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { enableMarketTemplate, listMarketTemplates, type AgentTemplateVO } from '@/api/market'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
+import ImagePicker from '@/components/ImagePicker.vue'
 
 const emit = defineEmits<{
   created: []
@@ -83,6 +87,7 @@ const selectedTemplateId = ref<number | undefined>()
 const form = reactive({
   name: '',
   description: '',
+  avatarUrl: '',
   platformModelId: undefined as number | undefined,
 })
 
@@ -108,6 +113,7 @@ watch(visible, async (open) => {
   selectedTemplateId.value = undefined
   form.name = ''
   form.description = ''
+  form.avatarUrl = ''
   if (!platformModels.value.length) {
     const { data } = await listPlatformModels()
     platformModels.value = data.data || []
@@ -168,6 +174,7 @@ async function submit() {
     const { data } = await createAgent({
       name,
       description: form.description.trim() || undefined,
+      avatarUrl: form.avatarUrl.trim() || undefined,
       platformModelId: form.platformModelId,
     })
     visible.value = false

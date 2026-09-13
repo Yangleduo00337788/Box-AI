@@ -23,7 +23,6 @@ export const SETTINGS_NAV = [
     title: '关于',
     items: [
       { value: '/settings/about', label: '关于盒子', icon: 'help-circle' },
-      { value: '/settings/legal', label: '隐私与协议', icon: 'secured' },
     ],
   },
 ] as const

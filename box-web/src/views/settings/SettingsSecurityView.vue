@@ -29,11 +29,11 @@
           <t-form-item label="确认新密码">
             <t-input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码" />
           </t-form-item>
-          <t-button theme="primary" :loading="changingPassword" @click="submitPassword">更新密码</t-button>
         </t-form>
       </section>
 
       <div class="security-actions">
+        <t-button theme="primary" :loading="changingPassword" @click="submitPassword">更新密码</t-button>
         <t-button variant="outline" @click="router.push('/settings/profile')">编辑个人信息</t-button>
         <t-button theme="danger" variant="outline" @click="logout">退出登录</t-button>
       </div>
@@ -121,7 +121,8 @@ function logout() {
 
 .security-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 12px;
   margin-top: 24px;
 }

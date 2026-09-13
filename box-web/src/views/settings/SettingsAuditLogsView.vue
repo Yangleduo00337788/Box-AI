@@ -4,17 +4,17 @@
     <p class="settings-page__desc">查看工作空间内的登录、资源变更与关键操作记录。</p>
 
     <div class="settings-card">
-      <t-form layout="inline" class="audit-filters" @submit.prevent="loadLogs">
-        <t-form-item label="操作">
-          <t-input v-model="filters.action" clearable placeholder="如 agent.create" style="width: 180px" />
-        </t-form-item>
-        <t-form-item label="资源类型">
-          <t-input v-model="filters.resourceType" clearable placeholder="如 AGENT" style="width: 140px" />
-        </t-form-item>
-        <t-form-item>
-          <t-button theme="primary" type="submit" :loading="loading">查询</t-button>
-        </t-form-item>
-      </t-form>
+      <div class="audit-filters">
+        <label class="audit-filters__item">
+          <span>操作</span>
+          <t-input v-model="filters.action" clearable placeholder="如 agent.create" />
+        </label>
+        <label class="audit-filters__item">
+          <span>资源类型</span>
+          <t-input v-model="filters.resourceType" clearable placeholder="如 AGENT" />
+        </label>
+        <t-button theme="primary" :loading="loading" @click="loadLogs">查询</t-button>
+      </div>
 
       <t-table
         row-key="id"
@@ -101,6 +101,28 @@ onMounted(loadLogs)
 
 <style scoped>
 .audit-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.audit-filters__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  color: var(--box-muted);
+}
+
+.audit-filters__item :deep(.t-input) {
+  width: 100%;
+}
+
+.audit-filters > .t-button {
+  flex-shrink: 0;
 }
 </style>

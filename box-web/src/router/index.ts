@@ -2,6 +2,21 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionStore } from '@/stores/permission'
 
+const APP_HOSTS = new Set(['localhost', '127.0.0.1'])
+
+async function resolveEmbedAgentId(host: string): Promise<number | null> {
+  try {
+    const response = await fetch(`/api/v1/published/embed/resolve?host=${encodeURIComponent(host)}`)
+    const payload = await response.json()
+    if (payload?.code === 0 && payload.data?.agentId) {
+      return Number(payload.data.agentId)
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -24,6 +39,16 @@ const router = createRouter({
       path: '/embed/agents/:id',
       component: () => import('@/views/EmbedAgentView.vue'),
       meta: { public: true, title: '智能体对话' },
+    },
+    {
+      path: '/embed',
+      component: () => import('@/views/EmbedAgentView.vue'),
+      meta: { public: true, title: '智能体对话' },
+    },
+    {
+      path: '/legal/:doc',
+      component: () => import('@/views/LegalDocumentView.vue'),
+      meta: { public: true, title: '法律条款' },
     },
     {
       path: '/',
@@ -87,7 +112,7 @@ const router = createRouter({
             { path: 'billing', component: () => import('@/views/settings/SettingsBillingView.vue'), meta: { title: '账单概览' } },
             { path: 'capacity', component: () => import('@/views/settings/SettingsCapacityView.vue'), meta: { title: '容量管理' } },
             { path: 'about', component: () => import('@/views/settings/SettingsAboutView.vue'), meta: { title: '关于盒子' } },
-            { path: 'legal', component: () => import('@/views/settings/SettingsLegalView.vue'), meta: { title: '隐私与协议' } },
+            { path: 'legal', redirect: '/legal/privacy' },
           ],
         },
       ],
@@ -96,6 +121,13 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  const host = window.location.hostname
+  if ((to.path === '/' || to.path === '/chat') && !APP_HOSTS.has(host)) {
+    const agentId = await resolveEmbedAgentId(host)
+    if (agentId) {
+      return { path: '/embed', query: to.query }
+    }
+  }
   const auth = useAuthStore()
   if (to.meta.public) {
     return true

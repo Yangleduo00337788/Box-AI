@@ -97,6 +97,7 @@
           </template>
         </t-input>
       </t-form-item>
+      <auth-agreement v-model:agreed="agreed" action-label="注册" />
       <t-form-item>
         <t-button theme="primary" type="submit" block size="large" shape="round" :loading="loading">
           注册
@@ -112,6 +113,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, FormRule } from 'tdesign-vue-next'
 import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
+import AuthAgreement from '@/components/AuthAgreement.vue'
 import { PORTAL_OPTIONS, type PortalType } from '@/constants/portal'
 import { extractApiError } from '@/api/apiError'
 import { sendVerificationCode } from '@/api/auth'
@@ -122,6 +124,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(false)
 const sendingCode = ref(false)
+const agreed = ref(false)
 const countdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 const accountType = ref<PortalType>('personal')
@@ -204,6 +207,10 @@ async function sendCode() {
 
 const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   if (validateResult !== true) return
+  if (!agreed.value) {
+    MessagePlugin.warning('请先阅读并同意用户协议和隐私政策')
+    return
+  }
   loading.value = true
   try {
     await auth.register({

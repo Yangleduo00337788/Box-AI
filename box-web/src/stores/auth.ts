@@ -12,6 +12,7 @@ import {
   type UserVO,
   type WorkspaceVO,
 } from '@/api/auth'
+import { uploadAvatar as uploadAvatarApi } from '@/api/asset'
 
 const TOKEN_KEY = 'box.token'
 const WORKSPACE_KEY = 'box.workspaceId'
@@ -76,8 +77,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function updateProfile(payload: { nickname?: string; bio?: string }) {
+  async function updateProfile(payload: { nickname?: string; bio?: string; avatarUrl?: string }) {
     const { data } = await updateProfileApi(payload)
+    persist(data.data)
+  }
+
+  async function uploadAvatar(file: File) {
+    const { data } = await uploadAvatarApi(file)
     persist(data.data)
   }
 
@@ -103,6 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     hydrate,
     updateProfile,
+    uploadAvatar,
     logout,
     setWorkspace,
   }

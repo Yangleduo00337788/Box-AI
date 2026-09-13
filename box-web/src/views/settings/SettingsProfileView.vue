@@ -2,7 +2,13 @@
   <div class="settings-page">
     <h1 class="settings-page__title">个人信息</h1>
     <div class="profile-card">
-      <t-avatar size="72px" class="profile-card__avatar">{{ avatarText }}</t-avatar>
+      <image-picker
+        :model-value="auth.user?.avatarUrl"
+        :fallback-text="avatarText"
+        hint="点击更换头像"
+        size="72px"
+        persist="avatar"
+      />
       <t-form :data="form" label-align="top" class="profile-card__form">
         <t-form-item label="显示名称" name="nickname" required-mark>
           <t-input v-model="form.nickname" placeholder="给你自己起个名字" maxlength="64" />
@@ -46,6 +52,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { extractApiError } from '@/api/apiError'
 import { useAuthStore } from '@/stores/auth'
 import { roleName } from '@/utils/role'
+import ImagePicker from '@/components/ImagePicker.vue'
 
 const auth = useAuthStore()
 const saving = ref(false)
@@ -108,6 +115,7 @@ async function save() {
 
 .profile-card {
   display: flex;
+  align-items: flex-start;
   gap: 32px;
   width: 100%;
   padding: 28px;

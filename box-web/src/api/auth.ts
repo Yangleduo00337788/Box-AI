@@ -79,7 +79,7 @@ export function fetchMe() {
   return http.get<Result<AuthVO>>('/auth/me')
 }
 
-export function updateProfile(payload: { nickname?: string; bio?: string }) {
+export function updateProfile(payload: { nickname?: string; bio?: string; avatarUrl?: string }) {
   return http.put<Result<AuthVO>>('/auth/profile', payload)
 }
 

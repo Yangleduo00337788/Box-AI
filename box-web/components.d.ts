@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AppLogo: typeof import('./src/components/AppLogo.vue')['default']
+    AuthAgreement: typeof import('./src/components/AuthAgreement.vue')['default']
     BrandWordmark: typeof import('./src/components/BrandWordmark.vue')['default']
     ChatModelPicker: typeof import('./src/components/ChatModelPicker.vue')['default']
     ConsumerSidebarFooter: typeof import('./src/components/ConsumerSidebarFooter.vue')['default']
@@ -17,6 +18,7 @@ declare module 'vue' {
     CreateWorkspaceDialog: typeof import('./src/components/CreateWorkspaceDialog.vue')['default']
     GlobalSearchDialog: typeof import('./src/components/GlobalSearchDialog.vue')['default']
     HelpFeedbackDialog: typeof import('./src/components/HelpFeedbackDialog.vue')['default']
+    ImagePicker: typeof import('./src/components/ImagePicker.vue')['default']
     MonacoEditor: typeof import('./src/components/MonacoEditor.vue')['default']
     NotificationCenter: typeof import('./src/components/NotificationCenter.vue')['default']
     PageHeader: typeof import('./src/components/PageHeader.vue')['default']
