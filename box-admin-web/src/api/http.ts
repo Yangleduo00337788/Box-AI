@@ -9,7 +9,7 @@ export interface Result<T> {
 
 const http = axios.create({
   baseURL: '/api/v1/admin',
-  timeout: 15000,
+  timeout: 30000,
 })
 
 http.interceptors.request.use((config) => {
