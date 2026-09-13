@@ -46,6 +46,8 @@ public class SystemContentApplicationService {
                 new SystemContentVO.LegalContentVO(
                         parseParagraphs(value(configs, "legal.privacy")),
                         parseParagraphs(value(configs, "legal.terms")),
+                        toHtml(value(configs, "legal.privacy")),
+                        toHtml(value(configs, "legal.terms")),
                         value(configs, "legal.updated_at")));
     }
 
@@ -58,10 +60,55 @@ public class SystemContentApplicationService {
         if (raw == null || raw.isBlank()) {
             return List.of();
         }
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("<")) {
+            return List.of();
+        }
         try {
             return objectMapper.readValue(raw, new TypeReference<List<String>>() {});
         } catch (Exception e) {
             return List.of(raw);
         }
+    }
+
+    private String toHtml(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("<")) {
+            return trimmed;
+        }
+        if (trimmed.startsWith("[")) {
+            try {
+                List<String> paragraphs = objectMapper.readValue(raw, new TypeReference<List<String>>() {});
+                StringBuilder html = new StringBuilder();
+                for (String paragraph : paragraphs) {
+                    if (paragraph == null || paragraph.isBlank()) {
+                        continue;
+                    }
+                    html.append("<p>").append(escapeHtml(paragraph)).append("</p>");
+                }
+                return html.toString();
+            } catch (Exception ignored) {
+                // fall through
+            }
+        }
+        StringBuilder html = new StringBuilder();
+        for (String block : trimmed.split("\\n\\s*\\n")) {
+            String paragraph = block.trim();
+            if (paragraph.isEmpty()) {
+                continue;
+            }
+            html.append("<p>").append(escapeHtml(paragraph).replace("\n", "<br/>")).append("</p>");
+        }
+        return html.toString();
+    }
+
+    private String escapeHtml(String value) {
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 }

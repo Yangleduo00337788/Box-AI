@@ -17,6 +17,8 @@ public record SystemContentVO(
     public record LegalContentVO(
             List<String> privacy,
             List<String> terms,
+            String privacyHtml,
+            String termsHtml,
             String updatedAt
     ) {}
 }
