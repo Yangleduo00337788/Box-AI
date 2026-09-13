@@ -8,17 +8,21 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    LegalSplitEditor: typeof import('./src/components/LegalSplitEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TAside: typeof import('tdesign-vue-next')['Aside']
     TAvatar: typeof import('tdesign-vue-next')['Avatar']
     TButton: typeof import('tdesign-vue-next')['Button']
     TCard: typeof import('tdesign-vue-next')['Card']
+    TCheckbox: typeof import('tdesign-vue-next')['Checkbox']
+    TCheckboxGroup: typeof import('tdesign-vue-next')['CheckboxGroup']
     TConfigProvider: typeof import('tdesign-vue-next')['ConfigProvider']
     TContent: typeof import('tdesign-vue-next')['Content']
     TDialog: typeof import('tdesign-vue-next')['Dialog']
     TDrawer: typeof import('tdesign-vue-next')['Drawer']
     TDropdown: typeof import('tdesign-vue-next')['Dropdown']
+    TEmpty: typeof import('tdesign-vue-next')['Empty']
     TenantMembersDrawer: typeof import('./src/components/TenantMembersDrawer.vue')['default']
     TForm: typeof import('tdesign-vue-next')['Form']
     TFormItem: typeof import('tdesign-vue-next')['FormItem']

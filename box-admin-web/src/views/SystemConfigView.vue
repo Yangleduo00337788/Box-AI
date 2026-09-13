@@ -4,10 +4,10 @@
 
     <t-loading :loading="loading" size="small">
       <t-form label-width="140px" class="config-form">
-        <section v-for="group in configGroups" :key="group.title" class="config-group">
-          <h3 class="config-group__title">{{ group.title }}</h3>
+        <section class="config-group">
+          <h3 class="config-group__title">基础信息</h3>
           <t-form-item
-            v-for="item in group.items"
+            v-for="item in basicItems"
             :key="item.configKey"
             :label="item.label"
           >
@@ -25,6 +25,20 @@
           </t-form-item>
         </section>
 
+        <section class="config-group">
+          <h3 class="config-group__title">法律文档</h3>
+          <p class="config-group__hint">左侧输入 HTML 或纯文本，右侧即时预览 C 端展示效果。</p>
+          <t-form-item label="隐私政策">
+            <legal-split-editor v-model="form['legal.privacy']" placeholder="可写 HTML，例如 <h2>引言</h2><p>……</p>" />
+          </t-form-item>
+          <t-form-item label="服务协议">
+            <legal-split-editor v-model="form['legal.terms']" placeholder="可写 HTML，例如 <h2>服务内容</h2><p>……</p>" />
+          </t-form-item>
+          <t-form-item label="最后更新日期">
+            <t-input v-model="form['legal.updated_at']" placeholder="2026-09-11" />
+          </t-form-item>
+        </section>
+
         <t-form-item>
           <t-button theme="primary" :loading="saving" @click="onSave">保存全部</t-button>
         </t-form-item>
@@ -37,56 +51,33 @@
 import { onMounted, reactive, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
+import LegalSplitEditor from '@/components/LegalSplitEditor.vue'
 import { fetchSystemConfigs, upsertSystemConfig } from '@/api/systemConfig'
+import { legalValueToSource } from '@/utils/legalHtml'
 
-interface ConfigField {
-  configKey: string
-  label: string
-  placeholder?: string
-  multiline?: boolean
-}
-
-const configGroups: { title: string; items: ConfigField[] }[] = [
-  {
-    title: '基础信息',
-    items: [
-      { configKey: 'support.email', label: '客服邮箱', placeholder: 'support@example.com' },
-      { configKey: 'about.product_name', label: '产品名称' },
-      { configKey: 'about.slogan', label: '产品 Slogan', multiline: true },
-      { configKey: 'about.positioning', label: '产品定位' },
-      { configKey: 'app.version', label: '客户端版本' },
-    ],
-  },
-  {
-    title: '法律文档',
-    items: [
-      {
-        configKey: 'legal.privacy',
-        label: '隐私政策',
-        multiline: true,
-        placeholder: 'JSON 数组，每行一段。例如 ["段落1","段落2"]',
-      },
-      {
-        configKey: 'legal.terms',
-        label: '服务协议',
-        multiline: true,
-        placeholder: 'JSON 数组，每行一段',
-      },
-      { configKey: 'legal.updated_at', label: '最后更新日期', placeholder: '2026-09-11' },
-    ],
-  },
+const basicItems = [
+  { configKey: 'support.email', label: '客服邮箱', placeholder: 'support@example.com' },
+  { configKey: 'about.product_name', label: '产品名称' },
+  { configKey: 'about.slogan', label: '产品 Slogan', multiline: true },
+  { configKey: 'about.positioning', label: '产品定位' },
+  { configKey: 'app.version', label: '客户端版本' },
 ]
+
+const legalKeys = ['legal.privacy', 'legal.terms', 'legal.updated_at']
 
 const loading = ref(false)
 const saving = ref(false)
 const form = reactive<Record<string, string>>({})
 
 function initForm(configs: { configKey: string; configValue?: string }[]) {
-  for (const group of configGroups) {
-    for (const item of group.items) {
-      const found = configs.find((cfg) => cfg.configKey === item.configKey)
-      form[item.configKey] = found?.configValue || ''
-    }
+  for (const item of basicItems) {
+    const found = configs.find((cfg) => cfg.configKey === item.configKey)
+    form[item.configKey] = found?.configValue || ''
+  }
+  for (const key of legalKeys) {
+    const found = configs.find((cfg) => cfg.configKey === key)
+    const raw = found?.configValue || ''
+    form[key] = key === 'legal.updated_at' ? raw : legalValueToSource(raw)
   }
 }
 
@@ -103,13 +94,12 @@ async function loadConfigs() {
 async function onSave() {
   saving.value = true
   try {
-    for (const group of configGroups) {
-      for (const item of group.items) {
-        await upsertSystemConfig({
-          configKey: item.configKey,
-          configValue: form[item.configKey],
-        })
-      }
+    const keys = [...basicItems.map((item) => item.configKey), ...legalKeys]
+    for (const key of keys) {
+      await upsertSystemConfig({
+        configKey: key,
+        configValue: form[key],
+      })
     }
     MessagePlugin.success('已保存')
     await loadConfigs()
@@ -123,7 +113,7 @@ onMounted(loadConfigs)
 
 <style scoped>
 .config-form {
-  max-width: 760px;
+  max-width: 1100px;
 }
 
 .config-group {
@@ -135,8 +125,14 @@ onMounted(loadConfigs)
 }
 
 .config-group__title {
-  margin: 0 0 16px;
+  margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
+}
+
+.config-group__hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--box-muted, #8f959e);
 }
 </style>
