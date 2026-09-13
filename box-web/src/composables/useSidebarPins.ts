@@ -53,6 +53,12 @@ export function useSidebarPins() {
     await persist()
   }
 
+  async function unpinConversation(id: number) {
+    if (!isConversationPinned(id)) return
+    pinnedConversationIds.value = pinnedConversationIds.value.filter((item) => item !== id)
+    await persist()
+  }
+
   return {
     pinnedAgentIds,
     pinnedConversationIds,
@@ -62,5 +68,6 @@ export function useSidebarPins() {
     isConversationPinned,
     toggleAgentPin,
     toggleConversationPin,
+    unpinConversation,
   }
 }

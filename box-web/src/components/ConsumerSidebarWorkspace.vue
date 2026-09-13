@@ -52,14 +52,36 @@
                 <span class="sidebar-task-row__label">{{ conversationLabel(conversation) }}</span>
               </button>
               <div class="sidebar-task-row__actions">
-                <button
-                  type="button"
-                  class="sidebar-task-row__action"
-                  :aria-label="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
-                  @click.stop="handleToggleConversationPin(conversation.id)"
-                >
-                  <t-icon name="pin" />
-                </button>
+                <t-tooltip :content="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'" placement="top" theme="light" :show-arrow="false">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    :aria-label="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
+                    @click.stop="handleToggleConversationPin(conversation.id)"
+                  >
+                    <t-icon name="pin" />
+                  </button>
+                </t-tooltip>
+                <t-tooltip content="改名" placement="top" theme="light" :show-arrow="false">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    aria-label="改名"
+                    @click.stop="openRenameConversation(conversation)"
+                  >
+                    <t-icon name="edit-1" />
+                  </button>
+                </t-tooltip>
+                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    aria-label="删除"
+                    @click.stop="handleDeleteConversation(conversation)"
+                  >
+                    <t-icon name="delete" />
+                  </button>
+                </t-tooltip>
               </div>
             </div>
           </nav>
@@ -196,6 +218,28 @@
       </t-loading>
 
     </section>
+
+    <t-dialog
+      v-if="renameVisible"
+      v-model:visible="renameVisible"
+      header="对话改名"
+      width="400px"
+      attach="body"
+      :destroy-on-close="true"
+      confirm-btn="保存"
+      cancel-btn="取消"
+      :confirm-loading="renameSaving"
+      :confirm-on-enter="true"
+      @confirm="confirmRenameConversation"
+    >
+      <t-input
+        v-model="renameTitle"
+        :maxlength="255"
+        show-limit-number
+        placeholder="请输入对话名称"
+        :autofocus="true"
+      />
+    </t-dialog>
   </div>
 </template>
 
@@ -205,6 +249,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import type { AgentVO } from '@/api/agent'
+import { extractApiError } from '@/api/apiError'
+import { deleteConversation, renameConversation, type ConversationVO } from '@/api/conversation'
+import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
@@ -212,7 +259,6 @@ import { useSidebarPins } from '@/composables/useSidebarPins'
 import { formatRelativeTime, getAvatarColor } from '@/utils/format'
 import { resolveTIconName } from '@/utils/icon'
 import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
-import type { ConversationVO } from '@/api/conversation'
 
 defineProps<{
   active: string
@@ -229,6 +275,7 @@ const {
   isConversationPinned,
   toggleAgentPin,
   toggleConversationPin,
+  unpinConversation,
   refresh: refreshPins,
 } = useSidebarPins()
 
@@ -237,6 +284,10 @@ const pinnedExpanded = ref(true)
 const conversationsExpanded = ref(false)
 const conversationFilter = ref<'all' | 'current-agent'>('all')
 const agentsExpanded = ref(true)
+const renameVisible = ref(false)
+const renameSaving = ref(false)
+const renameTitle = ref('')
+const renamingConversationId = ref<number | null>(null)
 
 type SidebarFocus =
   | { type: 'workbench'; path: string }
@@ -447,6 +498,56 @@ async function handleToggleConversationPin(conversationId: number) {
   } catch {
     MessagePlugin.error('置顶操作失败')
   }
+}
+
+function openRenameConversation(conversation: ConversationVO) {
+  renamingConversationId.value = conversation.id
+  renameTitle.value = conversationLabel(conversation)
+  renameVisible.value = true
+}
+
+async function confirmRenameConversation() {
+  const id = renamingConversationId.value
+  const title = renameTitle.value.trim()
+  if (!id) {
+    renameVisible.value = false
+    return
+  }
+  if (!title) {
+    MessagePlugin.warning('请输入对话名称')
+    return
+  }
+  renameSaving.value = true
+  try {
+    await renameConversation(id, title)
+    await refreshConversations()
+    renameVisible.value = false
+    MessagePlugin.success('已改名')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '改名失败'))
+  } finally {
+    renameSaving.value = false
+  }
+}
+
+async function handleDeleteConversation(conversation: ConversationVO) {
+  const label = conversationLabel(conversation)
+  await confirmResourceDelete({
+    header: '删除对话',
+    body: `确定删除对话「${label}」吗？消息将一并删除，此操作不可恢复。`,
+    resourceLabel: '对话',
+    onDelete: async () => {
+      await deleteConversation(conversation.id)
+      await unpinConversation(conversation.id)
+    },
+    onSuccess: async () => {
+      await refreshConversations()
+      if (activeConversationId.value === conversation.id) {
+        await router.push('/chat')
+      }
+      MessagePlugin.success('已删除')
+    },
+  })
 }
 
 function openConversation(conversation: ConversationVO) {
@@ -839,7 +940,7 @@ onMounted(async () => {
   width: 100%;
   min-height: 36px;
   padding: 0;
-  padding-right: 32px;
+  padding-right: 84px;
   border: none;
   background: transparent;
   color: var(--sidebar-text);

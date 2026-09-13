@@ -68,6 +68,14 @@ export function getConversation(id: number) {
   return http.get<Result<ConversationVO>>(`/conversations/${id}`)
 }
 
+export function renameConversation(id: number, title: string) {
+  return http.put<Result<ConversationVO>>(`/conversations/${id}`, { title })
+}
+
+export function deleteConversation(id: number) {
+  return http.delete<Result<void>>(`/conversations/${id}`)
+}
+
 export function listMessages(id: number) {
   return http.get<Result<MessageVO[]>>(`/conversations/${id}/messages`)
 }
