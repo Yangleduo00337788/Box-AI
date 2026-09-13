@@ -11,6 +11,8 @@ export interface SystemContentVO {
   legal: {
     privacy: string[]
     terms: string[]
+    privacyHtml?: string
+    termsHtml?: string
     updatedAt: string
   }
 }

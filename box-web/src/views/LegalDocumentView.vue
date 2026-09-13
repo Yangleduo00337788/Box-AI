@@ -6,10 +6,11 @@
         返回
       </button>
       <t-loading :loading="loading" size="small">
-        <article v-if="paragraphs.length" class="legal-doc">
+        <article v-if="html || paragraphs.length" class="legal-doc">
           <h1>{{ title }}</h1>
           <p v-if="updatedAt" class="legal-doc__updated">最后更新：{{ updatedAt }}</p>
-          <p v-for="(paragraph, index) in paragraphs" :key="index" class="legal-doc__text">{{ paragraph }}</p>
+          <div v-if="html" class="legal-doc__html" v-html="html" />
+          <p v-for="(paragraph, index) in paragraphs" v-else :key="index" class="legal-doc__text">{{ paragraph }}</p>
         </article>
         <t-empty v-else-if="!loading" description="暂无内容" />
       </t-loading>
@@ -31,8 +32,13 @@ const isPrivacy = computed(() => String(route.params.doc) === 'privacy')
 const title = computed(() => (isPrivacy.value ? '隐私政策' : '用户协议'))
 const paragraphs = computed(() => {
   const legal = content.value?.legal
-  if (!legal) return []
+  if (!legal || html.value) return []
   return isPrivacy.value ? legal.privacy || [] : legal.terms || []
+})
+const html = computed(() => {
+  const legal = content.value?.legal
+  if (!legal) return ''
+  return isPrivacy.value ? legal.privacyHtml || '' : legal.termsHtml || ''
 })
 const updatedAt = computed(() => content.value?.legal?.updatedAt || '')
 
@@ -100,6 +106,22 @@ onMounted(async () => {
   margin: 0 0 24px;
   font-size: 12px;
   color: var(--box-muted);
+}
+
+.legal-doc__html {
+  font: var(--td-font-body-medium);
+  color: var(--box-ink);
+  line-height: 1.8;
+}
+
+.legal-doc__html :deep(p) {
+  margin: 0 0 14px;
+}
+
+.legal-doc__html :deep(h1),
+.legal-doc__html :deep(h2),
+.legal-doc__html :deep(h3) {
+  margin: 20px 0 10px;
 }
 
 .legal-doc__text {
