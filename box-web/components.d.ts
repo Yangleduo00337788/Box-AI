@@ -11,6 +11,7 @@ declare module 'vue' {
     AppLogo: typeof import('./src/components/AppLogo.vue')['default']
     AuthAgreement: typeof import('./src/components/AuthAgreement.vue')['default']
     BrandWordmark: typeof import('./src/components/BrandWordmark.vue')['default']
+    ChatComposerShell: typeof import('./src/components/ChatComposerShell.vue')['default']
     ChatMarkdown: typeof import('./src/components/ChatMarkdown.vue')['default']
     ChatModelPicker: typeof import('./src/components/ChatModelPicker.vue')['default']
     ConsumerSidebarFooter: typeof import('./src/components/ConsumerSidebarFooter.vue')['default']

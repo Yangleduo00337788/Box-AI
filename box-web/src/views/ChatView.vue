@@ -24,6 +24,7 @@
         ？
       </h1>
 
+      <chat-composer-shell>
       <div class="composer">
         <t-textarea
           v-model="composerText"
@@ -95,6 +96,7 @@
           </div>
         </div>
       </div>
+      </chat-composer-shell>
 
       <div v-if="suggestionsLoading" class="suggestions-loading">
         <t-loading size="small" />
@@ -236,6 +238,7 @@
         </div>
       </div>
 
+      <chat-composer-shell>
       <div class="composer composer--bottom">
         <t-textarea
           v-model="composerText"
@@ -298,6 +301,7 @@
           </div>
         </div>
       </div>
+      </chat-composer-shell>
       </div>
 
       <aside v-if="tracePanelOpen" class="chat-trace-panel">
@@ -332,6 +336,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
+import ChatComposerShell from '@/components/ChatComposerShell.vue'
 import ChatMarkdown from '@/components/ChatMarkdown.vue'
 import ChatModelPicker from '@/components/ChatModelPicker.vue'
 import { parseUserContent } from '@/utils/chatContent'
