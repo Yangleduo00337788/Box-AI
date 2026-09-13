@@ -1,0 +1,9 @@
+{
+  "name": "@box/sdk",
+  "version": "1.0.0",
+  "description": "Box published Agent API client",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "UNLICENSED"
+}
