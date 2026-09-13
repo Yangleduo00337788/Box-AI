@@ -41,6 +41,9 @@
             <h2 class="config-panel__title">概览</h2>
             <p class="config-panel__desc">基础信息与可见性</p>
             <t-form :data="overviewForm" :rules="overviewRules" label-align="top" @submit="saveOverview">
+              <t-form-item label="Logo">
+                <image-picker v-model="overviewForm.avatarUrl" :fallback-text="(overviewForm.name || '智').slice(0, 1)" hint="上传 Logo" />
+              </t-form-item>
               <t-form-item label="名称" name="name">
                 <t-input v-model="overviewForm.name" maxlength="128" />
               </t-form-item>
@@ -328,7 +331,29 @@
                           :autosize="{ minRows: 3, maxRows: 6 }"
                         />
                       </t-form-item>
-                      <t-button theme="primary" :loading="savingEmbed" @click="saveEmbedConfig">保存 Embed 配置</t-button>
+                      <t-form-item label="自定义域名">
+                        <t-input v-model="embedForm.customDomain" placeholder="chat.example.com" />
+                      </t-form-item>
+                      <p v-if="embedForm.customDomain" class="embed-domain-hint">
+                        将域名 CNAME 到当前站点后访问根路径即可打开嵌入对话。
+                        <span v-if="embedForm.domainVerified">已验证。</span>
+                        <span v-else>尚未验证。</span>
+                      </p>
+                      <p v-if="embedForm.domainVerifyToken" class="embed-domain-hint">
+                        校验文件：<code>/.well-known/box-domain-verify.txt</code> 内容为
+                        <code>{{ embedForm.domainVerifyToken }}</code>
+                      </p>
+                      <t-space>
+                        <t-button theme="primary" :loading="savingEmbed" @click="saveEmbedConfig">保存 Embed 配置</t-button>
+                        <t-button
+                          v-if="embedForm.customDomain"
+                          variant="outline"
+                          :loading="verifyingDomain"
+                          @click="verifyEmbedDomain"
+                        >
+                          验证域名
+                        </t-button>
+                      </t-space>
                     </t-form>
                     <h4 class="config-subtitle" style="margin-top: 20px">集成代码</h4>
                     <p>Web Chat URL</p>
@@ -492,6 +517,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import MonacoEditor from '@/components/MonacoEditor.vue'
+import ImagePicker from '@/components/ImagePicker.vue'
 import { extractApiError } from '@/api/apiError'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import {
@@ -522,12 +548,14 @@ import {
   unbindAgentSubAgent,
   unbindAgentTool,
   unpublishAgent,
+  getAgentEmbedConfig,
   updateAgent,
   updateAgentConfig,
   updateAgentEmbedConfig,
   updateAgentMemory,
   updateAgentModel,
   updateAgentPrompt,
+  verifyAgentEmbedDomain,
   type AgentKnowledgeBindingVO,
   type AgentLongTermMemoryVO,
   type AgentMcpBindingVO,
@@ -607,6 +635,7 @@ const bindingSubAgent = ref(false)
 const savingMemory = ref(false)
 const savingConfig = ref(false)
 const savingEmbed = ref(false)
+const verifyingDomain = ref(false)
 const publishing = ref(false)
 const publishTab = ref<'api' | 'embed' | 'sdk'>('api')
 const sdkLang = ref<'javascript' | 'python' | 'curl'>('javascript')
@@ -651,6 +680,9 @@ const subAgentOptions = computed(() =>
 const publishEndpoint = computed(() => `/api/v1/published/agents/${agentId.value}/chat`)
 const publishChatUrl = computed(() => {
   const title = encodeURIComponent(agent.value?.name || 'Box Agent')
+  if (embedForm.customDomain && embedForm.domainVerified) {
+    return `https://${embedForm.customDomain}/embed?apiKey=YOUR_API_KEY&title=${title}`
+  }
   return `${window.location.origin}/embed/agents/${agentId.value}?apiKey=YOUR_API_KEY&title=${title}`
 })
 const publishEmbedCode = computed(
@@ -670,26 +702,23 @@ const publishApiExample = computed(
   ${publishEndpoint.value}`,
 )
 const publishJsExample = computed(
-  () => `const response = await fetch('${publishEndpoint.value}', {
-  method: 'POST',
-  headers: {
-    Authorization: 'Bearer ax_live_你的密钥',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({ message: '你好', stream: false }),
-});
-const result = await response.json();
-console.log(result.data.content);`,
+  () => `import { BoxClient } from '@box/sdk'
+
+const box = new BoxClient({
+  baseUrl: window.location.origin,
+  apiKey: 'ax_live_你的密钥',
+})
+const answer = await box.chat(${agentId.value}, '你好', {
+  stream: true,
+  onDelta: (chunk) => console.log(chunk),
+})
+console.log(answer)`,
 )
 const publishPythonExample = computed(
-  () => `import requests
+  () => `from boxai import BoxClient
 
-response = requests.post(
-    '${publishEndpoint.value}',
-    headers={'Authorization': 'Bearer ax_live_你的密钥'},
-    json={'message': '你好', 'stream': False},
-)
-print(response.json()['data']['content'])`,
+box = BoxClient('${typeof window !== 'undefined' ? window.location.origin : 'https://your-box-host'}', 'ax_live_你的密钥')
+print(box.chat(${agentId.value}, '你好', stream=True))`,
 )
 const publishSdkExample = computed(() => {
   if (sdkLang.value === 'python') {
@@ -725,7 +754,7 @@ const subAgentColumns = [
   { colKey: 'op', title: '操作', width: 100 },
 ]
 
-const overviewForm = reactive({ name: '', description: '' })
+const overviewForm = reactive({ name: '', description: '', avatarUrl: '' })
 const promptForm = reactive({ systemPrompt: '' })
 const modelForm = reactive({
   modelSource: 'PLATFORM' as ModelSource,
@@ -759,6 +788,9 @@ const embedForm = reactive({
   logoUrl: '',
   welcomeMessage: '',
   suggestedQuestionsText: '',
+  customDomain: '',
+  domainVerified: false,
+  domainVerifyToken: '',
 })
 
 interface AgentConfigPayload {
@@ -769,6 +801,7 @@ interface AgentConfigPayload {
     logoUrl?: string
     welcomeMessage?: string
     suggestedQuestions?: string[]
+    customDomain?: string
   }
 }
 
@@ -898,6 +931,7 @@ function applyAgent(data: AgentVO) {
   agent.value = data
   overviewForm.name = data.name
   overviewForm.description = data.description || ''
+  overviewForm.avatarUrl = data.avatarUrl || ''
   promptForm.systemPrompt = data.systemPrompt || ''
   modelForm.modelSource = data.modelSource === 'BYOK' ? 'BYOK' : 'PLATFORM'
   modelForm.platformModelId = data.platformModelId
@@ -910,6 +944,7 @@ function applyAgent(data: AgentVO) {
   memoryForm.memoryWindowSize = data.memoryWindowSize ?? 20
   memoryForm.longTermMemoryEnabled = data.longTermMemoryEnabled ?? false
   applyConfigJson(data.configJson)
+  void loadEmbedConfig()
   if (memoryForm.longTermMemoryEnabled) {
     loadLongTermMemories()
   } else {
@@ -926,6 +961,9 @@ function applyConfigJson(raw?: string) {
     embedForm.logoUrl = ''
     embedForm.welcomeMessage = ''
     embedForm.suggestedQuestionsText = ''
+    embedForm.customDomain = ''
+    embedForm.domainVerified = false
+    embedForm.domainVerifyToken = ''
     return
   }
   try {
@@ -937,6 +975,7 @@ function applyConfigJson(raw?: string) {
     embedForm.logoUrl = parsed.embed?.logoUrl || ''
     embedForm.welcomeMessage = parsed.embed?.welcomeMessage || ''
     embedForm.suggestedQuestionsText = (parsed.embed?.suggestedQuestions || []).join('\n')
+    embedForm.customDomain = parsed.embed?.customDomain || ''
   } catch {
     configForm.variablesJson = '[]'
   }
@@ -971,16 +1010,47 @@ function buildConfigJson() {
     embedForm.themeColor ||
     embedForm.logoUrl ||
     embedForm.welcomeMessage ||
-    questions.length
+    questions.length ||
+    embedForm.customDomain
   ) {
     payload.embed = {
       themeColor: embedForm.themeColor || '#0052d9',
       logoUrl: embedForm.logoUrl.trim(),
       welcomeMessage: embedForm.welcomeMessage.trim(),
       suggestedQuestions: questions,
+      customDomain: embedForm.customDomain.trim(),
     }
   }
   return JSON.stringify(payload)
+}
+
+function applyEmbedVo(data: {
+  themeColor?: string
+  logoUrl?: string
+  welcomeMessage?: string
+  suggestedQuestions?: string[]
+  customDomain?: string
+  domainVerified?: boolean
+  domainVerifyToken?: string | null
+}) {
+  embedForm.themeColor = data.themeColor || '#0052d9'
+  embedForm.logoUrl = data.logoUrl || ''
+  embedForm.welcomeMessage = data.welcomeMessage || ''
+  embedForm.suggestedQuestionsText = (data.suggestedQuestions || []).join('\n')
+  embedForm.customDomain = data.customDomain || ''
+  embedForm.domainVerified = Boolean(data.domainVerified)
+  embedForm.domainVerifyToken = data.domainVerifyToken || ''
+}
+
+async function loadEmbedConfig() {
+  try {
+    const { data } = await getAgentEmbedConfig(agentId.value)
+    if (data.data) {
+      applyEmbedVo(data.data)
+    }
+  } catch {
+    // keep parsed configJson values
+  }
 }
 
 async function saveEmbedConfig() {
@@ -991,18 +1061,31 @@ async function saveEmbedConfig() {
       logoUrl: embedForm.logoUrl.trim(),
       welcomeMessage: embedForm.welcomeMessage.trim(),
       suggestedQuestions: parseSuggestedQuestions(embedForm.suggestedQuestionsText),
+      customDomain: embedForm.customDomain.trim(),
     })
     if (data.data) {
-      embedForm.themeColor = data.data.themeColor || '#0052d9'
-      embedForm.logoUrl = data.data.logoUrl || ''
-      embedForm.welcomeMessage = data.data.welcomeMessage || ''
-      embedForm.suggestedQuestionsText = (data.data.suggestedQuestions || []).join('\n')
+      applyEmbedVo(data.data)
     }
     MessagePlugin.success('Embed 配置已保存，发布后将对外生效')
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '保存失败'))
   } finally {
     savingEmbed.value = false
+  }
+}
+
+async function verifyEmbedDomain() {
+  verifyingDomain.value = true
+  try {
+    const { data } = await verifyAgentEmbedDomain(agentId.value)
+    if (data.data) {
+      applyEmbedVo(data.data)
+    }
+    MessagePlugin.success(embedForm.domainVerified ? '域名已验证' : '验证已提交')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '域名验证失败'))
+  } finally {
+    verifyingDomain.value = false
   }
 }
 
@@ -1271,6 +1354,7 @@ const saveOverview: FormProps['onSubmit'] = async ({ validateResult }) => {
     const { data } = await updateAgent(agentId.value, {
       name: overviewForm.name.trim(),
       description: overviewForm.description.trim() || undefined,
+      avatarUrl: overviewForm.avatarUrl.trim() || undefined,
       modelId: agent.value.modelId,
     })
     if (data.data) applyAgent(data.data)
@@ -1563,6 +1647,12 @@ onMounted(loadAgent)
 
 .publish-api {
   margin-top: 24px;
+}
+
+.embed-domain-hint {
+  margin: 0 0 12px;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
 }
 
 .publish-tabs {

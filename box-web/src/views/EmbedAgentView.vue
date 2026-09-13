@@ -18,7 +18,7 @@
             :key="question"
             type="button"
             class="embed-suggestion"
-            :disabled="loading || !apiKey"
+            :disabled="loading || !apiKey || !agentId"
             @click="askSuggestion(question)"
           >
             {{ question }}
@@ -33,17 +33,16 @@
       >
         {{ item.content }}
       </div>
-      <div v-if="loading" class="embed-message embed-message--assistant">正在生成…</div>
     </div>
 
     <form class="embed-input" @submit.prevent="send">
       <t-input
         v-model="input"
         placeholder="输入消息…"
-        :disabled="loading || !apiKey"
+        :disabled="loading || !apiKey || !agentId"
         size="large"
       />
-      <t-button theme="primary" type="submit" :loading="loading" :disabled="!apiKey">发送</t-button>
+      <t-button theme="primary" type="submit" :loading="loading" :disabled="!apiKey || !agentId">发送</t-button>
     </form>
   </div>
 </template>
@@ -52,7 +51,11 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
-import { getPublishedAgentEmbedConfig, type AgentEmbedConfigVO } from '@/api/agent'
+import {
+  chatPublishedAgentStream,
+  getPublishedAgentEmbedConfig,
+  type AgentEmbedConfigVO,
+} from '@/api/agent'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -60,7 +63,7 @@ interface ChatMessage {
 }
 
 const route = useRoute()
-const agentId = computed(() => Number(route.params.id))
+const agentId = ref<number>(Number(route.params.id) || 0)
 const apiKey = computed(() => String(route.query.apiKey || ''))
 const queryTitle = computed(() => String(route.query.title || ''))
 const embedConfig = ref<AgentEmbedConfigVO>({
@@ -87,28 +90,37 @@ async function scrollToBottom() {
   }
 }
 
+function applyEmbed(data?: AgentEmbedConfigVO | null) {
+  if (!data) {
+    return
+  }
+  embedConfig.value = {
+    themeColor: data.themeColor || '#0052d9',
+    logoUrl: data.logoUrl,
+    welcomeMessage: data.welcomeMessage,
+    suggestedQuestions: data.suggestedQuestions || [],
+    agentName: data.agentName,
+  }
+}
+
 async function sendMessage(text: string) {
-  if (!text || !apiKey.value || loading.value) {
+  if (!text || !apiKey.value || !agentId.value || loading.value) {
     return
   }
   messages.value.push({ role: 'user', content: text })
+  const assistant: ChatMessage = { role: 'assistant', content: '' }
+  messages.value.push(assistant)
   loading.value = true
   await scrollToBottom()
   try {
-    const response = await fetch(`/api/v1/published/agents/${agentId.value}/chat`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey.value}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message: text, stream: false }),
+    await chatPublishedAgentStream(agentId.value, apiKey.value, text, async (chunk) => {
+      assistant.content += chunk
+      await scrollToBottom()
     })
-    const payload = await response.json()
-    if (!response.ok || payload.code !== 0) {
-      throw new Error(payload.message || '请求失败')
-    }
-    messages.value.push({ role: 'assistant', content: payload.data?.content || '' })
   } catch (error) {
+    if (!assistant.content) {
+      messages.value.pop()
+    }
     MessagePlugin.error(error instanceof Error ? error.message : '发送失败')
   } finally {
     loading.value = false
@@ -130,17 +142,25 @@ async function askSuggestion(question: string) {
 }
 
 async function loadEmbedConfig() {
+  if (!agentId.value) {
+    try {
+      const response = await fetch(`/api/v1/published/embed/resolve?host=${encodeURIComponent(window.location.hostname)}`)
+      const payload = await response.json()
+      if (payload?.code === 0 && payload.data?.agentId) {
+        agentId.value = Number(payload.data.agentId)
+        applyEmbed(payload.data.embed)
+        return
+      }
+      MessagePlugin.warning('无法根据当前域名解析嵌入对话')
+      return
+    } catch {
+      MessagePlugin.warning('无法根据当前域名解析嵌入对话')
+      return
+    }
+  }
   try {
     const { data } = await getPublishedAgentEmbedConfig(agentId.value)
-    if (data.data) {
-      embedConfig.value = {
-        themeColor: data.data.themeColor || '#0052d9',
-        logoUrl: data.data.logoUrl,
-        welcomeMessage: data.data.welcomeMessage,
-        suggestedQuestions: data.data.suggestedQuestions || [],
-        agentName: data.data.agentName,
-      }
-    }
+    applyEmbed(data.data)
   } catch {
     // keep defaults when agent is not published or config unavailable
   }

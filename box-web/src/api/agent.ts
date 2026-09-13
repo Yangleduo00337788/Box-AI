@@ -113,6 +113,15 @@ export interface AgentEmbedConfigVO {
   welcomeMessage?: string
   suggestedQuestions?: string[]
   agentName?: string
+  customDomain?: string
+  domainVerified?: boolean
+  domainVerifyToken?: string | null
+}
+
+export interface PublishedEmbedResolveVO {
+  agentId: number
+  customDomain?: string
+  embed?: AgentEmbedConfigVO
 }
 
 export function getAgentEmbedConfig(id: number) {
@@ -123,8 +132,17 @@ export function updateAgentEmbedConfig(id: number, payload: Partial<AgentEmbedCo
   return http.put<Result<AgentEmbedConfigVO>>(`/agents/${id}/embed-config`, payload)
 }
 
+export function verifyAgentEmbedDomain(id: number) {
+  return http.post<Result<AgentEmbedConfigVO>>(`/agents/${id}/embed-domain/verify`)
+}
+
 export function getPublishedAgentEmbedConfig(id: number) {
   return http.get<Result<AgentEmbedConfigVO>>(`/published/agents/${id}/embed-config`)
+}
+
+export function resolvePublishedEmbed(host?: string) {
+  const query = host ? `?host=${encodeURIComponent(host)}` : ''
+  return http.get<Result<PublishedEmbedResolveVO>>(`/published/embed/resolve${query}`)
 }
 
 export interface AgentChatHistoryItem {
@@ -218,6 +236,26 @@ export async function chatAgentStream(
     onToolConfirm: options?.onToolConfirm,
   }
   await consumeSseStream(response, handlers, options?.signal)
+}
+
+export async function chatPublishedAgentStream(
+  id: number,
+  apiKey: string,
+  message: string,
+  onDelta: (chunk: string) => void,
+  options?: { signal?: AbortSignal },
+): Promise<void> {
+  const response = await fetch(`/api/v1/published/agents/${id}/chat`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream, application/json',
+    },
+    body: JSON.stringify({ message, stream: true }),
+    signal: options?.signal,
+  })
+  await consumeSseStream(response, { onDelta }, options?.signal)
 }
 
 export function deleteAgent(id: number) {
