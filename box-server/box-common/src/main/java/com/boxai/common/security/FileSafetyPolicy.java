@@ -6,16 +6,19 @@ import com.boxai.common.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class FileSafetyPolicy {
 
     public static final long MAX_SIZE_BYTES = 20L * 1024 * 1024;
-    public static final long MAX_IMAGE_SIZE_BYTES = 2L * 1024 * 1024;
+    public static final long MAX_IMAGE_SIZE_BYTES = 8L * 1024 * 1024;
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx",
-            "txt", "md", "csv", "json", "png", "jpg", "jpeg");
-    private static final Set<String> IMAGE_EXTENSIONS = Set.of("png", "jpg", "jpeg");
+            "txt", "md", "csv", "json", "png", "jpg", "jpeg", "svg");
+    private static final Set<String> IMAGE_EXTENSIONS = Set.of("png", "jpg", "jpeg", "svg");
+    private static final int MAX_INLINE_SVG_CHARS = 65536;
+    private static final Pattern SVG_EVENT_ATTR = Pattern.compile("on[a-z]+\\s*=", Pattern.CASE_INSENSITIVE);
 
     private FileSafetyPolicy() {
     }
@@ -70,11 +73,23 @@ public final class FileSafetyPolicy {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请上传图片");
         }
         if (size > MAX_IMAGE_SIZE_BYTES || bytes.length > MAX_IMAGE_SIZE_BYTES) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片不能超过 2MB");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片不能超过 8MB");
         }
         String ext = requireAllowedExtension(originalName);
         if (!IMAGE_EXTENSIONS.contains(ext)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅支持 PNG / JPG 图片");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅支持 PNG / JPG / SVG 图片");
+        }
+        if ("svg".equals(ext)) {
+            if (!looksLikeSafeSvg(bytes)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "SVG 内容无效或不安全");
+            }
+            if (contentType != null && !contentType.isBlank()) {
+                String mime = contentType.toLowerCase(Locale.ROOT);
+                if (!(mime.contains("svg") || mime.equals("image/svg+xml"))) {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持该 MIME 类型");
+                }
+            }
+            return ext;
         }
         if (!looksLikeImage(bytes, ext)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "图片内容无效");
@@ -117,7 +132,7 @@ public final class FileSafetyPolicy {
         if (bytes == null || bytes.length == 0) {
             return false;
         }
-        if ("png".equals(ext) || "jpg".equals(ext) || "jpeg".equals(ext) || "pdf".equals(ext)) {
+        if ("png".equals(ext) || "jpg".equals(ext) || "jpeg".equals(ext) || "pdf".equals(ext) || "svg".equals(ext)) {
             return false;
         }
         String sample = new String(bytes, 0, Math.min(bytes.length, 256), StandardCharsets.UTF_8)
@@ -125,7 +140,65 @@ public final class FileSafetyPolicy {
                 .toLowerCase(Locale.ROOT);
         return sample.startsWith("<!doctype html")
                 || sample.startsWith("<html")
-                || sample.startsWith("<svg")
                 || sample.startsWith("<script");
+    }
+
+    public static String sanitizeInlineSvg(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String text = raw.trim();
+        if (text.length() > MAX_INLINE_SVG_CHARS) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "SVG 代码过长");
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        int start = lower.indexOf("<svg");
+        if (start < 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请输入完整的 SVG 代码");
+        }
+        int endTag = lower.lastIndexOf("</svg>");
+        String svg;
+        if (endTag > start) {
+            svg = text.substring(start, endTag + "</svg>".length());
+        } else {
+            int gt = text.indexOf('>', start);
+            if (gt < 0) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "请输入完整的 SVG 代码");
+            }
+            svg = text.substring(start, gt + 1);
+            if (!svg.trim().endsWith("/>")) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "请输入完整的 SVG 代码");
+            }
+        }
+        String cleaned = stripUnsafeSvg(svg);
+        if (!cleaned.toLowerCase(Locale.ROOT).contains("<svg")) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "SVG 内容无效或不安全");
+        }
+        return cleaned;
+    }
+
+    private static String stripUnsafeSvg(String svg) {
+        return svg.replaceAll("(?is)<script\\b[^>]*>.*?</script>", "")
+                .replaceAll("(?is)<foreignObject\\b[^>]*>.*?</foreignObject>", "")
+                .replaceAll("(?is)<iframe\\b[^>]*>.*?</iframe>", "")
+                .replaceAll("(?is)<embed\\b[^>]*>.*?</embed>", "")
+                .replaceAll("(?is)<object\\b[^>]*>.*?</object>", "")
+                .replaceAll("(?i)javascript:", "")
+                .replaceAll("(?i)\\s+on[a-z]+\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)", "");
+    }
+
+    private static boolean looksLikeSafeSvg(byte[] bytes) {
+        String text = new String(bytes, StandardCharsets.UTF_8).trim();
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (!lower.contains("<svg")) {
+            return false;
+        }
+        return !lower.contains("<script")
+                && !lower.contains("javascript:")
+                && !lower.contains("foreignobject")
+                && !lower.contains("<iframe")
+                && !lower.contains("<embed")
+                && !lower.contains("<object")
+                && !SVG_EVENT_ATTR.matcher(lower).find();
     }
 }

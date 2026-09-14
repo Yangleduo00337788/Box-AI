@@ -19,6 +19,7 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
@@ -64,6 +65,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
     public void handleNotAcceptable(HttpServletResponse response) throws IOException {
         writeJson(response, HttpStatus.BAD_REQUEST, Result.failure(ErrorCode.BAD_REQUEST, "请求无法完成"));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public void handleMaxUpload(HttpServletResponse response) throws IOException {
+        writeJson(response, HttpStatus.BAD_REQUEST, Result.failure(ErrorCode.BAD_REQUEST, "上传文件过大，单文件不能超过 20MB"));
     }
 
     @ExceptionHandler(Exception.class)

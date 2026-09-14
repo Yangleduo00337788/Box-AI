@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: box-server
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
   datasource:
     url: jdbc:mysql://127.0.0.1:3307/box?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: root

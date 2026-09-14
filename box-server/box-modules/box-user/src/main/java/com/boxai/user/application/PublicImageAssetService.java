@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
 @Service
 public class PublicImageAssetService {
 
-    private static final Pattern FILE_NAME = Pattern.compile("^[0-9a-fA-F-]{36}\\.(png|jpg|jpeg)$");
-    private static final Set<String> IMAGE_EXT = Set.of("png", "jpg", "jpeg");
+    private static final Pattern FILE_NAME = Pattern.compile("^[0-9a-fA-F-]{36}\\.(png|jpg|jpeg|svg)$");
+    private static final Set<String> IMAGE_EXT = Set.of("png", "jpg", "jpeg", "svg");
 
     private final ObjectStorage objectStorage;
     private final String storageBucket;
@@ -74,6 +74,9 @@ public class PublicImageAssetService {
     private static String contentType(String ext) {
         if ("png".equals(ext)) {
             return MediaType.IMAGE_PNG_VALUE;
+        }
+        if ("svg".equals(ext)) {
+            return "image/svg+xml";
         }
         return MediaType.IMAGE_JPEG_VALUE;
     }
