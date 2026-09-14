@@ -16,4 +16,6 @@ public interface PluginCategoryRepository {
     void save(PluginCategory category);
 
     void update(PluginCategory category);
+
+    void delete(String categoryCode);
 }

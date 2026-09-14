@@ -6,6 +6,7 @@ public record AdminPluginCatalogVO(
         String category,
         String title,
         String description,
+        String manifestJson,
         String status,
         Integer sortOrder,
         Integer installCount

@@ -14,6 +14,7 @@ public class PluginCatalog {
     private String category;
     private String title;
     private String description;
+    private String manifestJson;
     private String status;
     private Integer sortOrder;
     private Integer installCount;

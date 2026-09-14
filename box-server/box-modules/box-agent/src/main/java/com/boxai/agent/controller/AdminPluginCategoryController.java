@@ -6,6 +6,7 @@ import com.boxai.agent.api.plugin.UpdatePluginCategoryRequest;
 import com.boxai.agent.application.PluginCategoryApplicationService;
 import com.boxai.common.result.Result;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,5 +50,11 @@ public class AdminPluginCategoryController {
                 request.description(),
                 request.sortOrder(),
                 request.status()));
+    }
+
+    @DeleteMapping("/{categoryCode}")
+    public Result<Void> delete(@PathVariable String categoryCode) {
+        pluginCategoryApplicationService.delete(categoryCode);
+        return Result.success(null);
     }
 }

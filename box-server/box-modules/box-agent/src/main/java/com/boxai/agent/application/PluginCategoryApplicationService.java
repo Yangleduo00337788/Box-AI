@@ -3,6 +3,7 @@ package com.boxai.agent.application;
 import com.boxai.agent.api.plugin.PluginCategoryVO;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.plugin.PluginCatalogRepository;
 import com.boxai.domain.plugin.PluginCategory;
 import com.boxai.domain.plugin.PluginCategoryRepository;
 import org.springframework.stereotype.Service;
@@ -14,9 +15,12 @@ import java.util.List;
 public class PluginCategoryApplicationService {
 
     private final PluginCategoryRepository pluginCategoryRepository;
+    private final PluginCatalogRepository pluginCatalogRepository;
 
-    public PluginCategoryApplicationService(PluginCategoryRepository pluginCategoryRepository) {
+    public PluginCategoryApplicationService(PluginCategoryRepository pluginCategoryRepository,
+                                            PluginCatalogRepository pluginCatalogRepository) {
         this.pluginCategoryRepository = pluginCategoryRepository;
+        this.pluginCatalogRepository = pluginCatalogRepository;
     }
 
     public List<PluginCategoryVO> listActive() {
@@ -73,6 +77,17 @@ public class PluginCategoryApplicationService {
         }
         pluginCategoryRepository.update(category);
         return toVO(category);
+    }
+
+    @Transactional
+    public void delete(String categoryCode) {
+        pluginCategoryRepository.findByCode(categoryCode)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "分类不存在"));
+        long pluginCount = pluginCatalogRepository.countByCategory(categoryCode);
+        if (pluginCount > 0) {
+            throw new BusinessException(ErrorCode.CONFLICT, "该分类下仍有插件，请先删除或改分类后再删除");
+        }
+        pluginCategoryRepository.delete(categoryCode);
     }
 
     private PluginCategoryVO toVO(PluginCategory category) {

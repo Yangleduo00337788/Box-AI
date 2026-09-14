@@ -46,6 +46,14 @@ public class WorkspacePluginInstallRepositoryImpl implements WorkspacePluginInst
     }
 
     @Override
+    public long countByPluginId(Long pluginId) {
+        if (pluginId == null) {
+            return 0;
+        }
+        return mapper.selectCountByQuery(QueryWrapper.create().eq("plugin_id", pluginId));
+    }
+
+    @Override
     public WorkspacePluginInstall save(WorkspacePluginInstall install) {
         WorkspacePluginInstallDO row = new WorkspacePluginInstallDO();
         row.setWorkspaceId(install.getWorkspaceId());

@@ -15,9 +15,13 @@ public interface PluginCatalogRepository {
 
     List<PluginCatalog> searchByTitle(String keyword, int limit);
 
+    long countByCategory(String category);
+
     PluginCatalog save(PluginCatalog plugin);
 
     void update(PluginCatalog plugin);
+
+    void delete(Long id);
 
     void incrementInstallCount(Long id);
 

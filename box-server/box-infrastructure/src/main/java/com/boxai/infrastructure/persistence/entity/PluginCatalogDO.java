@@ -19,6 +19,8 @@ public class PluginCatalogDO {
     private String category;
     private String title;
     private String description;
+    @Column("manifest_json")
+    private String manifestJson;
     private String status;
     @Column("sort_order")
     private Integer sortOrder;

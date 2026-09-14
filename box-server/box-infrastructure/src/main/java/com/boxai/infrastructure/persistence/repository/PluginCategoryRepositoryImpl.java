@@ -74,6 +74,11 @@ public class PluginCategoryRepositoryImpl implements PluginCategoryRepository {
         category.setUpdatedAt(row.getUpdatedAt());
     }
 
+    @Override
+    public void delete(String categoryCode) {
+        mapper.deleteById(categoryCode);
+    }
+
     private PluginCategory toDomain(PluginCategoryDO row) {
         PluginCategory category = new PluginCategory();
         category.setCategoryCode(row.getCategoryCode());

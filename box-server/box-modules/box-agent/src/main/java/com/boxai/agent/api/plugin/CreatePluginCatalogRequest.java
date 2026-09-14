@@ -7,5 +7,6 @@ public record CreatePluginCatalogRequest(
         @NotBlank String category,
         @NotBlank String title,
         String description,
+        String manifestJson,
         Integer sortOrder
 ) {}

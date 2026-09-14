@@ -74,6 +74,14 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
     }
 
     @Override
+    public long countByCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return 0;
+        }
+        return mapper.selectCountByQuery(QueryWrapper.create().eq("category", category.trim()));
+    }
+
+    @Override
     public PluginCatalog save(PluginCatalog plugin) {
         PluginCatalogDO row = toDo(plugin);
         row.setCreatedAt(LocalDateTime.now());
@@ -114,6 +122,11 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
                 .update();
     }
 
+    @Override
+    public void delete(Long id) {
+        mapper.deleteById(id);
+    }
+
     private PluginCatalogDO toDo(PluginCatalog plugin) {
         PluginCatalogDO row = new PluginCatalogDO();
         row.setId(plugin.getId());
@@ -121,6 +134,7 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         row.setCategory(plugin.getCategory());
         row.setTitle(plugin.getTitle());
         row.setDescription(plugin.getDescription());
+        row.setManifestJson(plugin.getManifestJson());
         row.setStatus(plugin.getStatus());
         row.setSortOrder(plugin.getSortOrder());
         row.setInstallCount(plugin.getInstallCount());
@@ -134,6 +148,7 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         plugin.setCategory(row.getCategory());
         plugin.setTitle(row.getTitle());
         plugin.setDescription(row.getDescription());
+        plugin.setManifestJson(row.getManifestJson());
         plugin.setStatus(row.getStatus());
         plugin.setSortOrder(row.getSortOrder());
         plugin.setInstallCount(row.getInstallCount());

@@ -12,6 +12,8 @@ public interface WorkspacePluginInstallRepository {
 
     Set<Long> listInstalledPluginIds(Long workspaceId);
 
+    long countByPluginId(Long pluginId);
+
     WorkspacePluginInstall save(WorkspacePluginInstall install);
 
     void delete(Long id);
