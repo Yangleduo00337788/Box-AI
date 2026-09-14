@@ -40,15 +40,43 @@ lerna-debug.log*
 **/application-local.properties
 box-server/box-bootstrap/src/main/resources/application.yml
 
-# 测试覆盖率
+# 测试产物与本地联调（不含 Java src/test 单元测试源码）
 coverage/
 .nyc_output/
+.pytest_cache/
+e2e/
+**/e2e/
+**/surefire-reports/
+**/failsafe-reports/
+**/test-output/
+playwright-report/
+test-results/
+
+# 一次性脚本 / 本地演示（任意目录下的 scripts）
+scripts/
+**/scripts/
+
+# Python 本地环境
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 日志
+*.log
+logs/
 
 # 临时文件
 tmp/
 tmp-*/
 *.tmp
 *.bak
+*.orig
+
+# 构建 / 工具缓存
+.cache/
+.eslintcache
+.turbo/
 
 # OS
 .DS_Store
@@ -59,9 +87,6 @@ Desktop.ini
 .agents/
 .cursor/
 skills-lock.json
-
-# 一次性生成脚本
-scripts/
 
 # Docker 本地数据卷（如有）
 deploy/data/
