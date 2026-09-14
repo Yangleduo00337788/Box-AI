@@ -1,6 +1,6 @@
 # Box V1 进度追踪
 
-文档版本：V1.6 · 整体完成度：**~95%**
+文档版本：V1.7 · 整体完成度：**~96%**
 
 > 未完成项与执行顺序见 [`10-Gaps.md`](./10-Gaps.md)。本文档反映代码库真实状态，不再使用「100%」表述。
 
@@ -10,10 +10,25 @@
 
 | 维度 | 完成度 | 说明 |
 |------|--------|------|
-| 文档规划 | ~98% | 与代码库对齐：模块/路由/表名/Docker/SSE（2026-09 文档修订） |
-| 后端实现 | ~96% | OAuth stub、Embed 配置 API、Docker 镜像 |
-| 前端实现 | ~94% | Embed 定制、模板向导、Workflow 1920 布局 |
-| V1 可演示 | ~98% | **P0/P1/P2 主清单已全部完成** |
+| 文档规划 | ~96% | 2026-09-14 已补 Flyway V25–V29、B 端路由；PRD Super Admin 部分能力仍在 backlog |
+| 后端实现 | ~96% | V1 主清单完成；OAuth 仍为 stub；B 端用户/审计/套餐知识库配额已接 |
+| 前端实现 | ~95% | C 端 V1 完成；B 端工作台/用户/审计/主题已落地 |
+| V1 可演示 | ~98% | **`10-Gaps.md` P0/P1/P2 主清单已全部完成** |
+
+---
+
+## Sprint 7 已完成（B 端运营补齐，2026-09-14）
+
+| ID | 任务 | 状态 |
+|----|------|------|
+| A-01 | B 端工作台 `/dashboard`（统计 + 图表） | ✅ |
+| A-02 | 全平台审计 `GET /api/v1/admin/audit-logs` | ✅ |
+| A-03 | 平台用户列表启停 + `POST /api/v1/admin/users` 创建管理员 | ✅ |
+| A-07 | 平台分析 `/analytics`（执行量 / Token / 租户用量） | ✅ |
+| A-08 | 官方工具 `/platform-tools`、官方 MCP `/platform-mcp` | ✅ |
+| A-04 | 套餐 `quotaKnowledgeBases` 读写 | ✅ |
+| A-05 | 新建租户可选 PERSONAL / ENTERPRISE | ✅ |
+| A-06 | 插件 `manifest_json`（Flyway V29） | ✅ |
 
 ---
 
@@ -167,7 +182,7 @@
 
 ---
 
-## Flyway 迁移（当前 V1–V24）
+## Flyway 迁移（当前 V1–V29）
 
 路径：`box-server/box-bootstrap/src/main/resources/db/migration/`
 
@@ -197,6 +212,11 @@
 | V22 | `V22__audit_log.sql` | 审计日志 |
 | V23 | `V23__rbac_permissions.sql` | RBAC 权限码补齐 |
 | V24 | `V24__execution_request_id.sql` | Execution request_id |
+| V25 | `V25__embed_custom_domain.sql` | Embed 自定义域名 |
+| V26 | `V26__legal_documents.sql` | 法律文档配置 |
+| V27 | `V27__column_comments.sql` | 列注释 |
+| V28 | `V28__plugin_skills.sql` | 插件 Skill |
+| V29 | `V29__plugin_catalog_manifest.sql` | 插件目录 manifest_json |
 
 ---
 
@@ -237,15 +257,21 @@
 | 嵌入对话 | `/embed/agents/:id` | ✅ | 公开页 |
 | 忘记密码 | `/forgot-password` | ✅ | 公开页 |
 
-**管理后台 `box-admin-web`**（独立 Vite 应用，默认 `/tenants`）：
+**管理后台 `box-admin-web`**（独立 Vite 应用，默认 `/dashboard`）：
 
 | 页面 | 路由 | 备注 |
 |------|------|------|
-| 租户管理 | `/tenants` | 租户创建、启停、成员 |
-| 套餐管理 | `/plans` | 套餐与配额 |
+| 工作台 | `/dashboard` | 租户/资源统计与图表 |
+| 平台分析 | `/analytics` | 执行量、成功率、Token、租户用量 TOP |
+| 租户管理 | `/tenants` | 创建（含个人/企业）、启停、成员、套餐、额度 |
+| 用户管理 | `/users` | 新建平台管理员、分页、类型/状态、启停 |
+| 套餐管理 | `/plans` | 套餐与配额（含知识库上限） |
+| 审计日志 | `/audit-logs` | 全平台操作记录 |
 | 平台模型池 | `/platform-models` | 平台级模型与密钥 |
 | 智能体市场 | `/agent-templates` | C 端模板上架 |
 | 插件市场 | `/plugin-catalog` | 插件分类与上架 |
+| 官方工具 | `/platform-tools` | 上架 HTTP 工具供租户安装 |
+| 官方 MCP | `/platform-mcp` | 上架 MCP 服务供租户安装 |
 | 系统配置 | `/system-config` | 关于、协议、客服 |
 
 已废弃或重定向：`/conversations`、`/chat/logs`、`/agents` → `/chat`
@@ -355,7 +381,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 | 通知 | `/api/v1/notifications/*` | ✅ | 未读角标、已读；顶栏 `NotificationCenter` |
 | 账单/额度 | `/api/v1/billing/*` | ✅ | `box-tenant` |
 | 侧栏 | `/api/v1/sidebar` | ✅ | C 端菜单与工作区上下文 |
-| 平台管理 | `/api/v1/admin/*` | ✅ | 租户、套餐、平台模型、插件目录、系统配置 |
+| 平台管理 | `/api/v1/admin/*` | ✅ | 租户、用户、套餐、审计、分析、平台模型、插件/工具/MCP、系统配置 |
 
 ---
 

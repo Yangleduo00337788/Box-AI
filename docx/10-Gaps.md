@@ -1,8 +1,8 @@
 # Box 未完成项 — 可执行 TODO 清单
 
-文档版本：V1.0  
-更新说明：对照 `02-PRD.md`、`03-Architecture.md`、`05-Backend.md`、`09-Progress.md` 与当前代码库梳理  
-整体完成度估算：后端 ~96% · 前端 ~94% · **文档同步 ~98%**（2026-09 已与代码库对齐）
+文档版本：V1.1  
+更新说明：2026-09-14 对照代码库补 B 端与 Flyway V25–V29；主清单仍全部 ✅，新增 §八 backlog  
+整体完成度估算：后端 ~96% · 前端 ~95% · **文档同步 ~96%**
 
 ---
 
@@ -214,11 +214,26 @@ B-17 B-18  +  F-17 F-19 F-20
 
 ### V1 主清单已清零
 
-P0 / P1 / P2 共 50 项已全部完成。后续可按 PRD 远期另开 backlog，例如：
+P0 / P1 / P2 共 50 项已全部完成。后续需求见下方 §八，勿与本清单混用。
 
-- 真实 OAuth/SSO 对接（GitHub/Google/OIDC 完整流程）
-- Embed 流式对话、自定义域名
-- Workflow 自动布局算法
+---
+
+## 八、对照 PRD 仍未做 / 未对齐（新 backlog）
+
+主清单清零后，与 `02-PRD.md` Super Admin 及远期项仍有差距。以下**不是** V1 必补，按需排期。
+
+| ID | 优先级 | 状态 | 任务 | 说明 |
+|----|--------|------|------|------|
+| BL-01 | P2 | 🟡 | 真实 OAuth / 企业 SSO | 现有 providers + authorize/callback **stub（501）** |
+| BL-02 | P2 | ✅ | B 端平台 Analytics | `/analytics` + `GET /api/v1/admin/analytics/overview|trends` |
+| BL-03 | P2 | ✅ | B 端工具 / MCP 目录 | `/platform-tools`、`/platform-mcp`，复用插件目录 category |
+| BL-04 | P2 | 🟡 | Embed 自定义域名生效 | V25 + Builder 可填；DNS 校验与按域名路由未闭环 |
+| BL-05 | P2 | ⬜ | 计费支付闭环 | 套餐/额度/账单页已有，无支付网关 |
+| BL-06 | P2 | ⬜ | Kubernetes / 分布式 Runtime | PRD §97 明确暂时不追求 |
+| BL-07 | P1 | ⬜ | 抽检 `05-Backend.md` B 端路由 | 仍写默认 `/tenants`，缺 dashboard/users/audit |
+| BL-08 | P2 | ✅ | B 端创建平台管理员 | `POST /api/v1/admin/users` + 用户页弹窗 |
+
+**已对齐、文档曾滞后（现已写入 `09-Progress.md`）**：Flyway V25–V29；B 端工作台/用户/审计/租户类型/知识库配额；C 端默认入口 `/chat`（PRD 写 Dashboard 首页，以 F-06 产品决策为准）。
 
 ---
 
