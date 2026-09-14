@@ -23,4 +23,8 @@ public interface ExecutionRepository {
     List<Execution> listByConversation(Long conversationId, int limit);
 
     int countByWorkspace(Long workspaceId);
+
+    List<Execution> listRecent(int limit);
+
+    int countAll();
 }

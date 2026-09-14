@@ -8,6 +8,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -24,6 +25,13 @@ public class TenantUsageRepositoryImpl implements TenantUsageRepository {
         return Optional.ofNullable(tenantUsageMapper.selectOneByQuery(
                         QueryWrapper.create().eq("tenant_id", tenantId).eq("period", period)))
                 .map(this::toDomain);
+    }
+
+    @Override
+    public List<TenantUsage> listByPeriod(String period) {
+        return tenantUsageMapper.selectListByQuery(QueryWrapper.create().eq("period", period)).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override

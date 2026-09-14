@@ -91,6 +91,21 @@ public class ExecutionRepositoryImpl implements ExecutionRepository {
         return count == null ? 0 : count.intValue();
     }
 
+    @Override
+    public List<Execution> listRecent(int limit) {
+        return mapper.selectListByQuery(
+                        QueryWrapper.create().orderBy("created_at", false).limit(Math.max(limit, 1)))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public int countAll() {
+        Long count = mapper.selectCountByQuery(QueryWrapper.create());
+        return count == null ? 0 : count.intValue();
+    }
+
     private Execution toDomain(ExecutionDO row) {
         Execution execution = new Execution();
         execution.setId(row.getId());
