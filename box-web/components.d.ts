@@ -8,7 +8,6 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    AppLogo: typeof import('./src/components/AppLogo.vue')['default']
     AuthAgreement: typeof import('./src/components/AuthAgreement.vue')['default']
     BrandWordmark: typeof import('./src/components/BrandWordmark.vue')['default']
     ChatComposerShell: typeof import('./src/components/ChatComposerShell.vue')['default']

@@ -4,6 +4,8 @@ export interface AuditLogVO {
   id: number
   workspaceId: number
   userId?: number
+  userEmail?: string
+  userNickname?: string
   action: string
   resourceType: string
   resourceId?: string

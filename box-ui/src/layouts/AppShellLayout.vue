@@ -41,15 +41,17 @@
               v-if="shellVariant === 'consumer'"
               class="sidebar-header__actions"
             >
-              <button
-                type="button"
-                class="sidebar-header-btn sidebar-collapse"
-                aria-label="折叠导航"
-                @click="collapsed = true"
-              >
-                <sidebar-collapse-icon :collapsed="false" />
-              </button>
-              <t-tooltip content="搜索" placement="bottom" theme="light" :show-arrow="false">
+              <t-tooltip content="折叠导航" placement="bottom" theme="light" :show-arrow="false" attach="body">
+                <button
+                  type="button"
+                  class="sidebar-header-btn sidebar-collapse"
+                  aria-label="折叠导航"
+                  @click="collapsed = true"
+                >
+                  <sidebar-collapse-icon :collapsed="false" />
+                </button>
+              </t-tooltip>
+              <t-tooltip content="搜索" placement="bottom" theme="light" :show-arrow="false" attach="body">
                 <button
                   type="button"
                   class="sidebar-header-btn"
@@ -60,15 +62,23 @@
                 </button>
               </t-tooltip>
             </div>
-            <button
+            <t-tooltip
               v-else
-              type="button"
-              class="sidebar-header-btn sidebar-collapse"
-              :aria-label="isAdminIconRail ? '展开导航' : '折叠导航'"
-              @click="collapsed = !collapsed"
+              :content="isAdminIconRail ? '展开导航' : '折叠导航'"
+              placement="bottom"
+              theme="light"
+              :show-arrow="false"
+              attach="body"
             >
-              <sidebar-collapse-icon :collapsed="isAdminIconRail" />
-            </button>
+              <button
+                type="button"
+                class="sidebar-header-btn sidebar-collapse"
+                :aria-label="isAdminIconRail ? '展开导航' : '折叠导航'"
+                @click="collapsed = !collapsed"
+              >
+                <sidebar-collapse-icon :collapsed="isAdminIconRail" />
+              </button>
+            </t-tooltip>
           </div>
         </div>
 
@@ -130,15 +140,23 @@
         }"
       >
         <Transition name="sidebar-expand">
-          <button
+          <t-tooltip
             v-if="isConsumerCollapsed && !hideSidebar"
-            type="button"
-            class="sidebar-expand-trigger"
-            aria-label="展开导航"
-            @click="collapsed = false"
+            content="展开导航"
+            placement="right"
+            theme="light"
+            :show-arrow="false"
+            attach="body"
           >
-            <sidebar-collapse-icon :collapsed="true" />
-          </button>
+            <button
+              type="button"
+              class="sidebar-expand-trigger"
+              aria-label="展开导航"
+              @click="collapsed = false"
+            >
+              <sidebar-collapse-icon :collapsed="true" />
+            </button>
+          </t-tooltip>
         </Transition>
         <router-view />
       </div>
@@ -319,6 +337,10 @@ function onSearch() {
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+}
+
+.sidebar-header__actions :deep(.t-popup__reference) {
+  display: inline-flex;
 }
 
 .sidebar-brand-link {

@@ -19,18 +19,28 @@
         <div class="sidebar-task-panel__head">
           <span class="sidebar-task-panel__title">对话历史</span>
           <div class="sidebar-task-panel__tools">
-            <button
-              type="button"
-              class="sidebar-task-panel__tool"
-              :aria-label="conversationsExpanded ? '收起列表' : '展开列表'"
-              @click="toggleConversationsExpanded"
+            <t-tooltip
+              :content="conversationsExpanded ? '收起列表' : '展开列表'"
+              placement="top"
+              theme="light"
+              :show-arrow="false"
+              attach="body"
             >
-              <t-icon :name="conversationsExpanded ? 'fullscreen-exit' : 'fullscreen'" />
-            </button>
-            <t-dropdown :options="conversationFilterOptions" trigger="click" @click="onConversationFilter">
-              <button type="button" class="sidebar-task-panel__tool" aria-label="筛选对话">
-                <t-icon name="filter" />
+              <button
+                type="button"
+                class="sidebar-task-panel__tool"
+                :aria-label="conversationsExpanded ? '收起列表' : '展开列表'"
+                @click="toggleConversationsExpanded"
+              >
+                <t-icon :name="conversationsExpanded ? 'fullscreen-exit' : 'fullscreen'" />
               </button>
+            </t-tooltip>
+            <t-dropdown :options="conversationFilterOptions" trigger="click" @click="onConversationFilter">
+              <t-tooltip content="筛选对话" placement="top" theme="light" :show-arrow="false" attach="body">
+                <button type="button" class="sidebar-task-panel__tool" aria-label="筛选对话">
+                  <t-icon name="filter" />
+                </button>
+              </t-tooltip>
             </t-dropdown>
           </div>
         </div>
@@ -52,7 +62,13 @@
                 <span class="sidebar-task-row__label">{{ conversationLabel(conversation) }}</span>
               </button>
               <div class="sidebar-task-row__actions">
-                <t-tooltip :content="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'" placement="top" theme="light" :show-arrow="false">
+                <t-tooltip
+                  :content="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
+                  placement="top"
+                  theme="light"
+                  :show-arrow="false"
+                  attach="body"
+                >
                   <button
                     type="button"
                     class="sidebar-task-row__action"
@@ -62,7 +78,7 @@
                     <t-icon name="pin" />
                   </button>
                 </t-tooltip>
-                <t-tooltip content="改名" placement="top" theme="light" :show-arrow="false">
+                <t-tooltip content="改名" placement="top" theme="light" :show-arrow="false" attach="body">
                   <button
                     type="button"
                     class="sidebar-task-row__action"
@@ -72,7 +88,7 @@
                     <t-icon name="edit-1" />
                   </button>
                 </t-tooltip>
-                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false">
+                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false" attach="body">
                   <button
                     type="button"
                     class="sidebar-task-row__action"
@@ -102,14 +118,22 @@
             <span class="sidebar-line__label">置顶</span>
           </button>
           <div class="sidebar-section-row__actions">
-            <button
-              type="button"
-              class="sidebar-section-row__btn"
-              :aria-label="pinnedExpanded ? '折叠置顶' : '展开置顶'"
-              @click.stop="pinnedExpanded = !pinnedExpanded"
+            <t-tooltip
+              :content="pinnedExpanded ? '折叠置顶' : '展开置顶'"
+              placement="top"
+              theme="light"
+              :show-arrow="false"
+              attach="body"
             >
-              <t-icon :name="pinnedExpanded ? 'chevron-down' : 'chevron-right'" />
-            </button>
+              <button
+                type="button"
+                class="sidebar-section-row__btn"
+                :aria-label="pinnedExpanded ? '折叠置顶' : '展开置顶'"
+                @click.stop="pinnedExpanded = !pinnedExpanded"
+              >
+                <t-icon :name="pinnedExpanded ? 'chevron-down' : 'chevron-right'" />
+              </button>
+            </t-tooltip>
           </div>
         </div>
 
@@ -138,9 +162,11 @@
               <span class="sidebar-line__meta">{{ item.meta }}</span>
             </router-link>
             <div class="sidebar-row__actions">
-              <button type="button" class="sidebar-row__action" aria-label="取消置顶" @click.stop="item.onUnpin?.()">
-                <t-icon name="pin" />
-              </button>
+              <t-tooltip content="取消置顶" placement="top" theme="light" :show-arrow="false" attach="body">
+                <button type="button" class="sidebar-row__action" aria-label="取消置顶" @click.stop="item.onUnpin?.()">
+                  <t-icon name="pin" />
+                </button>
+              </t-tooltip>
             </div>
           </div>
         </div>
@@ -158,19 +184,27 @@
           <span class="sidebar-line__label">我的智能体</span>
         </button>
         <div class="sidebar-section-row__actions">
-          <t-tooltip content="创建智能体" placement="top" theme="light" :show-arrow="false">
+          <t-tooltip content="创建智能体" placement="top" theme="light" :show-arrow="false" attach="body">
             <button type="button" class="sidebar-section-row__btn" aria-label="创建智能体" @click.stop="goCreateAgent">
               <t-icon name="add" />
             </button>
           </t-tooltip>
-          <button
-            type="button"
-            class="sidebar-section-row__btn"
-            :aria-label="agentsExpanded ? '折叠智能体' : '展开智能体'"
-            @click.stop="toggleAgentsExpanded"
+          <t-tooltip
+            :content="agentsExpanded ? '折叠智能体' : '展开智能体'"
+            placement="top"
+            theme="light"
+            :show-arrow="false"
+            attach="body"
           >
-            <t-icon :name="agentsExpanded ? 'chevron-down' : 'chevron-right'" />
-          </button>
+            <button
+              type="button"
+              class="sidebar-section-row__btn"
+              :aria-label="agentsExpanded ? '折叠智能体' : '展开智能体'"
+              @click.stop="toggleAgentsExpanded"
+            >
+              <t-icon :name="agentsExpanded ? 'chevron-down' : 'chevron-right'" />
+            </button>
+          </t-tooltip>
         </div>
       </div>
 
@@ -196,18 +230,28 @@
               <span class="sidebar-line__meta">{{ formatRelativeTime(agent.updatedAt) }}</span>
             </button>
             <div class="sidebar-row__actions">
-              <button
-                type="button"
-                class="sidebar-row__action"
-                :aria-label="isAgentPinned(agent.id) ? '取消置顶' : '置顶'"
-                @click.stop="handleToggleAgentPin(agent.id)"
+              <t-tooltip
+                :content="isAgentPinned(agent.id) ? '取消置顶' : '置顶'"
+                placement="top"
+                theme="light"
+                :show-arrow="false"
+                attach="body"
               >
-                <t-icon name="pin" />
-              </button>
-              <t-dropdown :options="agentMenuOptions(agent)" trigger="click" @click="onAgentMenu">
-                <button type="button" class="sidebar-row__action" aria-label="更多" @click.stop>
-                  <t-icon name="more" />
+                <button
+                  type="button"
+                  class="sidebar-row__action"
+                  :aria-label="isAgentPinned(agent.id) ? '取消置顶' : '置顶'"
+                  @click.stop="handleToggleAgentPin(agent.id)"
+                >
+                  <t-icon name="pin" />
                 </button>
+              </t-tooltip>
+              <t-dropdown :options="agentMenuOptions(agent)" trigger="click" @click="onAgentMenu">
+                <t-tooltip content="更多" placement="top" theme="light" :show-arrow="false" attach="body">
+                  <button type="button" class="sidebar-row__action" aria-label="更多" @click.stop>
+                    <t-icon name="more" />
+                  </button>
+                </t-tooltip>
               </t-dropdown>
             </div>
           </div>
@@ -675,6 +719,13 @@ onMounted(async () => {
 .sidebar-section-row:hover .sidebar-section-row__actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+.sidebar-section-row__actions :deep(.t-popup__reference),
+.sidebar-row__actions :deep(.t-popup__reference),
+.sidebar-task-panel__tools :deep(.t-popup__reference),
+.sidebar-task-row__actions :deep(.t-popup__reference) {
+  display: inline-flex;
 }
 
 .sidebar-section-row__btn {
