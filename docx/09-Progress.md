@@ -272,6 +272,7 @@
 | 插件市场 | `/plugin-catalog` | 插件分类与上架 |
 | 官方工具 | `/platform-tools` | 上架 HTTP 工具供租户安装 |
 | 官方 MCP | `/platform-mcp` | 上架 MCP 服务供租户安装 |
+| 运营位 | `/ops-placements` | C 端公告、推荐与市场精选 |
 | 系统配置 | `/system-config` | 关于、协议、客服 |
 
 已废弃或重定向：`/conversations`、`/chat/logs`、`/agents` → `/chat`
@@ -381,7 +382,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 | 通知 | `/api/v1/notifications/*` | ✅ | 未读角标、已读；顶栏 `NotificationCenter` |
 | 账单/额度 | `/api/v1/billing/*` | ✅ | `box-tenant` |
 | 侧栏 | `/api/v1/sidebar` | ✅ | C 端菜单与工作区上下文 |
-| 平台管理 | `/api/v1/admin/*` | ✅ | 租户、用户、套餐、审计、分析、平台模型、插件/工具/MCP、系统配置 |
+| 平台管理 | `/api/v1/admin/*` | ✅ | 租户、用户、套餐、审计、分析、运营位、平台模型、插件/工具/MCP、系统配置 |
 
 ---
 
