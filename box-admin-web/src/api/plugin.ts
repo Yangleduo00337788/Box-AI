@@ -12,6 +12,7 @@ export interface AdminPluginCatalogVO {
   category: string
   title: string
   description?: string
+  manifestJson?: string
   status: string
   sortOrder: number
   installCount: number
@@ -37,8 +38,12 @@ export function updatePluginCategory(
   return http.put<Result<PluginCategoryVO>>(`/plugin-categories/${categoryCode}`, payload)
 }
 
-export function fetchPlugins() {
-  return http.get<Result<AdminPluginCatalogVO[]>>('/plugins')
+export function deletePluginCategory(categoryCode: string) {
+  return http.delete<Result<void>>(`/plugin-categories/${categoryCode}`)
+}
+
+export function fetchPlugins(category?: string) {
+  return http.get<Result<AdminPluginCatalogVO[]>>('/plugins', { params: category ? { category } : undefined })
 }
 
 export function createPlugin(payload: {
@@ -46,6 +51,7 @@ export function createPlugin(payload: {
   category: string
   title: string
   description?: string
+  manifestJson?: string
   sortOrder?: number
 }) {
   return http.post<Result<AdminPluginCatalogVO>>('/plugins', payload)
@@ -57,9 +63,14 @@ export function updatePlugin(
     category?: string
     title?: string
     description?: string
+    manifestJson?: string
     sortOrder?: number
     status?: string
   },
 ) {
   return http.put<Result<AdminPluginCatalogVO>>(`/plugins/${id}`, payload)
+}
+
+export function deletePlugin(id: number) {
+  return http.delete<Result<void>>(`/plugins/${id}`)
 }

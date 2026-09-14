@@ -10,6 +10,7 @@ export interface PlanVO {
   quotaTokens: number
   quotaMembers: number
   quotaWorkspaces: number
+  quotaKnowledgeBases: number
   status: number
   createdAt?: string
 }
@@ -23,6 +24,7 @@ export interface CreatePlanRequest {
   quotaTokens: number
   quotaMembers: number
   quotaWorkspaces: number
+  quotaKnowledgeBases: number
 }
 
 export interface UpdatePlanRequest {
@@ -33,6 +35,7 @@ export interface UpdatePlanRequest {
   quotaTokens: number
   quotaMembers: number
   quotaWorkspaces: number
+  quotaKnowledgeBases: number
   status: number
 }
 
@@ -46,4 +49,8 @@ export function createPlan(payload: CreatePlanRequest) {
 
 export function updatePlan(id: number, payload: UpdatePlanRequest) {
   return http.put<Result<PlanVO>>(`/plans/${id}`, payload)
+}
+
+export function deletePlan(id: number) {
+  return http.delete<Result<void>>(`/plans/${id}`)
 }

@@ -13,11 +13,26 @@ const router = createRouter({
       path: '/',
       component: () => import('@/layouts/AppLayout.vue'),
       children: [
-        { path: '', redirect: '/tenants' },
+        { path: '', redirect: '/dashboard' },
+        {
+          path: 'dashboard',
+          component: () => import('@/views/DashboardView.vue'),
+          meta: { title: '工作台' },
+        },
+        {
+          path: 'analytics',
+          component: () => import('@/views/AnalyticsView.vue'),
+          meta: { title: '平台分析' },
+        },
         {
           path: 'tenants',
           component: () => import('@/views/TenantsView.vue'),
           meta: { title: '租户管理' },
+        },
+        {
+          path: 'users',
+          component: () => import('@/views/UsersView.vue'),
+          meta: { title: '用户管理' },
         },
         {
           path: 'plans',
@@ -38,6 +53,21 @@ const router = createRouter({
           path: 'plugin-catalog',
           component: () => import('@/views/PluginCatalogView.vue'),
           meta: { title: '插件市场' },
+        },
+        {
+          path: 'platform-tools',
+          component: () => import('@/views/PlatformCatalogView.vue'),
+          meta: { title: '官方工具', catalogCategory: 'tools' },
+        },
+        {
+          path: 'platform-mcp',
+          component: () => import('@/views/PlatformCatalogView.vue'),
+          meta: { title: '官方 MCP', catalogCategory: 'mcp' },
+        },
+        {
+          path: 'audit-logs',
+          component: () => import('@/views/AuditLogsView.vue'),
+          meta: { title: '审计日志' },
         },
         {
           path: 'system-config',

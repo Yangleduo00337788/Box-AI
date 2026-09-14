@@ -1,11 +1,14 @@
 <template>
-  <div class="system-config-page">
-    <page-header title="系统配置" desc="管理 C 端关于、协议、客服邮箱等产品文案与版本信息。" />
+  <div class="system-config-page admin-page">
+    <page-header title="系统配置" desc="管理 C 端关于、协议、客服邮箱等产品文案与版本信息。">
+      <template #actions>
+        <t-button theme="primary" :loading="saving" @click="onSave">保存全部</t-button>
+      </template>
+    </page-header>
 
     <t-loading :loading="loading" size="small">
       <t-form label-width="140px" class="config-form">
-        <section class="config-group">
-          <h3 class="config-group__title">基础信息</h3>
+        <t-card :bordered="false" title="基础信息" class="config-card">
           <t-form-item
             v-for="item in basicItems"
             :key="item.configKey"
@@ -23,10 +26,9 @@
               :placeholder="item.placeholder"
             />
           </t-form-item>
-        </section>
+        </t-card>
 
-        <section class="config-group">
-          <h3 class="config-group__title">法律文档</h3>
+        <t-card :bordered="false" title="法律文档" class="config-card">
           <p class="config-group__hint">左侧输入 HTML 或纯文本，右侧即时预览 C 端展示效果。</p>
           <t-form-item label="隐私政策">
             <legal-split-editor v-model="form['legal.privacy']" placeholder="可写 HTML，例如 <h2>引言</h2><p>……</p>" />
@@ -37,11 +39,7 @@
           <t-form-item label="最后更新日期">
             <t-input v-model="form['legal.updated_at']" placeholder="2026-09-11" />
           </t-form-item>
-        </section>
-
-        <t-form-item>
-          <t-button theme="primary" :loading="saving" @click="onSave">保存全部</t-button>
-        </t-form-item>
+        </t-card>
       </t-form>
     </t-loading>
   </div>
@@ -113,26 +111,16 @@ onMounted(loadConfigs)
 
 <style scoped>
 .config-form {
-  max-width: 1100px;
+  width: 100%;
 }
 
-.config-group {
-  margin-bottom: 28px;
-  padding: 20px;
-  border: 1px solid var(--box-border, #e5e6eb);
-  border-radius: 12px;
-  background: #fff;
-}
-
-.config-group__title {
-  margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 600;
+.config-card {
+  margin-bottom: 16px;
 }
 
 .config-group__hint {
   margin: 0 0 16px;
   font-size: 13px;
-  color: var(--box-muted, #8f959e);
+  color: var(--td-text-color-placeholder);
 }
 </style>

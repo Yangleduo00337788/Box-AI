@@ -62,3 +62,7 @@ export function updateAgentTemplate(
 export function updateAgentTemplateStatus(id: number, status: string) {
   return http.put<Result<AgentTemplateVO>>(`/agent-templates/${id}/status`, { status })
 }
+
+export function deleteAgentTemplate(id: number) {
+  return http.delete<Result<void>>(`/agent-templates/${id}`)
+}

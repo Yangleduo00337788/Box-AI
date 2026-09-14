@@ -22,19 +22,23 @@ export interface QuotaSnapshotVO {
   quotaTokens: number
   quotaMembers: number
   quotaWorkspaces: number
+  quotaKnowledgeBases?: number
   usedAiCalls: number
   usedTokens: number
   usedMembers: number
   usedWorkspaces: number
+  usedKnowledgeBases?: number
   remainingAiCalls: number | null
   remainingTokens: number | null
   remainingMembers: number | null
   remainingWorkspaces: number | null
+  remainingKnowledgeBases?: number | null
 }
 
 export interface CreateTenantRequest {
   name: string
   slug?: string
+  tenantType: 'PERSONAL' | 'ENTERPRISE'
   contactEmail?: string
 }
 

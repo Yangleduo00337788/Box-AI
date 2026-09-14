@@ -25,16 +25,19 @@
       :data="members"
       :columns="columns"
       :loading="loading"
-      bordered
-      stripe
+      hover
       size="small"
-    />
+    >
+      <template #empty>
+        <t-empty description="暂无成员" />
+      </template>
+    </t-table>
   </t-drawer>
 </template>
 
 <script setup lang="ts">
 import { h, ref, watch } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import {
   addTenantMember,
@@ -71,13 +74,19 @@ const columns: PrimaryTableCol<TenantMemberVO>[] = [
     colKey: 'roleCode',
     title: '角色',
     width: 100,
-    cell: (_, { row }) => (row.roleCode === 'TENANT_ADMIN' ? '管理员' : '成员'),
+    cell: (_, { row }) =>
+      h(Tag, { theme: row.roleCode === 'TENANT_ADMIN' ? 'primary' : 'default', variant: 'light' }, () =>
+        row.roleCode === 'TENANT_ADMIN' ? '管理员' : '成员',
+      ),
   },
   {
     colKey: 'status',
     title: '状态',
     width: 80,
-    cell: (_, { row }) => (row.status === 1 ? '正常' : '停用'),
+    cell: (_, { row }) =>
+      h(Tag, { theme: row.status === 1 ? 'success' : 'warning', variant: 'light' }, () =>
+        row.status === 1 ? '正常' : '停用',
+      ),
   },
   {
     colKey: 'actions',
@@ -85,12 +94,13 @@ const columns: PrimaryTableCol<TenantMemberVO>[] = [
     width: 80,
     cell: (_, { row }) =>
       h(
-        'a',
+        Link,
         {
-          href: 'javascript:void(0)',
+          theme: row.status === 1 ? 'danger' : 'primary',
+          hover: 'color',
           onClick: () => toggleStatus(row),
         },
-        row.status === 1 ? '停用' : '启用',
+        () => (row.status === 1 ? '停用' : '启用'),
       ),
   },
 ]

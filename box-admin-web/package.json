@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "axios": "^1.8.4",
+    "echarts": "^6.1.0",
     "pinia": "^3.0.2",
     "tdesign-icons-vue-next": "^0.3.6",
     "tdesign-vue-next": "^1.11.5",

@@ -1,12 +1,18 @@
 <template>
-  <div class="templates-page">
+  <div class="templates-page admin-page">
     <page-header title="智能体市场" desc="上架模板智能体，供 C 端用户一键启用。">
       <template #actions>
         <t-button theme="primary" @click="openCreate">新建模板</t-button>
       </template>
     </page-header>
 
-    <t-table row-key="id" :data="templates" :columns="columns" :loading="loading" bordered stripe />
+    <t-card :bordered="false" class="admin-card">
+      <t-table row-key="id" :data="templates" :columns="columns" :loading="loading" hover>
+        <template #empty>
+          <t-empty description="暂无模板" />
+        </template>
+      </t-table>
+    </t-card>
 
     <t-dialog
       v-model:visible="dialogVisible"
@@ -44,11 +50,12 @@
 
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { FormInstanceFunctions, FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
 import {
   createAgentTemplate,
+  deleteAgentTemplate,
   fetchAgentTemplates,
   updateAgentTemplate,
   updateAgentTemplateStatus,
@@ -106,26 +113,23 @@ const columns: PrimaryTableCol<AgentTemplateVO>[] = [
     colKey: 'status',
     title: '状态',
     width: 90,
-    cell: (_, { row }) => statusLabel[row.status] || row.status,
+    cell: (_, { row }) => {
+      const theme = row.status === 'LISTED' ? 'success' : row.status === 'DRAFT' ? 'default' : 'warning'
+      return h(Tag, { theme, variant: 'light' }, () => statusLabel[row.status] || row.status)
+    },
   },
   {
     colKey: 'actions',
     title: '操作',
-    width: 200,
+    width: 220,
+    fixed: 'right',
     cell: (_, { row }) =>
-      h('div', { class: 'actions' }, [
-        h('a', { href: 'javascript:void(0)', onClick: () => openEdit(row) }, '编辑'),
+      h('div', { class: 'admin-ops' }, [
+        h(Link, { theme: 'primary', hover: 'color', onClick: () => openEdit(row) }, () => '编辑'),
         row.status !== 'LISTED'
-          ? h(
-              'a',
-              { href: 'javascript:void(0)', style: 'margin-left:12px', onClick: () => listTemplate(row) },
-              '上架',
-            )
-          : h(
-              'a',
-              { href: 'javascript:void(0)', style: 'margin-left:12px', onClick: () => archiveTemplate(row) },
-              '下架',
-            ),
+          ? h(Link, { theme: 'primary', hover: 'color', onClick: () => listTemplate(row) }, () => '上架')
+          : h(Link, { theme: 'warning', hover: 'color', onClick: () => archiveTemplate(row) }, () => '下架'),
+        h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDelete(row) }, () => '删除'),
       ]),
   },
 ]
@@ -213,12 +217,19 @@ async function archiveTemplate(row: AgentTemplateVO) {
   await loadData()
 }
 
+function confirmDelete(row: AgentTemplateVO) {
+  const dialog = DialogPlugin.confirm({
+    header: '删除模板',
+    body: `确定删除「${row.name}」？已启用该模板的智能体不会被删除。`,
+    theme: 'warning',
+    onConfirm: async () => {
+      await deleteAgentTemplate(row.id)
+      MessagePlugin.success('模板已删除')
+      dialog.destroy()
+      await loadData()
+    },
+  })
+}
+
 onMounted(loadData)
 </script>
-
-<style scoped>
-.actions a {
-  color: var(--td-brand-color);
-  text-decoration: none;
-}
-</style>

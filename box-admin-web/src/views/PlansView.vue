@@ -1,12 +1,18 @@
 <template>
-  <div class="plans-page">
+  <div class="plans-page admin-page">
     <page-header title="套餐管理" desc="配置套餐方案、价格与配额上限。">
       <template #actions>
         <t-button theme="primary" @click="openCreate">新建套餐</t-button>
       </template>
     </page-header>
 
-    <t-table row-key="id" :data="plans" :columns="columns" :loading="loading" bordered stripe />
+    <t-card :bordered="false" class="admin-card">
+      <t-table row-key="id" :data="plans" :columns="columns" :loading="loading" hover>
+        <template #empty>
+          <t-empty description="暂无套餐" />
+        </template>
+      </t-table>
+    </t-card>
 
     <t-dialog
       v-model:visible="dialogVisible"
@@ -40,6 +46,9 @@
         <t-form-item label="工作空间上限" name="quotaWorkspaces">
           <t-input-number v-model="form.quotaWorkspaces" :min="0" theme="column" />
         </t-form-item>
+        <t-form-item label="知识库上限" name="quotaKnowledgeBases">
+          <t-input-number v-model="form.quotaKnowledgeBases" :min="0" theme="column" />
+        </t-form-item>
         <t-form-item v-if="editing" label="状态" name="status">
           <t-radio-group v-model="form.status">
             <t-radio :value="1">启用</t-radio>
@@ -54,10 +63,10 @@
 
 <script setup lang="ts">
 import { h, onMounted, reactive, ref } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { FormInstanceFunctions, FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
-import { createPlan, fetchPlans, updatePlan, type PlanVO } from '@/api/plan'
+import { createPlan, deletePlan, fetchPlans, updatePlan, type PlanVO } from '@/api/plan'
 
 const plans = ref<PlanVO[]>([])
 const loading = ref(false)
@@ -76,6 +85,7 @@ const form = reactive({
   quotaTokens: 0,
   quotaMembers: 0,
   quotaWorkspaces: 0,
+  quotaKnowledgeBases: 0,
   status: 1,
 })
 
@@ -93,31 +103,35 @@ const columns: PrimaryTableCol<PlanVO>[] = [
     width: 100,
     cell: (_, { row }) => `¥${row.priceMonthly}`,
   },
-  { colKey: 'quotaAiCalls', title: 'AI 调用', width: 100 },
+  { colKey: 'quotaAiCalls', title: 'AI 调用', width: 100, cell: (_, { row }) => formatLimit(row.quotaAiCalls) },
   {
     colKey: 'quotaTokens',
     title: 'Token',
     width: 120,
     cell: (_, { row }) => formatLimit(row.quotaTokens),
   },
-  { colKey: 'quotaMembers', title: '成员', width: 80 },
-  { colKey: 'quotaWorkspaces', title: '空间', width: 80 },
+  { colKey: 'quotaMembers', title: '成员', width: 80, cell: (_, { row }) => formatLimit(row.quotaMembers) },
+  { colKey: 'quotaWorkspaces', title: '空间', width: 80, cell: (_, { row }) => formatLimit(row.quotaWorkspaces) },
+  { colKey: 'quotaKnowledgeBases', title: '知识库', width: 90, cell: (_, { row }) => formatLimit(row.quotaKnowledgeBases) },
   {
     colKey: 'status',
     title: '状态',
     width: 80,
-    cell: (_, { row }) => (row.status === 1 ? '启用' : '停用'),
+    cell: (_, { row }) =>
+      h(Tag, { theme: row.status === 1 ? 'success' : 'warning', variant: 'light' }, () =>
+        row.status === 1 ? '启用' : '停用',
+      ),
   },
   {
     colKey: 'actions',
     title: '操作',
-    width: 80,
+    width: 140,
+    fixed: 'right',
     cell: (_, { row }) =>
-      h(
-        'a',
-        { href: 'javascript:void(0)', onClick: () => openEdit(row) },
-        '编辑',
-      ),
+      h('div', { class: 'admin-ops' }, [
+        h(Link, { theme: 'primary', hover: 'color', onClick: () => openEdit(row) }, () => '编辑'),
+        h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDelete(row) }, () => '删除'),
+      ]),
   },
 ]
 
@@ -144,6 +158,7 @@ function resetForm() {
   form.quotaTokens = 50000
   form.quotaMembers = 1
   form.quotaWorkspaces = 1
+  form.quotaKnowledgeBases = 1
   form.status = 1
 }
 
@@ -164,6 +179,7 @@ function openEdit(row: PlanVO) {
   form.quotaTokens = row.quotaTokens
   form.quotaMembers = row.quotaMembers
   form.quotaWorkspaces = row.quotaWorkspaces
+  form.quotaKnowledgeBases = row.quotaKnowledgeBases ?? 0
   form.status = row.status
   dialogVisible.value = true
 }
@@ -182,6 +198,7 @@ async function onSave() {
         quotaTokens: form.quotaTokens,
         quotaMembers: form.quotaMembers,
         quotaWorkspaces: form.quotaWorkspaces,
+        quotaKnowledgeBases: form.quotaKnowledgeBases,
         status: form.status,
       })
       MessagePlugin.success('套餐已更新')
@@ -195,6 +212,7 @@ async function onSave() {
         quotaTokens: form.quotaTokens,
         quotaMembers: form.quotaMembers,
         quotaWorkspaces: form.quotaWorkspaces,
+        quotaKnowledgeBases: form.quotaKnowledgeBases,
       })
       MessagePlugin.success('套餐已创建')
     }
@@ -204,6 +222,20 @@ async function onSave() {
     saving.value = false
   }
   return true
+}
+
+function confirmDelete(row: PlanVO) {
+  const dialog = DialogPlugin.confirm({
+    header: '删除套餐',
+    body: `确定删除「${row.name}」？仍有租户使用时将无法删除。`,
+    theme: 'warning',
+    onConfirm: async () => {
+      await deletePlan(row.id)
+      MessagePlugin.success('套餐已删除')
+      dialog.destroy()
+      await loadPlans()
+    },
+  })
 }
 
 onMounted(loadPlans)

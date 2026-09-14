@@ -1,5 +1,15 @@
 /// <reference types="vite/client" />
 
+import 'vue-router'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    public?: boolean
+    title?: string
+    catalogCategory?: 'tools' | 'mcp'
+  }
+}
+
 declare module '@box/ui/layouts/AuthLayout.vue' {
   import type { DefineComponent } from 'vue'
   const component: DefineComponent<{ slogan?: string; showMascot?: boolean }, {}, unknown>

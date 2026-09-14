@@ -1,8 +1,8 @@
 <template>
-  <div class="platform-models-page">
+  <div class="platform-models-page admin-page">
     <page-header title="平台模型池" desc="接入上游模型服务商，配置平台密钥，并从上游拉取模型供 C 端选用。" />
 
-    <t-card :bordered="true" class="models-card">
+    <t-card :bordered="false" class="admin-tab-card">
       <t-tabs v-model="tab">
         <t-tab-panel value="providers" label="服务商" />
         <t-tab-panel value="models" label="模型" />
@@ -19,9 +19,12 @@
           :data="providers"
           :columns="providerColumns"
           :loading="loading"
-          bordered
-          stripe
-        />
+          hover
+        >
+          <template #empty>
+            <t-empty description="暂无服务商" />
+          </template>
+        </t-table>
 
         <div v-if="tab === 'models'" class="toolbar">
           <t-space>
@@ -59,9 +62,12 @@
           :data="models"
           :columns="modelColumns"
           :loading="loading"
-          bordered
-          stripe
-        />
+          hover
+        >
+          <template #empty>
+            <t-empty :description="modelProviderId ? '该服务商暂无模型' : '暂无模型'" />
+          </template>
+        </t-table>
 
         <div v-if="tab === 'keys'" class="toolbar">
           <t-space>
@@ -82,9 +88,12 @@
           :data="credentials"
           :columns="keyColumns"
           :loading="credentialLoading"
-          bordered
-          stripe
-        />
+          hover
+        >
+          <template #empty>
+            <t-empty :description="credentialProviderId ? '该服务商暂无密钥' : '请先选择服务商'" />
+          </template>
+        </t-table>
       </div>
     </t-card>
 
@@ -234,7 +243,7 @@
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { SearchIcon } from 'tdesign-icons-vue-next'
-import { DialogPlugin, MessagePlugin, Space } from 'tdesign-vue-next'
+import { DialogPlugin, Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { FormInstanceFunctions, FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
 import {
@@ -368,16 +377,20 @@ const providerColumns: PrimaryTableCol<PlatformProviderVO>[] = [
     colKey: 'status',
     title: '状态',
     width: 80,
-    cell: (_, { row }) => (row.status === 1 ? '启用' : '停用'),
+    cell: (_, { row }) =>
+      h(Tag, { theme: row.status === 1 ? 'success' : 'warning', variant: 'light' }, () =>
+        row.status === 1 ? '启用' : '停用',
+      ),
   },
   {
     colKey: 'actions',
     title: '操作',
     width: 140,
+    fixed: 'right',
     cell: (_, { row }) =>
-      h(Space, { size: 'small' }, () => [
-        h('a', { href: 'javascript:void(0)', onClick: () => openProvider(row) }, '编辑'),
-        h('a', { href: 'javascript:void(0)', onClick: () => confirmDeleteProvider(row) }, '删除'),
+      h('div', { class: 'admin-ops' }, [
+        h(Link, { theme: 'primary', hover: 'color', onClick: () => openProvider(row) }, () => '编辑'),
+        h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDeleteProvider(row) }, () => '删除'),
       ]),
   },
 ]
@@ -410,16 +423,20 @@ const modelColumns: PrimaryTableCol<PlatformModelVO>[] = [
     colKey: 'status',
     title: '状态',
     width: 80,
-    cell: (_, { row }) => (row.status === 1 ? '启用' : '停用'),
+    cell: (_, { row }) =>
+      h(Tag, { theme: row.status === 1 ? 'success' : 'warning', variant: 'light' }, () =>
+        row.status === 1 ? '启用' : '停用',
+      ),
   },
   {
     colKey: 'actions',
     title: '操作',
     width: 140,
+    fixed: 'right',
     cell: (_, { row }) =>
-      h(Space, { size: 'small' }, () => [
-        h('a', { href: 'javascript:void(0)', onClick: () => openModel(row) }, '编辑'),
-        h('a', { href: 'javascript:void(0)', onClick: () => confirmDeleteModel(row) }, '删除'),
+      h('div', { class: 'admin-ops' }, [
+        h(Link, { theme: 'primary', hover: 'color', onClick: () => openModel(row) }, () => '编辑'),
+        h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDeleteModel(row) }, () => '删除'),
       ]),
   },
 ]
@@ -431,15 +448,19 @@ const keyColumns: PrimaryTableCol<PlatformCredentialVO>[] = [
     colKey: 'status',
     title: '状态',
     width: 80,
-    cell: (_, { row }) => (row.status === 1 ? '启用' : '停用'),
+    cell: (_, { row }) =>
+      h(Tag, { theme: row.status === 1 ? 'success' : 'warning', variant: 'light' }, () =>
+        row.status === 1 ? '启用' : '停用',
+      ),
   },
   { colKey: 'lastUsedAt', title: '最近使用', width: 180 },
   {
     colKey: 'actions',
     title: '操作',
     width: 80,
+    fixed: 'right',
     cell: (_, { row }) =>
-      h('a', { href: 'javascript:void(0)', onClick: () => confirmDeleteKey(row) }, '删除'),
+      h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDeleteKey(row) }, () => '删除'),
   },
 ]
 
@@ -703,10 +724,6 @@ onMounted(loadBase)
 </script>
 
 <style scoped>
-.models-card {
-  overflow: hidden;
-}
-
 .tab-body {
   margin-top: 16px;
 }
