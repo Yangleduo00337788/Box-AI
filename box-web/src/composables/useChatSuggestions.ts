@@ -8,6 +8,8 @@ export interface ChatSuggestion {
   subtitle?: string
   prompt: string
   icon: string
+  ops?: boolean
+  linkUrl?: string
 }
 
 const SUGGESTION_ICONS = ['user', 'view-module', 'filter', 'edit', 'chart', 'task-checked']

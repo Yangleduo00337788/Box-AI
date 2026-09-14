@@ -24,7 +24,19 @@
         ？
       </h1>
 
+      <ops-chat-banner />
+
       <chat-composer-shell>
+      <div class="composer-stack" :class="{ 'composer-stack--ops': !!currentChatOps }">
+        <ops-notice-bar
+          v-if="currentChatOps"
+          :item="currentChatOps"
+          :index="chatOpsIndex"
+          :total="chatOps.length"
+          @dismiss="dismissOps"
+          @open="openOpsLink"
+          @page="chatOpsIndex = $event"
+        />
       <div class="composer">
         <t-textarea
           v-model="composerText"
@@ -96,6 +108,7 @@
           </div>
         </div>
       </div>
+      </div>
       </chat-composer-shell>
 
       <div v-if="suggestionsLoading" class="suggestions-loading">
@@ -107,7 +120,7 @@
           :key="item.id"
           type="button"
           class="suggestion-card"
-          @click="startNewChat(item.prompt)"
+          @click="onSuggestionClick(item)"
         >
           <div class="suggestion-card__head">
             <t-icon :name="item.icon" />
@@ -337,6 +350,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import ChatComposerShell from '@/components/ChatComposerShell.vue'
+import OpsNoticeBar from '@/components/OpsNoticeBar.vue'
+import OpsChatBanner from '@/components/OpsChatBanner.vue'
 import ChatMarkdown from '@/components/ChatMarkdown.vue'
 import ChatModelPicker from '@/components/ChatModelPicker.vue'
 import { parseUserContent } from '@/utils/chatContent'
@@ -346,9 +361,10 @@ import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { uploadImageAsset } from '@/api/asset'
 import { appPreferences } from '@/composables/useAppPreferences'
 import { useAgentSelection } from '@/composables/useAgentSelection'
-import { useChatSuggestions } from '@/composables/useChatSuggestions'
+import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSuggestions'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
+import { useOpsPlacements } from '@/composables/useOpsPlacements'
 import { getAvatarColor } from '@/utils/format'
 import {
   createConversation,
@@ -374,6 +390,16 @@ const { refresh: refreshConversations, conversations } = useConversationNav()
 const { openCreateAgentDialog } = useCreateAgentDialog()
 const { agents, selectedAgent, refresh: refreshAgents, selectAgent, selectAgentByConversation } = useAgentSelection()
 const { suggestions, loading: suggestionsLoading, refresh: refreshSuggestions } = useChatSuggestions()
+const { items: chatOps, dismiss: dismissOps, openLink: openOpsLink } = useOpsPlacements('CHAT_HOME')
+const chatOpsIndex = ref(0)
+const currentChatOps = computed(() => chatOps.value[chatOpsIndex.value] || chatOps.value[0])
+
+watch(
+  () => chatOps.value.length,
+  (length) => {
+    if (chatOpsIndex.value >= length) chatOpsIndex.value = 0
+  },
+)
 
 const chatting = ref(false)
 const composerText = ref('')
@@ -473,8 +499,14 @@ const canSendMessage = computed(
 const BRAND_SUGGESTION_TITLES = new Set(['box', 'coze', '扣子', '盒子'])
 
 const displaySuggestions = computed(() =>
-  suggestions.value.filter((item) => !BRAND_SUGGESTION_TITLES.has(item.title.trim().toLowerCase())),
+  suggestions.value
+    .filter((item) => !BRAND_SUGGESTION_TITLES.has(item.title.trim().toLowerCase()))
+    .slice(0, 3),
 )
+
+function onSuggestionClick(item: ChatSuggestion) {
+  void startNewChat(item.prompt)
+}
 
 const agentOptions = computed<DropdownOption[]>(() =>
   agents.value.map((agent) => ({
@@ -1015,6 +1047,7 @@ onMounted(async () => {
 .chat-workspace {
   display: flex;
   flex-direction: column;
+  flex: 1;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -1098,6 +1131,42 @@ onMounted(async () => {
 .chat-new__agent-arrow {
   font-size: 18px;
   color: var(--box-ink-muted, #8f959e);
+}
+
+.composer-stack {
+  width: 100%;
+}
+
+.composer-stack--ops {
+  border: 1px solid #e5e6eb;
+  border-radius: 24px;
+  background: #fff;
+  padding: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.composer-stack--ops :deep(.ops-notice) {
+  border: none;
+  border-radius: 16px;
+  min-height: 36px;
+  margin-bottom: 4px;
+  padding: 8px 12px;
+  background: #f5f6f8;
+}
+
+.composer-stack--ops :deep(.ops-notice--promo) {
+  background: #fff6ec;
+}
+
+.composer-stack--ops .composer {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 4px 4px 2px;
+}
+
+.composer-stack--ops .composer:focus-within {
+  box-shadow: none;
 }
 
 .composer {
@@ -1268,10 +1337,6 @@ onMounted(async () => {
   cursor: not-allowed;
   background: #c9cdd4 !important;
   border-color: #c9cdd4 !important;
-}
-
-.suggestions-loading {
-  margin-top: 20px;
 }
 
 .suggestions {

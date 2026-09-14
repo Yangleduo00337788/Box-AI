@@ -1,17 +1,22 @@
 <template>
-  <app-shell-layout
-    shell-variant="consumer"
-    :menu-groups="CONSUMER_MENU_GROUPS"
-    :active="active"
-    content-panel
-    :content-padded="contentPadded"
-    :hide-sidebar="isSettingsRoute"
-    :user-name="userName"
-    user-hint="Box"
-    @search="searchVisible = true"
-  >
+  <div class="consumer-frame">
+    <ops-global-alert />
+    <app-shell-layout
+      shell-variant="consumer"
+      :menu-groups="CONSUMER_MENU_GROUPS"
+      :active="active"
+      content-panel
+      :content-padded="contentPadded"
+      :hide-sidebar="isSettingsRoute"
+      :user-name="userName"
+      user-hint="Box"
+      @search="searchVisible = true"
+    >
     <template #sidebar-nav>
       <consumer-sidebar-workspace :active="active" />
+    </template>
+    <template #footer-extra="{ collapsed }">
+      <ops-chat-ad v-if="!collapsed" />
     </template>
     <template #sidebar-footer="{ collapsed, userName: slotUserName, avatarText }">
       <consumer-sidebar-footer
@@ -23,6 +28,7 @@
       />
     </template>
   </app-shell-layout>
+  </div>
 
   <global-search-dialog v-model:visible="searchVisible" />
   <create-agent-dialog @created="onAgentCreated" />
@@ -36,6 +42,8 @@ import AppShellLayout from '@box/ui/layouts/AppShellLayout.vue'
 import ConsumerSidebarFooter from '@/components/ConsumerSidebarFooter.vue'
 import ConsumerSidebarWorkspace from '@/components/ConsumerSidebarWorkspace.vue'
 import CreateAgentDialog from '@/components/CreateAgentDialog.vue'
+import OpsChatAd from '@/components/OpsChatAd.vue'
+import OpsGlobalAlert from '@/components/OpsGlobalAlert.vue'
 import GlobalSearchDialog from '@/components/GlobalSearchDialog.vue'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
@@ -113,3 +121,19 @@ watch(
   },
 )
 </script>
+
+<style scoped>
+.consumer-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.consumer-frame :deep(.app-layout) {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+</style>
+

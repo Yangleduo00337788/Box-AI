@@ -158,7 +158,10 @@
             </button>
           </t-tooltip>
         </Transition>
-        <router-view />
+        <slot name="content-banner" />
+        <div class="page-container__body">
+          <router-view />
+        </div>
       </div>
     </t-content>
   </t-layout>
@@ -555,6 +558,8 @@ function onSearch() {
 
 .app-layout--consumer .page-container--panel {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -603,8 +608,13 @@ function onSearch() {
 
 .app-layout--consumer .page-container--panel-padded {
   padding: 24px 32px 32px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.app-layout--consumer .page-container--panel > .page-container__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .app-layout--consumer .sidebar-collapse,
