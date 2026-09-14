@@ -14,4 +14,6 @@ public interface PlanRepository {
     Optional<Plan> findByCode(String code);
 
     List<Plan> listAll();
+
+    void delete(Long id);
 }

@@ -83,7 +83,7 @@ public class TenantApplicationService {
         Tenant tenant = new Tenant();
         tenant.setName(request.name().trim());
         tenant.setSlug(slug);
-        tenant.setTenantType(TenantTypes.ENTERPRISE);
+        tenant.setTenantType(normalizeAccountType(request.tenantType()));
         tenant.setContactEmail(request.contactEmail());
         tenant.setStatus(1);
         quotaApplicationService.assignDefaultPlan(tenant);

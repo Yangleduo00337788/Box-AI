@@ -6,6 +6,8 @@ public record AuditLogVO(
         Long id,
         Long workspaceId,
         Long userId,
+        String userEmail,
+        String userNickname,
         String action,
         String resourceType,
         String resourceId,

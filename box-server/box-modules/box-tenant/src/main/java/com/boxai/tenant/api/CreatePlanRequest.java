@@ -14,5 +14,6 @@ public record CreatePlanRequest(
         @NotNull Integer quotaAiCalls,
         @NotNull Long quotaTokens,
         @NotNull Integer quotaMembers,
-        @NotNull Integer quotaWorkspaces
+        @NotNull Integer quotaWorkspaces,
+        @NotNull Integer quotaKnowledgeBases
 ) {}

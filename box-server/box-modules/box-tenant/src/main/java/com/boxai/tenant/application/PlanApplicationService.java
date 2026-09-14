@@ -4,6 +4,7 @@ import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.plan.Plan;
 import com.boxai.domain.plan.PlanRepository;
+import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.tenant.api.CreatePlanRequest;
 import com.boxai.tenant.api.PlanVO;
 import com.boxai.tenant.api.UpdatePlanRequest;
@@ -17,9 +18,11 @@ import java.util.Locale;
 public class PlanApplicationService {
 
     private final PlanRepository planRepository;
+    private final TenantRepository tenantRepository;
 
-    public PlanApplicationService(PlanRepository planRepository) {
+    public PlanApplicationService(PlanRepository planRepository, TenantRepository tenantRepository) {
         this.planRepository = planRepository;
+        this.tenantRepository = tenantRepository;
     }
 
     public List<PlanVO> listAll() {
@@ -45,6 +48,7 @@ public class PlanApplicationService {
         plan.setQuotaTokens(request.quotaTokens());
         plan.setQuotaMembers(request.quotaMembers());
         plan.setQuotaWorkspaces(request.quotaWorkspaces());
+        plan.setQuotaKnowledgeBases(request.quotaKnowledgeBases());
         plan.setStatus(1);
         planRepository.save(plan);
         return toVo(plan);
@@ -60,12 +64,23 @@ public class PlanApplicationService {
         plan.setQuotaTokens(request.quotaTokens());
         plan.setQuotaMembers(request.quotaMembers());
         plan.setQuotaWorkspaces(request.quotaWorkspaces());
+        plan.setQuotaKnowledgeBases(request.quotaKnowledgeBases());
         if (request.status() != 0 && request.status() != 1) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "状态值无效");
         }
         plan.setStatus(request.status());
         planRepository.update(plan);
         return toVo(plan);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        requirePlan(id);
+        long tenants = tenantRepository.countByPlanId(id);
+        if (tenants > 0) {
+            throw new BusinessException(ErrorCode.CONFLICT, "仍有租户使用该套餐，请先改套餐后再删除");
+        }
+        planRepository.delete(id);
     }
 
     public Plan requirePlan(Long id) {
@@ -84,6 +99,7 @@ public class PlanApplicationService {
                 plan.getQuotaTokens(),
                 plan.getQuotaMembers(),
                 plan.getQuotaWorkspaces(),
+                plan.getQuotaKnowledgeBases() == null ? 0 : plan.getQuotaKnowledgeBases(),
                 plan.getStatus(),
                 plan.getCreatedAt());
     }

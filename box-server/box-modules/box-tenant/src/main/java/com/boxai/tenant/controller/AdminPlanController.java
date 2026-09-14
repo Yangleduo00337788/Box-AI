@@ -6,6 +6,7 @@ import com.boxai.tenant.api.PlanVO;
 import com.boxai.tenant.api.UpdatePlanRequest;
 import com.boxai.tenant.application.PlanApplicationService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,5 +45,11 @@ public class AdminPlanController {
     @PutMapping("/{id}")
     public Result<PlanVO> update(@PathVariable Long id, @Valid @RequestBody UpdatePlanRequest request) {
         return Result.success(planApplicationService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        planApplicationService.delete(id);
+        return Result.success(null);
     }
 }

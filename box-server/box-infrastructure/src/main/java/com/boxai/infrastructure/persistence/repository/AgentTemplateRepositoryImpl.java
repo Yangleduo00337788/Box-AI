@@ -77,6 +77,11 @@ public class AgentTemplateRepositoryImpl implements AgentTemplateRepository {
                 .update();
     }
 
+    @Override
+    public void delete(Long id) {
+        mapper.deleteById(id);
+    }
+
     private AgentTemplate toDomain(AgentTemplateDO row) {
         AgentTemplate template = new AgentTemplate();
         template.setId(row.getId());

@@ -7,6 +7,7 @@ import com.boxai.agent.api.template.UpdateAgentTemplateStatusRequest;
 import com.boxai.agent.application.AgentTemplateApplicationService;
 import com.boxai.common.result.Result;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,5 +48,11 @@ public class AdminAgentTemplateController {
     public Result<AgentTemplateVO> updateStatus(@PathVariable Long id,
                                                   @Valid @RequestBody UpdateAgentTemplateStatusRequest request) {
         return Result.success(agentTemplateApplicationService.updateStatus(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        agentTemplateApplicationService.delete(id);
+        return Result.success(null);
     }
 }

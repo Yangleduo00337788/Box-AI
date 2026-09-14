@@ -68,6 +68,14 @@ public class TenantRepositoryImpl implements TenantRepository {
     }
 
     @Override
+    public long countByPlanId(Long planId) {
+        if (planId == null) {
+            return 0;
+        }
+        return tenantMapper.selectCountByQuery(QueryWrapper.create().eq("plan_id", planId));
+    }
+
+    @Override
     public Optional<TenantMember> findMember(Long tenantId, Long userId) {
         return Optional.ofNullable(memberMapper.selectOneByQuery(
                         QueryWrapper.create().eq("tenant_id", tenantId).eq("user_id", userId)))

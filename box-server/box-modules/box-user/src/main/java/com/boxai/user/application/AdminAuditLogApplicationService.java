@@ -1,14 +1,11 @@
 package com.boxai.user.application;
 
-import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.result.PageResult;
 import com.boxai.domain.audit.AuditLog;
 import com.boxai.domain.audit.AuditLogQuery;
 import com.boxai.domain.audit.AuditLogRepository;
 import com.boxai.domain.user.User;
 import com.boxai.domain.user.UserRepository;
-import com.boxai.security.context.WorkspaceContext;
-import com.boxai.security.permission.WorkspacePermissionService;
 import com.boxai.user.api.AuditLogVO;
 import org.springframework.stereotype.Service;
 
@@ -22,20 +19,16 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-public class AuditLogApplicationService {
+public class AdminAuditLogApplicationService {
 
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
-    private final WorkspacePermissionService workspacePermissionService;
 
-    public AuditLogApplicationService(AuditLogRepository auditLogRepository,
-                                      UserRepository userRepository,
-                                      WorkspacePermissionService workspacePermissionService) {
+    public AdminAuditLogApplicationService(AuditLogRepository auditLogRepository, UserRepository userRepository) {
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
-        this.workspacePermissionService = workspacePermissionService;
     }
 
     public PageResult<AuditLogVO> page(String action,
@@ -45,9 +38,7 @@ public class AuditLogApplicationService {
                                        String endTime,
                                        int page,
                                        int pageSize) {
-        workspacePermissionService.requirePermission(PermissionCodes.AUDIT_READ);
         AuditLogQuery query = new AuditLogQuery();
-        query.setWorkspaceId(WorkspaceContext.require().workspaceId());
         query.setAction(trimToNull(action));
         query.setResourceType(trimToNull(resourceType));
         query.setUserId(userId);

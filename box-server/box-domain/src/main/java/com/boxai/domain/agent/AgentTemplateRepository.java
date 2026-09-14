@@ -16,4 +16,6 @@ public interface AgentTemplateRepository {
     List<AgentTemplate> listListed();
 
     void incrementInstallCount(Long id);
+
+    void delete(Long id);
 }

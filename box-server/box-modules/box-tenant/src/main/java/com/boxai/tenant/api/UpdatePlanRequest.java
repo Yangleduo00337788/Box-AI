@@ -14,5 +14,6 @@ public record UpdatePlanRequest(
         @NotNull Long quotaTokens,
         @NotNull Integer quotaMembers,
         @NotNull Integer quotaWorkspaces,
+        @NotNull Integer quotaKnowledgeBases,
         @NotNull Integer status
 ) {}

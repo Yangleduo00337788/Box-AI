@@ -62,6 +62,11 @@ public class PlanRepositoryImpl implements PlanRepository {
                 .toList();
     }
 
+    @Override
+    public void delete(Long id) {
+        planMapper.deleteById(id);
+    }
+
     private Plan toDomain(PlanDO row) {
         Plan plan = new Plan();
         plan.setId(row.getId());

@@ -13,6 +13,7 @@ public record PlanVO(
         Long quotaTokens,
         Integer quotaMembers,
         Integer quotaWorkspaces,
+        Integer quotaKnowledgeBases,
         Integer status,
         LocalDateTime createdAt
 ) {}

@@ -20,4 +20,5 @@ public class User {
     private Integer status;
     private String userType;
     private LocalDateTime lastLoginAt;
+    private LocalDateTime createdAt;
 }

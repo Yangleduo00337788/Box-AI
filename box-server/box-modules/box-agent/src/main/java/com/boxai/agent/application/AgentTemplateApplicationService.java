@@ -177,6 +177,12 @@ public class AgentTemplateApplicationService {
         return agentApplicationService.detail(agent.getId());
     }
 
+    @Transactional
+    public void delete(Long id) {
+        requireTemplate(id);
+        agentTemplateRepository.delete(id);
+    }
+
     private AgentTemplate requireTemplate(Long id) {
         return agentTemplateRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_TEMPLATE_NOT_FOUND, "智能体模板不存在"));

@@ -15,6 +15,8 @@ public interface TenantRepository {
 
     List<Tenant> listAll();
 
+    long countByPlanId(Long planId);
+
     Optional<TenantMember> findMember(Long tenantId, Long userId);
 
     Optional<TenantMember> findPrimaryByUserId(Long userId);
