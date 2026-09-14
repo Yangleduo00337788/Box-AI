@@ -40,6 +40,11 @@ const router = createRouter({
           meta: { title: '套餐管理' },
         },
         {
+          path: 'ops-placements',
+          component: () => import('@/views/OpsPlacementsView.vue'),
+          meta: { title: '运营位' },
+        },
+        {
           path: 'platform-models',
           component: () => import('@/views/PlatformModelsView.vue'),
           meta: { title: '平台模型池' },
