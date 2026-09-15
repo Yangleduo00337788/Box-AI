@@ -114,10 +114,9 @@
         >
           <span class="sidebar-task-panel__title">项目</span>
           <div class="sidebar-task-panel__tools">
-            <t-icon
-              :name="projectsExpanded ? 'chevron-down' : 'chevron-right'"
-              class="sidebar-task-panel__chevron"
-            />
+            <span class="sidebar-task-panel__tool sidebar-task-panel__tool--static" aria-hidden="true">
+              <t-icon :name="projectsExpanded ? 'chevron-down' : 'chevron-right'" />
+            </span>
             <t-tooltip content="创建项目" placement="top" theme="light" :show-arrow="false" attach="body">
               <button type="button" class="sidebar-task-panel__tool" aria-label="创建项目" @click.stop="openCreateProject">
                 <t-icon name="add" />
@@ -188,10 +187,9 @@
         >
           <span class="sidebar-task-panel__title">任务列表</span>
           <div class="sidebar-task-panel__tools">
-            <t-icon
-              :name="conversationsExpanded ? 'chevron-down' : 'chevron-right'"
-              class="sidebar-task-panel__chevron"
-            />
+            <span class="sidebar-task-panel__tool sidebar-task-panel__tool--static" aria-hidden="true">
+              <t-icon :name="conversationsExpanded ? 'chevron-down' : 'chevron-right'" />
+            </span>
             <t-dropdown :options="conversationFilterOptions" trigger="click" @click="onConversationFilter">
               <t-tooltip content="筛选任务" placement="top" theme="light" :show-arrow="false" attach="body">
                 <button type="button" class="sidebar-task-panel__tool" aria-label="筛选任务" @click.stop>
@@ -271,10 +269,9 @@
         >
           <span class="sidebar-task-panel__title">已置顶</span>
           <div class="sidebar-task-panel__tools">
-            <t-icon
-              :name="pinnedExpanded ? 'chevron-down' : 'chevron-right'"
-              class="sidebar-task-panel__chevron"
-            />
+            <span class="sidebar-task-panel__tool sidebar-task-panel__tool--static" aria-hidden="true">
+              <t-icon :name="pinnedExpanded ? 'chevron-down' : 'chevron-right'" />
+            </span>
           </div>
         </button>
         <div v-if="pinnedExpanded" class="sidebar-task-panel__body">
@@ -1210,24 +1207,11 @@ watch(activeProjectId, () => {
   font-weight: inherit;
 }
 
-.sidebar-task-panel__chevron {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--box-muted);
-  pointer-events: none;
-}
-
 .sidebar-task-panel__tools {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 2px;
   flex-shrink: 0;
   height: 24px;
 }
@@ -1260,6 +1244,16 @@ watch(activeProjectId, () => {
 .sidebar-task-panel__tool:hover {
   background: var(--box-hover);
   color: var(--box-ink);
+}
+
+.sidebar-task-panel__tool--static {
+  cursor: default;
+  pointer-events: none;
+}
+
+.sidebar-task-panel__tool--static:hover {
+  background: transparent;
+  color: var(--box-muted);
 }
 
 .sidebar-task-panel__list {
