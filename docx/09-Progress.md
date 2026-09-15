@@ -404,6 +404,25 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 
 ---
 
+## V1.5 商业化与运营（2026-09）
+
+Flyway **V35–V37**；Phase A–E 按计划落地（支付网关、市场审核 UI、Model Router 接入 chat 仍 🟡）。
+
+| 域 | 交付 | 状态 |
+|----|------|------|
+| 计费订阅 | Subscription / Invoice / PaymentRecord；C 端套餐商城 + mock 支付；B 端账单对账 | ✅ / 支付 🟡 |
+| 超量策略 | `plan.overage_policy` + Quota REJECT/DEGRADE/METERED | ✅ |
+| 邀请协作 | `workspace_invitation` + `/invite/{token}` + 待接受列表 | ✅ |
+| 企业升级 | 个人→企业 `upgradeToEnterprise` | ✅ |
+| 运营排障 | 用户上下文 Drawer；Analytics 租户下钻（不含代登录进 C 端） | ✅ |
+| C 端体验 | 侧栏 IA；Debug/Executions 合并；对话导出；API 文档 Tab；Session 管理 | ✅ |
+| B 端治理 | 平台角色创建；SMTP/OAuth 系统配置；管理端找回密码 | 🟡 RBAC 拦截待细化 |
+| Phase E | 运营位埋点；知识库 URL 导入；市场审核字段；Model Router stub | 部分 🟡 |
+
+**主要路由**：C 端 `/settings/plan`、`/team`、`/invite/:token`；B 端 `/billing-invoices`、`/forgot-password`。
+
+---
+
 ## 文档维护规范（D-11）
 
 完成一项 B/F/D 任务或一个 Sprint 后：

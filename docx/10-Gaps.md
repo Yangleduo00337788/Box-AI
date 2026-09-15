@@ -228,10 +228,26 @@ P0 / P1 / P2 共 50 项已全部完成。后续需求见下方 §八，勿与本
 | BL-02 | P2 | ✅ | B 端平台 Analytics | `/analytics` + `GET /api/v1/admin/analytics/overview|trends` |
 | BL-03 | P2 | ✅ | B 端工具 / MCP 目录 | `/platform-tools`、`/platform-mcp`，复用插件目录 category |
 | BL-04 | P2 | 🟡 | Embed 自定义域名生效 | V25 + Builder 可填；DNS 校验与按域名路由未闭环 |
-| BL-05 | P2 | ⬜ | 计费支付闭环 | 套餐/额度/账单页已有，无支付网关 |
+| BL-05 | P2 | 🟡 | 计费支付闭环 | 订阅/账单/ mock 支付已落地；真实支付网关仍缺 |
 | BL-06 | P2 | ⬜ | Kubernetes / 分布式 Runtime | PRD §97 明确暂时不追求 |
 | BL-07 | P1 | ⬜ | 抽检 `05-Backend.md` B 端路由 | 仍写默认 `/tenants`，缺 dashboard/users/audit |
 | BL-08 | P2 | ✅ | B 端创建平台管理员 | `POST /api/v1/admin/users` + 用户页弹窗 |
+| BL-09 | P1 | ✅ | C 端套餐订阅 | Subscription + mock 支付确认 + Settings 套餐商城 |
+| BL-10 | P1 | ✅ | 超量策略 overagePolicy | Plan `REJECT/DEGRADE/METERED` + Quota 执行 |
+| BL-11 | P1 | ✅ | 邀请链接流 | `workspace_invitation` + `/invite/{token}` |
+| BL-12 | P2 | ✅ | 个人→企业升级 | `POST /tenants/upgrade-enterprise` |
+| BL-13 | P1 | ⬜ | B 端代登录 | 已移除（不采用代登录进 C 端） |
+| BL-14 | P1 | ✅ | 用户上下文 Drawer | `GET /admin/users/{id}/context` |
+| BL-15 | P1 | ✅ | Analytics 租户下钻 | `GET /admin/analytics/tenants/{id}` |
+| BL-16 | P2 | ✅ | C 端侧栏 IA + Debug 合并 | 资源分组侧栏 + `/executions` → `/debug` |
+| BL-17 | P2 | ✅ | 对话导出 Markdown | ChatView 导出按钮 |
+| BL-18 | P2 | ✅ | API 文档 Tab | Settings API Keys OpenAPI/curl |
+| BL-19 | P1 | ✅ | Session 设备管理 | `user_session` + `/auth/sessions` |
+| BL-20 | P1 | 🟡 | 平台 RBAC + 配置中心 | `platformAdminRole` + SMTP/OAuth 配置 UI；Interceptor 细粒度待完善 |
+| BL-21 | P2 | 🟡 | 市场审核灰度 | V37 字段已加；审核 UI/服务待完善 |
+| BL-22 | P2 | ✅ | 运营位埋点 | `ops_placement_metric` + track API + C 端上报 |
+| BL-23 | P2 | 🟡 | Auto 智能路由 | `ModelRouterApplicationService` stub，未接入 chat |
+| BL-24 | P2 | ✅ | 知识库 URL 导入 | `import-url` API + KnowledgeView UI |
 
 **已对齐、文档曾滞后（现已写入 `09-Progress.md`）**：Flyway V25–V29；B 端工作台/用户/审计/租户类型/知识库配额；C 端默认入口 `/chat`（PRD 写 Dashboard 首页，以 F-06 产品决策为准）。
 
