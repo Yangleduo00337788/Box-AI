@@ -141,6 +141,57 @@ public class KnowledgeDocumentApplicationService {
     }
 
     @Transactional
+    public KnowledgeDocumentVO importFromUrl(Long knowledgeBaseId, String url, String syncCron) {
+        workspacePermissionService.requirePermission(PermissionCodes.KNOWLEDGE_UPLOAD);
+        if (url == null || url.isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写网页地址");
+        }
+        KnowledgeBase kb = knowledgeBaseApplicationService.requireKnowledgeBase(knowledgeBaseId);
+        Long userId = WorkspaceContext.require().userId();
+        String normalizedUrl = url.trim();
+        byte[] bytes;
+        try {
+            bytes = java.net.URI.create(normalizedUrl).toURL().openStream().readAllBytes();
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "抓取网页失败");
+        }
+        String originalName = normalizedUrl.replaceAll("[^a-zA-Z0-9._-]", "_") + ".html";
+        if (originalName.length() > 120) {
+            originalName = originalName.substring(originalName.length() - 120);
+        }
+        KnowledgeDocument document = new KnowledgeDocument();
+        document.setWorkspaceId(kb.getWorkspaceId());
+        document.setKnowledgeBaseId(kb.getId());
+        document.setName(originalName);
+        document.setFileName(originalName);
+        document.setFileType("HTML");
+        document.setMimeType("text/html");
+        document.setFileSize((long) bytes.length);
+        document.setStorageBucket(storageBucket);
+        document.setChunkCount(0);
+        document.setStatus("PARSING");
+        document.setCreatedBy(userId);
+        knowledgeDocumentRepository.save(document);
+        String storageKey = "knowledge/" + kb.getId() + "/" + document.getId() + "/" + originalName;
+        document.setStorageKey(storageKey);
+        try {
+            document.setMd5(md5(bytes));
+            objectStorage.put(storageBucket, storageKey, new java.io.ByteArrayInputStream(bytes), bytes.length, "text/html");
+            String text = documentTextExtractor.extract(bytes, originalName);
+            processDocument(kb, document, text);
+            knowledgeDocumentRepository.update(document);
+            refreshKnowledgeBaseCounts(kb);
+            return toVO(document);
+        } catch (BusinessException e) {
+            markFailed(document, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            markFailed(document, "网页处理失败");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "网页处理失败");
+        }
+    }
+
+    @Transactional
     public KnowledgeDocumentVO retry(Long documentId) {
         workspacePermissionService.requirePermission(PermissionCodes.KNOWLEDGE_UPLOAD);
         KnowledgeDocument document = requireDocument(documentId);

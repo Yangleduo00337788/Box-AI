@@ -2,6 +2,7 @@ package com.boxai.knowledge.controller;
 
 import com.boxai.common.result.Result;
 import com.boxai.knowledge.api.CreateKnowledgeBaseRequest;
+import com.boxai.knowledge.api.ImportKnowledgeUrlRequest;
 import com.boxai.knowledge.api.KnowledgeBaseVO;
 import com.boxai.knowledge.api.KnowledgeDocumentVO;
 import com.boxai.knowledge.api.KnowledgeSearchHitVO;
@@ -82,6 +83,13 @@ public class KnowledgeBaseController {
     public Result<KnowledgeDocumentVO> uploadDocument(@PathVariable Long id,
                                                       @RequestPart("file") MultipartFile file) {
         return Result.success(knowledgeDocumentApplicationService.upload(id, file));
+    }
+
+    @PostMapping("/{id}/documents/import-url")
+    public Result<KnowledgeDocumentVO> importUrl(@PathVariable Long id,
+                                                 @Valid @RequestBody ImportKnowledgeUrlRequest request) {
+        return Result.success(knowledgeDocumentApplicationService.importFromUrl(
+                id, request.url(), request.syncCron()));
     }
 
     @PostMapping("/{id}/search")

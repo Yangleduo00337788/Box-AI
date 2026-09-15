@@ -13,4 +13,5 @@ public final class AuditResourceTypes {
     public static final String API_KEY = "api_key";
     public static final String MEMBER = "member";
     public static final String ROLE = "role";
+    public static final String TENANT = "tenant";
 }
