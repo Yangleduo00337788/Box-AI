@@ -11,8 +11,6 @@ import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.user.User;
 import com.boxai.domain.user.UserRepository;
-import com.boxai.domain.workspace.WorkspaceMember;
-import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.security.context.LoginUser;
 import com.boxai.security.jwt.JwtService;
 import com.boxai.tenant.api.TenantVO;
@@ -22,6 +20,7 @@ import com.boxai.user.api.ChangePasswordRequest;
 import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
 import com.boxai.user.api.ResetPasswordRequest;
+import com.boxai.user.api.SelectCurrentWorkspaceRequest;
 import com.boxai.user.api.SendVerificationCodeRequest;
 import com.boxai.user.api.SendVerificationCodeResponse;
 import com.boxai.user.api.UpdateProfileRequest;
@@ -42,7 +41,6 @@ import java.util.Locale;
 public class AuthApplicationService {
 
     private final UserRepository userRepository;
-    private final WorkspaceRepository workspaceRepository;
     private final WorkspaceApplicationService workspaceApplicationService;
     private final TenantApplicationService tenantApplicationService;
     private final PasswordEncoder passwordEncoder;
@@ -50,18 +48,18 @@ public class AuthApplicationService {
     private final VerificationCodeService verificationCodeService;
     private final AuditLogService auditLogService;
     private final RateLimitService rateLimitService;
+    private final UserPreferenceApplicationService userPreferenceApplicationService;
 
     public AuthApplicationService(UserRepository userRepository,
-                                  WorkspaceRepository workspaceRepository,
                                   WorkspaceApplicationService workspaceApplicationService,
                                   TenantApplicationService tenantApplicationService,
                                   PasswordEncoder passwordEncoder,
                                   JwtService jwtService,
                                   VerificationCodeService verificationCodeService,
                                   AuditLogService auditLogService,
-                                  RateLimitService rateLimitService) {
+                                  RateLimitService rateLimitService,
+                                  UserPreferenceApplicationService userPreferenceApplicationService) {
         this.userRepository = userRepository;
-        this.workspaceRepository = workspaceRepository;
         this.workspaceApplicationService = workspaceApplicationService;
         this.tenantApplicationService = tenantApplicationService;
         this.passwordEncoder = passwordEncoder;
@@ -69,6 +67,7 @@ public class AuthApplicationService {
         this.verificationCodeService = verificationCodeService;
         this.auditLogService = auditLogService;
         this.rateLimitService = rateLimitService;
+        this.userPreferenceApplicationService = userPreferenceApplicationService;
     }
 
     @Transactional
@@ -97,7 +96,8 @@ public class AuthApplicationService {
         userRepository.save(user);
         var tenant = tenantApplicationService.createForRegistration(
                 user, accountType, request.companyName(), request.contactEmail());
-        workspaceApplicationService.createDefaultWorkspace(user, tenant.getId(), tenant.getTenantType());
+        var workspace = workspaceApplicationService.createDefaultWorkspace(user, tenant.getId(), tenant.getTenantType());
+        userPreferenceApplicationService.setCurrentWorkspaceId(user.getId(), workspace.getId());
         AuthVO auth = issue(user);
         auditLogService.recordForUser(
                 user.getId(),
@@ -155,6 +155,15 @@ public class AuthApplicationService {
         if (UserTypes.PLATFORM_ADMIN.equals(user.getUserType())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "请使用平台管理端登录");
         }
+        return issue(user);
+    }
+
+    @Transactional
+    public AuthVO selectCurrentWorkspace(LoginUser loginUser, SelectCurrentWorkspaceRequest request) {
+        workspaceApplicationService.requireAccess(request.workspaceId(), loginUser.userId());
+        userPreferenceApplicationService.setCurrentWorkspaceId(loginUser.userId(), request.workspaceId());
+        User user = userRepository.findById(loginUser.userId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在"));
         return issue(user);
     }
 
@@ -227,16 +236,38 @@ public class AuthApplicationService {
         tenantApplicationService.ensurePrimaryTenantActive(user.getId());
         String userType = user.getUserType() == null ? UserTypes.TENANT_USER : user.getUserType();
         String token = jwtService.generate(user.getId(), user.getUsername(), userType);
-        List<WorkspaceMember> members = workspaceRepository.listMembersByUserId(user.getId());
-        List<WorkspaceVO> workspaces = members.stream()
-                .map(item -> new WorkspaceVO(item.getWorkspaceId(), item.getWorkspaceName(), item.getWorkspaceSlug(), item.getRoleCode()))
+        List<WorkspaceVO> workspaces = workspaceApplicationService.listMineByUserId(user.getId()).stream()
+                .map(item -> new WorkspaceVO(
+                        item.id(),
+                        item.name(),
+                        item.slug(),
+                        item.description(),
+                        item.avatarUrl(),
+                        item.status(),
+                        item.roleCode()))
                 .toList();
         TenantSummaryVO tenant = toTenantSummary(tenantApplicationService.findPrimaryByUserId(user.getId()));
+        Long currentWorkspaceId = resolveCurrentWorkspaceId(user.getId(), workspaces);
         return new AuthVO(
                 token,
                 new UserVO(user.getId(), user.getUsername(), user.getEmail(), user.getNickname(), user.getAvatarUrl(), user.getBio(), userType),
                 tenant,
-                workspaces);
+                workspaces,
+                currentWorkspaceId);
+    }
+
+    private Long resolveCurrentWorkspaceId(Long userId, List<WorkspaceVO> workspaces) {
+        Long saved = userPreferenceApplicationService.getCurrentWorkspaceId(userId);
+        boolean valid = saved != null && workspaces.stream().anyMatch(item -> saved.equals(item.id()));
+        if (valid) {
+            return saved;
+        }
+        if (workspaces.isEmpty()) {
+            return null;
+        }
+        Long fallback = workspaces.get(0).id();
+        userPreferenceApplicationService.setCurrentWorkspaceId(userId, fallback);
+        return fallback;
     }
 
     private TenantSummaryVO toTenantSummary(TenantVO tenant) {

@@ -7,6 +7,10 @@ public interface WorkspaceRepository {
 
     Workspace save(Workspace workspace);
 
+    void update(Workspace workspace);
+
+    void deleteById(Long id);
+
     Optional<Workspace> findById(Long id);
 
     Optional<Workspace> findBySlug(String slug);

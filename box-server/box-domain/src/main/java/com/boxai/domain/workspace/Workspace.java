@@ -3,6 +3,8 @@ package com.boxai.domain.workspace;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 public class Workspace {
@@ -15,4 +17,5 @@ public class Workspace {
     private String avatarUrl;
     private Long ownerId;
     private Integer status;
+    private LocalDateTime createdAt;
 }

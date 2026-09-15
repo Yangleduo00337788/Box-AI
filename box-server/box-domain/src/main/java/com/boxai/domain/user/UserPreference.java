@@ -12,6 +12,7 @@ public class UserPreference {
     private Long userId;
     private String theme;
     private Boolean sendWithEnter;
+    private Long currentWorkspaceId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

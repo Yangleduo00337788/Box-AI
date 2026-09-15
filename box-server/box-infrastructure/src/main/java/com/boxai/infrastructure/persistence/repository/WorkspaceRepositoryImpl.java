@@ -51,6 +51,27 @@ public class WorkspaceRepositoryImpl implements WorkspaceRepository {
     }
 
     @Override
+    public void update(Workspace workspace) {
+        WorkspaceDO row = workspaceMapper.selectOneById(workspace.getId());
+        if (row == null) {
+            return;
+        }
+        row.setName(workspace.getName());
+        row.setSlug(workspace.getSlug());
+        row.setDescription(workspace.getDescription());
+        row.setAvatarUrl(workspace.getAvatarUrl());
+        row.setStatus(workspace.getStatus() == null ? 1 : workspace.getStatus());
+        row.setUpdatedBy(workspace.getOwnerId());
+        row.setUpdatedAt(LocalDateTime.now());
+        workspaceMapper.update(row);
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        workspaceMapper.deleteById(id);
+    }
+
+    @Override
     public Optional<Workspace> findById(Long id) {
         return Optional.ofNullable(workspaceMapper.selectOneById(id)).map(this::toDomain);
     }
@@ -66,12 +87,16 @@ public class WorkspaceRepositoryImpl implements WorkspaceRepository {
         List<WorkspaceMemberDO> rows = memberMapper.selectListByQuery(QueryWrapper.create().eq("user_id", userId).eq("status", 1));
         List<WorkspaceMember> result = new ArrayList<>();
         for (WorkspaceMemberDO row : rows) {
+            WorkspaceDO workspace = workspaceMapper.selectOneById(row.getWorkspaceId());
+            if (workspace == null || workspace.getStatus() == null || workspace.getStatus() != 1) {
+                continue;
+            }
             WorkspaceMember member = toMember(row);
-            workspaceMapper.selectOneById(row.getWorkspaceId());
-            Optional.ofNullable(workspaceMapper.selectOneById(row.getWorkspaceId())).ifPresent(ws -> {
-                member.setWorkspaceName(ws.getName());
-                member.setWorkspaceSlug(ws.getSlug());
-            });
+            member.setWorkspaceName(workspace.getName());
+            member.setWorkspaceSlug(workspace.getSlug());
+            member.setWorkspaceDescription(workspace.getDescription());
+            member.setWorkspaceAvatarUrl(workspace.getAvatarUrl());
+            member.setWorkspaceStatus(workspace.getStatus());
             Optional.ofNullable(roleMapper.selectOneById(row.getRoleId())).ifPresent(role -> member.setRoleCode(role.getRoleCode()));
             result.add(member);
         }
@@ -150,7 +175,8 @@ public class WorkspaceRepositoryImpl implements WorkspaceRepository {
 
     @Override
     public int countByTenantId(Long tenantId) {
-        Long count = workspaceMapper.selectCountByQuery(QueryWrapper.create().eq("tenant_id", tenantId));
+        Long count = workspaceMapper.selectCountByQuery(
+                QueryWrapper.create().eq("tenant_id", tenantId).eq("status", 1));
         return count == null ? 0 : count.intValue();
     }
 
@@ -173,6 +199,7 @@ public class WorkspaceRepositoryImpl implements WorkspaceRepository {
         workspace.setAvatarUrl(row.getAvatarUrl());
         workspace.setOwnerId(row.getOwnerId());
         workspace.setStatus(row.getStatus());
+        workspace.setCreatedAt(row.getCreatedAt());
         return workspace;
     }
 

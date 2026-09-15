@@ -5,5 +5,7 @@ public record WorkspaceDetailVO(
         String name,
         String slug,
         String description,
+        String avatarUrl,
+        Integer status,
         String roleCode
 ) {}

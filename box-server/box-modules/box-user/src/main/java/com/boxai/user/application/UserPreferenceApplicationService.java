@@ -20,6 +20,19 @@ public class UserPreferenceApplicationService {
         return toVO(userPreferenceRepository.findByUserId(userId).orElseGet(() -> createDefault(userId)));
     }
 
+    public Long getCurrentWorkspaceId(Long userId) {
+        return userPreferenceRepository.findByUserId(userId)
+                .map(UserPreference::getCurrentWorkspaceId)
+                .orElse(null);
+    }
+
+    @Transactional
+    public void setCurrentWorkspaceId(Long userId, Long workspaceId) {
+        UserPreference preference = userPreferenceRepository.findByUserId(userId).orElseGet(() -> createDefault(userId));
+        preference.setCurrentWorkspaceId(workspaceId);
+        userPreferenceRepository.update(preference);
+    }
+
     @Transactional
     public UserPreferenceVO update(Long userId, UpdateUserPreferenceRequest request) {
         UserPreference preference = userPreferenceRepository.findByUserId(userId).orElseGet(() -> createDefault(userId));

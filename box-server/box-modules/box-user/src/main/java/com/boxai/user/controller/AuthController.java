@@ -8,6 +8,7 @@ import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
 import com.boxai.user.api.OAuthProviderVO;
 import com.boxai.user.api.ResetPasswordRequest;
+import com.boxai.user.api.SelectCurrentWorkspaceRequest;
 import com.boxai.user.api.SendVerificationCodeRequest;
 import com.boxai.user.api.SendVerificationCodeResponse;
 import com.boxai.user.api.UpdateProfileRequest;
@@ -95,6 +96,11 @@ public class AuthController {
     @GetMapping("/me")
     public Result<AuthVO> me() {
         return Result.success(authApplicationService.me(SecurityContexts.currentUser()));
+    }
+
+    @PutMapping("/current-workspace")
+    public Result<AuthVO> selectCurrentWorkspace(@Valid @RequestBody SelectCurrentWorkspaceRequest request) {
+        return Result.success(authApplicationService.selectCurrentWorkspace(SecurityContexts.currentUser(), request));
     }
 
     @PutMapping("/profile")

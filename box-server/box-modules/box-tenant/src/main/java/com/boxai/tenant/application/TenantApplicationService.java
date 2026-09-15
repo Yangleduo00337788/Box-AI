@@ -8,7 +8,9 @@ import com.boxai.domain.tenant.Tenant;
 import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.user.User;
+import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.security.tenant.TenantAccessGuard;
+import com.boxai.tenant.api.AdminWorkspaceVO;
 import com.boxai.tenant.api.CreateTenantRequest;
 import com.boxai.tenant.api.TenantVO;
 import org.springframework.stereotype.Service;
@@ -25,15 +27,18 @@ public class TenantApplicationService {
     private final TenantAccessGuard tenantAccessGuard;
     private final QuotaApplicationService quotaApplicationService;
     private final PlanApplicationService planApplicationService;
+    private final WorkspaceRepository workspaceRepository;
 
     public TenantApplicationService(TenantRepository tenantRepository,
                                     TenantAccessGuard tenantAccessGuard,
                                     QuotaApplicationService quotaApplicationService,
-                                    PlanApplicationService planApplicationService) {
+                                    PlanApplicationService planApplicationService,
+                                    WorkspaceRepository workspaceRepository) {
         this.tenantRepository = tenantRepository;
         this.tenantAccessGuard = tenantAccessGuard;
         this.quotaApplicationService = quotaApplicationService;
         this.planApplicationService = planApplicationService;
+        this.workspaceRepository = workspaceRepository;
     }
 
     @Transactional
@@ -67,6 +72,22 @@ public class TenantApplicationService {
 
     public List<TenantVO> listAll() {
         return tenantRepository.listAll().stream().map(this::toVo).toList();
+    }
+
+    public List<AdminWorkspaceVO> listWorkspaces(Long tenantId) {
+        tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "租户不存在"));
+        return workspaceRepository.listByTenantId(tenantId).stream()
+                .map(item -> new AdminWorkspaceVO(
+                        item.getId(),
+                        item.getName(),
+                        item.getSlug(),
+                        item.getDescription(),
+                        item.getAvatarUrl(),
+                        item.getStatus(),
+                        item.getOwnerId(),
+                        item.getCreatedAt()))
+                .toList();
     }
 
     @Transactional

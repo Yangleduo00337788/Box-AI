@@ -6,5 +6,6 @@ public record AuthVO(
         String token,
         UserVO user,
         TenantSummaryVO tenant,
-        List<WorkspaceVO> workspaces
+        List<WorkspaceVO> workspaces,
+        Long currentWorkspaceId
 ) {}

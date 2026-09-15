@@ -1,6 +1,7 @@
 package com.boxai.tenant.controller;
 
 import com.boxai.common.result.Result;
+import com.boxai.tenant.api.AdminWorkspaceVO;
 import com.boxai.tenant.api.AssignTenantPlanRequest;
 import com.boxai.tenant.api.CreateTenantRequest;
 import com.boxai.tenant.api.QuotaSnapshotVO;
@@ -57,5 +58,10 @@ public class AdminTenantController {
     @GetMapping("/{id}/quota")
     public Result<QuotaSnapshotVO> quota(@PathVariable Long id) {
         return Result.success(quotaApplicationService.getQuotaForTenant(id));
+    }
+
+    @GetMapping("/{id}/workspaces")
+    public Result<List<AdminWorkspaceVO>> workspaces(@PathVariable Long id) {
+        return Result.success(tenantApplicationService.listWorkspaces(id));
     }
 }

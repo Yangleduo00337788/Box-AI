@@ -47,6 +47,7 @@ public class UserPreferenceRepositoryImpl implements UserPreferenceRepository {
         preference.setUserId(row.getUserId());
         preference.setTheme(row.getTheme());
         preference.setSendWithEnter(row.getSendWithEnter() == null || row.getSendWithEnter() == 1);
+        preference.setCurrentWorkspaceId(row.getCurrentWorkspaceId());
         preference.setCreatedAt(row.getCreatedAt());
         preference.setUpdatedAt(row.getUpdatedAt());
         return preference;
@@ -57,6 +58,7 @@ public class UserPreferenceRepositoryImpl implements UserPreferenceRepository {
         row.setUserId(preference.getUserId());
         row.setTheme(preference.getTheme() == null ? "light" : preference.getTheme());
         row.setSendWithEnter(preference.getSendWithEnter() == null || preference.getSendWithEnter() ? 1 : 0);
+        row.setCurrentWorkspaceId(preference.getCurrentWorkspaceId());
         return row;
     }
 }

@@ -17,6 +17,8 @@ public class UserPreferenceDO {
     private String theme;
     @Column("send_with_enter")
     private Integer sendWithEnter;
+    @Column("current_workspace_id")
+    private Long currentWorkspaceId;
     @Column("created_at")
     private LocalDateTime createdAt;
     @Column("updated_at")

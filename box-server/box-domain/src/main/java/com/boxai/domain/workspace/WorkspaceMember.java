@@ -15,4 +15,7 @@ public class WorkspaceMember {
     private String roleCode;
     private String workspaceName;
     private String workspaceSlug;
+    private String workspaceDescription;
+    private String workspaceAvatarUrl;
+    private Integer workspaceStatus;
 }
