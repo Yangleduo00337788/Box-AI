@@ -350,10 +350,18 @@ public class PlatformModelApplicationService {
 
     public Optional<Long> findFirstRunnableModelId() {
         return listModelsForConsumer().stream()
-                .filter(item -> item.status() != null && item.status() == 1)
                 .map(PlatformModelVO::id)
-                .filter(Objects::nonNull)
+                .filter(this::isRunnable)
                 .findFirst();
+    }
+
+    public Long requireRunnableModelId(Long preferredId) {
+        if (isRunnable(preferredId)) {
+            return preferredId;
+        }
+        return findFirstRunnableModelId().orElseThrow(() -> new BusinessException(
+                ErrorCode.PLATFORM_CREDENTIAL_MISSING,
+                "平台尚未配置可用模型密钥：请在管理端「平台模型池」为已上架模型绑定密钥"));
     }
 
     public void touchCredential(Long credentialId) {

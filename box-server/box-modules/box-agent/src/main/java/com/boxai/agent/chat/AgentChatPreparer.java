@@ -28,7 +28,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 @Service
 public class AgentChatPreparer {
@@ -101,36 +100,15 @@ public class AgentChatPreparer {
                                                  Long platformModelOverride) {
         List<ChatTurn> turns = buildTurns(agent.getId(), draft, history, userMessage);
         String modelSource = draft.getModelSource() == null ? ModelSources.PLATFORM : draft.getModelSource();
-        if (platformModelOverride != null) {
-            if (!ModelSources.PLATFORM.equals(modelSource)) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "当前智能体使用自定义模型，不支持在对话中切换平台模型");
-            }
-            if (!platformModelApplicationService.isRunnable(platformModelOverride)) {
-                throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "所选平台模型不可用");
-            }
-            ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(platformModelOverride);
-            return buildPrepared(
-                    agent.getId(),
-                    resolved.runtimeConfig(),
-                    turns,
-                    draft,
-                    resolved.platformCredentialId(),
-                    true,
-                    resolved.platformModelId(),
-                    null);
-        }
         if (ModelSources.PLATFORM.equals(modelSource)) {
-            Long platformModelId = draft.getPlatformModelId();
-            if (!platformModelApplicationService.isRunnable(platformModelId)) {
-                Long runnableId = platformModelApplicationService.findFirstRunnableModelId()
-                        .orElseThrow(() -> new BusinessException(
-                                ErrorCode.PLATFORM_CREDENTIAL_MISSING,
-                                "平台尚未配置可用模型密钥：请在管理端「平台模型池」为已上架模型绑定密钥"));
-                if (!Objects.equals(platformModelId, runnableId)) {
-                    draft.setPlatformModelId(runnableId);
-                    agentVersionRepository.update(draft);
+            Long platformModelId;
+            if (platformModelOverride != null) {
+                if (!platformModelApplicationService.isRunnable(platformModelOverride)) {
+                    throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "所选平台模型不可用");
                 }
-                platformModelId = runnableId;
+                platformModelId = platformModelOverride;
+            } else {
+                platformModelId = platformModelApplicationService.requireRunnableModelId(draft.getPlatformModelId());
             }
             ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(platformModelId);
             return buildPrepared(
@@ -142,6 +120,9 @@ public class AgentChatPreparer {
                     true,
                     resolved.platformModelId(),
                     null);
+        }
+        if (platformModelOverride != null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "当前智能体使用自定义模型，不支持在对话中切换平台模型");
         }
 
         if (draft.getModelId() == null) {
