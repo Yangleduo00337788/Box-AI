@@ -15,5 +15,6 @@ public record UpdatePlanRequest(
         @NotNull Integer quotaMembers,
         @NotNull Integer quotaWorkspaces,
         @NotNull Integer quotaKnowledgeBases,
+        String overagePolicy,
         @NotNull Integer status
 ) {}

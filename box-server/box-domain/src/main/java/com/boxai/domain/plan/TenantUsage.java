@@ -14,6 +14,8 @@ public class TenantUsage {
     private String period;
     private Integer aiCalls;
     private Long tokens;
+    private Integer overageAiCalls;
+    private Long overageTokens;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

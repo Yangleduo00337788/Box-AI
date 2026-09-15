@@ -1,5 +1,6 @@
 package com.boxai.tenant.application;
 
+import com.boxai.common.constant.OveragePolicies;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.plan.Plan;
@@ -49,6 +50,7 @@ public class PlanApplicationService {
         plan.setQuotaMembers(request.quotaMembers());
         plan.setQuotaWorkspaces(request.quotaWorkspaces());
         plan.setQuotaKnowledgeBases(request.quotaKnowledgeBases());
+        plan.setOveragePolicy(normalizeOveragePolicy(request.overagePolicy()));
         plan.setStatus(1);
         planRepository.save(plan);
         return toVo(plan);
@@ -65,6 +67,7 @@ public class PlanApplicationService {
         plan.setQuotaMembers(request.quotaMembers());
         plan.setQuotaWorkspaces(request.quotaWorkspaces());
         plan.setQuotaKnowledgeBases(request.quotaKnowledgeBases());
+        plan.setOveragePolicy(normalizeOveragePolicy(request.overagePolicy()));
         if (request.status() != 0 && request.status() != 1) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "状态值无效");
         }
@@ -100,8 +103,22 @@ public class PlanApplicationService {
                 plan.getQuotaMembers(),
                 plan.getQuotaWorkspaces(),
                 plan.getQuotaKnowledgeBases() == null ? 0 : plan.getQuotaKnowledgeBases(),
+                plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy(),
                 plan.getStatus(),
                 plan.getCreatedAt());
+    }
+
+    private String normalizeOveragePolicy(String value) {
+        if (value == null || value.isBlank()) {
+            return OveragePolicies.REJECT;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!OveragePolicies.REJECT.equals(normalized)
+                && !OveragePolicies.DEGRADE.equals(normalized)
+                && !OveragePolicies.METERED.equals(normalized)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "超量策略无效");
+        }
+        return normalized;
     }
 
     private String trimToNull(String value) {

@@ -24,6 +24,8 @@ public class BillingApplicationService {
         QuotaSnapshotVO quota = quotaApplicationService.getQuotaForWorkspace(workspaceId);
         Plan plan = planApplicationService.requirePlan(quota.planId());
         BigDecimal monthly = plan.getPriceMonthly() == null ? BigDecimal.ZERO : plan.getPriceMonthly();
+        BigDecimal overageAmount = calculateOverageAmount(plan, quota);
+        BigDecimal estimated = monthly.add(overageAmount);
         return new BillingOverviewVO(
                 quota.period(),
                 quota.planName(),
@@ -32,8 +34,27 @@ public class BillingApplicationService {
                 quota.usedTokens(),
                 quota.quotaAiCalls(),
                 quota.quotaTokens(),
-                monthly,
-                "CNY");
+                quota.overageAiCalls() == null ? 0 : quota.overageAiCalls(),
+                quota.overageTokens() == null ? 0L : quota.overageTokens(),
+                plan.getOveragePolicy(),
+                estimated,
+                "CNY",
+                false);
+    }
+
+    private BigDecimal calculateOverageAmount(Plan plan, QuotaSnapshotVO quota) {
+        if (!"METERED".equals(plan.getOveragePolicy())) {
+            return BigDecimal.ZERO;
+        }
+        int overageCalls = quota.overageAiCalls() == null ? 0 : quota.overageAiCalls();
+        long overageTokens = quota.overageTokens() == null ? 0L : quota.overageTokens();
+        if (overageCalls <= 0 && overageTokens <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal callRate = new BigDecimal("0.01");
+        BigDecimal tokenRate = new BigDecimal("0.000001");
+        return callRate.multiply(BigDecimal.valueOf(overageCalls))
+                .add(tokenRate.multiply(BigDecimal.valueOf(overageTokens)));
     }
 
     public BillingOverviewVO overviewForCurrentWorkspace() {

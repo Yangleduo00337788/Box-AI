@@ -1,0 +1,64 @@
+ALTER TABLE plan
+    ADD COLUMN overage_policy VARCHAR(16) NOT NULL DEFAULT 'REJECT'
+        COMMENT 'REJECT/DEGRADE/METERED' AFTER quota_knowledge_bases;
+
+UPDATE plan SET overage_policy = 'REJECT' WHERE overage_policy IS NULL OR overage_policy = '';
+
+ALTER TABLE tenant_usage
+    ADD COLUMN overage_ai_calls INT NOT NULL DEFAULT 0 COMMENT '超额 AI 调用' AFTER tokens,
+    ADD COLUMN overage_tokens BIGINT NOT NULL DEFAULT 0 COMMENT '超额 Token' AFTER overage_ai_calls;
+
+CREATE TABLE subscription (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id BIGINT UNSIGNED NOT NULL,
+    plan_id BIGINT UNSIGNED NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING_PAYMENT' COMMENT 'PENDING_PAYMENT/ACTIVE/CANCELLED/EXPIRED',
+    billing_cycle VARCHAR(16) NOT NULL DEFAULT 'MONTHLY',
+    current_period_start DATE NOT NULL,
+    current_period_end DATE NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_subscription_tenant (tenant_id),
+    KEY idx_subscription_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租户订阅';
+
+CREATE TABLE billing_invoice (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id BIGINT UNSIGNED NOT NULL,
+    subscription_id BIGINT UNSIGNED NULL,
+    invoice_no VARCHAR(64) NOT NULL,
+    period CHAR(7) NOT NULL COMMENT 'YYYY-MM',
+    plan_id BIGINT UNSIGNED NOT NULL,
+    plan_name VARCHAR(128) NOT NULL,
+    subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    overage_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    total_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    currency VARCHAR(8) NOT NULL DEFAULT 'CNY',
+    status VARCHAR(16) NOT NULL DEFAULT 'OPEN' COMMENT 'DRAFT/OPEN/PAID/VOID',
+    paid_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_invoice_no (invoice_no),
+    KEY idx_invoice_tenant (tenant_id),
+    KEY idx_invoice_period (period)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='账单发票';
+
+CREATE TABLE payment_record (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id BIGINT UNSIGNED NOT NULL,
+    invoice_id BIGINT UNSIGNED NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    currency VARCHAR(8) NOT NULL DEFAULT 'CNY',
+    channel VARCHAR(32) NOT NULL DEFAULT 'MOCK' COMMENT 'MOCK/WECHAT/ALIPAY/STRIPE',
+    status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/SUCCEEDED/FAILED',
+    external_ref VARCHAR(128) NULL,
+    paid_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_payment_tenant (tenant_id),
+    KEY idx_payment_invoice (invoice_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付记录';

@@ -10,7 +10,11 @@ public record BillingOverviewVO(
         Long usedTokens,
         Integer quotaAiCalls,
         Long quotaTokens,
+        Integer overageAiCalls,
+        Long overageTokens,
+        String overagePolicy,
         BigDecimal estimatedAmount,
-        String currency
+        String currency,
+        boolean paymentEnabled
 ) {
 }

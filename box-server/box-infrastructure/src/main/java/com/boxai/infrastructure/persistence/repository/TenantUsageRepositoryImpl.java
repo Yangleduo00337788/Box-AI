@@ -62,6 +62,8 @@ public class TenantUsageRepositoryImpl implements TenantUsageRepository {
         usage.setPeriod(row.getPeriod());
         usage.setAiCalls(row.getAiCalls());
         usage.setTokens(row.getTokens());
+        usage.setOverageAiCalls(row.getOverageAiCalls());
+        usage.setOverageTokens(row.getOverageTokens());
         usage.setCreatedAt(row.getCreatedAt());
         usage.setUpdatedAt(row.getUpdatedAt());
         return usage;
@@ -73,6 +75,8 @@ public class TenantUsageRepositoryImpl implements TenantUsageRepository {
         row.setPeriod(usage.getPeriod());
         row.setAiCalls(usage.getAiCalls() == null ? 0 : usage.getAiCalls());
         row.setTokens(usage.getTokens() == null ? 0L : usage.getTokens());
+        row.setOverageAiCalls(usage.getOverageAiCalls() == null ? 0 : usage.getOverageAiCalls());
+        row.setOverageTokens(usage.getOverageTokens() == null ? 0L : usage.getOverageTokens());
         return row;
     }
 }

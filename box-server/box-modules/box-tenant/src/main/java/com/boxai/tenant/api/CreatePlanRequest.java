@@ -15,5 +15,6 @@ public record CreatePlanRequest(
         @NotNull Long quotaTokens,
         @NotNull Integer quotaMembers,
         @NotNull Integer quotaWorkspaces,
-        @NotNull Integer quotaKnowledgeBases
+        @NotNull Integer quotaKnowledgeBases,
+        String overagePolicy
 ) {}

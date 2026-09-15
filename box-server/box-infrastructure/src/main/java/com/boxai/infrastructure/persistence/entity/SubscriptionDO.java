@@ -6,24 +6,28 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
-@Table("tenant_usage")
-public class TenantUsageDO {
+@Table("subscription")
+public class SubscriptionDO {
 
     @Id(keyType = KeyType.Auto)
     private Long id;
     @Column("tenant_id")
     private Long tenantId;
-    private String period;
-    @Column("ai_calls")
-    private Integer aiCalls;
-    private Long tokens;
-    @Column("overage_ai_calls")
-    private Integer overageAiCalls;
-    @Column("overage_tokens")
-    private Long overageTokens;
+    @Column("plan_id")
+    private Long planId;
+    private String status;
+    @Column("billing_cycle")
+    private String billingCycle;
+    @Column("current_period_start")
+    private LocalDate currentPeriodStart;
+    @Column("current_period_end")
+    private LocalDate currentPeriodEnd;
+    @Column("created_by")
+    private Long createdBy;
     @Column("created_at")
     private LocalDateTime createdAt;
     @Column("updated_at")

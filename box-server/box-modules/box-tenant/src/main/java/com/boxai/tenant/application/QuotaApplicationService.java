@@ -1,5 +1,6 @@
 package com.boxai.tenant.application;
 
+import com.boxai.common.constant.OveragePolicies;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.knowledge.KnowledgeBaseRepository;
@@ -73,9 +74,13 @@ public class QuotaApplicationService {
         Long tenantId = resolveTenantId(workspaceId);
         Plan plan = resolvePlan(tenantId);
         TenantUsage usage = getOrCreateUsage(tenantId, currentPeriod());
-        assertAiWithinLimit(plan, usage);
-        usage.setAiCalls(usage.getAiCalls() + 1);
-        usage.setTokens(usage.getTokens() + Math.max(tokens, 0));
+        long tokenDelta = Math.max(tokens, 0);
+        if (wouldExceedAiLimit(plan, usage, tokenDelta)) {
+            handleOverage(plan, usage, tokenDelta);
+        } else {
+            usage.setAiCalls(usage.getAiCalls() + 1);
+            usage.setTokens(usage.getTokens() + tokenDelta);
+        }
         tenantUsageRepository.update(usage);
     }
 
@@ -146,6 +151,9 @@ public class QuotaApplicationService {
                 plan.getQuotaKnowledgeBases(),
                 usage.getAiCalls(),
                 usage.getTokens(),
+                usage.getOverageAiCalls() == null ? 0 : usage.getOverageAiCalls(),
+                usage.getOverageTokens() == null ? 0L : usage.getOverageTokens(),
+                plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy(),
                 usedMembers,
                 usedWorkspaces,
                 usedKnowledgeBases,
@@ -157,6 +165,13 @@ public class QuotaApplicationService {
     }
 
     private void assertAiWithinLimit(Plan plan, TenantUsage usage) {
+        if (!isOverAiLimit(plan, usage)) {
+            return;
+        }
+        String policy = plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy();
+        if (OveragePolicies.DEGRADE.equals(policy) || OveragePolicies.METERED.equals(policy)) {
+            return;
+        }
         if (plan.getQuotaAiCalls() != null && plan.getQuotaAiCalls() > 0
                 && usage.getAiCalls() >= plan.getQuotaAiCalls()) {
             throw new BusinessException(ErrorCode.QUOTA_EXCEEDED, "本月 AI 调用次数已达套餐上限");
@@ -165,6 +180,32 @@ public class QuotaApplicationService {
                 && usage.getTokens() >= plan.getQuotaTokens()) {
             throw new BusinessException(ErrorCode.QUOTA_EXCEEDED, "本月 Token 用量已达套餐上限");
         }
+    }
+
+    private boolean isOverAiLimit(Plan plan, TenantUsage usage) {
+        return wouldExceedAiLimit(plan, usage, 0);
+    }
+
+    private boolean wouldExceedAiLimit(Plan plan, TenantUsage usage, long tokenDelta) {
+        if (plan.getQuotaAiCalls() != null && plan.getQuotaAiCalls() > 0
+                && usage.getAiCalls() + 1 > plan.getQuotaAiCalls()) {
+            return true;
+        }
+        if (plan.getQuotaTokens() != null && plan.getQuotaTokens() > 0
+                && usage.getTokens() + tokenDelta > plan.getQuotaTokens()) {
+            return true;
+        }
+        return false;
+    }
+
+    private void handleOverage(Plan plan, TenantUsage usage, long tokenDelta) {
+        String policy = plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy();
+        if (OveragePolicies.REJECT.equals(policy)) {
+            assertAiWithinLimit(plan, usage);
+            return;
+        }
+        usage.setOverageAiCalls((usage.getOverageAiCalls() == null ? 0 : usage.getOverageAiCalls()) + 1);
+        usage.setOverageTokens((usage.getOverageTokens() == null ? 0L : usage.getOverageTokens()) + tokenDelta);
     }
 
     private Tenant requireTenant(Long tenantId) {

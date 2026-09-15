@@ -4,6 +4,8 @@ import com.boxai.common.constant.RoleCodes;
 import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.plan.Plan;
+import com.boxai.domain.plan.PlanRepository;
 import com.boxai.domain.tenant.Tenant;
 import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.tenant.TenantRepository;
@@ -28,17 +30,20 @@ public class TenantApplicationService {
     private final QuotaApplicationService quotaApplicationService;
     private final PlanApplicationService planApplicationService;
     private final WorkspaceRepository workspaceRepository;
+    private final PlanRepository planRepository;
 
     public TenantApplicationService(TenantRepository tenantRepository,
                                     TenantAccessGuard tenantAccessGuard,
                                     QuotaApplicationService quotaApplicationService,
                                     PlanApplicationService planApplicationService,
-                                    WorkspaceRepository workspaceRepository) {
+                                    WorkspaceRepository workspaceRepository,
+                                    PlanRepository planRepository) {
         this.tenantRepository = tenantRepository;
         this.tenantAccessGuard = tenantAccessGuard;
         this.quotaApplicationService = quotaApplicationService;
         this.planApplicationService = planApplicationService;
         this.workspaceRepository = workspaceRepository;
+        this.planRepository = planRepository;
     }
 
     @Transactional
@@ -148,6 +153,28 @@ public class TenantApplicationService {
 
     public void ensurePrimaryTenantActive(Long userId) {
         tenantAccessGuard.ensurePrimaryTenantActive(userId);
+    }
+
+    @Transactional
+    public TenantVO upgradeToEnterprise(Long userId, String companyName) {
+        TenantMember member = tenantRepository.findPrimaryByUserId(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "未找到租户"));
+        Tenant tenant = tenantRepository.findById(member.getTenantId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "租户不存在"));
+        if (!TenantTypes.PERSONAL.equals(tenant.getTenantType())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "当前已是企业版");
+        }
+        if (companyName == null || companyName.isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写企业名称");
+        }
+        tenant.setTenantType(TenantTypes.ENTERPRISE);
+        tenant.setName(companyName.trim());
+        tenant.setSlug(uniqueSlug(companyName));
+        Plan plan = planRepository.findByCode("enterprise_starter")
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLAN_NOT_FOUND, "企业套餐不存在"));
+        tenant.setPlanId(plan.getId());
+        tenantRepository.update(tenant);
+        return toVo(tenant);
     }
 
     private TenantVO toVo(Tenant tenant) {
