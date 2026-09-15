@@ -28,6 +28,7 @@ declare module 'vue' {
     OpsNoticeBar: typeof import('./src/components/OpsNoticeBar.vue')['default']
     OpsPlacementIcon: typeof import('./src/components/OpsPlacementIcon.vue')['default']
     PageHeader: typeof import('./src/components/PageHeader.vue')['default']
+    ProjectConversationPanel: typeof import('./src/components/ProjectConversationPanel.vue')['default']
     QuotaDonutChart: typeof import('./src/components/QuotaDonutChart.vue')['default']
     ResourceManageEmpty: typeof import('./src/components/ResourceManageEmpty.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

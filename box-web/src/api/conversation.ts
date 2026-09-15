@@ -11,6 +11,7 @@ export interface ConversationVO {
   id: number
   agentId: number
   agentName?: string
+  projectId?: number | null
   title?: string
   status: string
   messageCount?: number
@@ -56,12 +57,23 @@ function authHeaders(accept = 'application/json') {
   return headers
 }
 
-export function listConversations() {
-  return http.get<Result<ConversationVO[]>>('/conversations')
+export function listConversations(options?: { projectId?: number; unassigned?: boolean }) {
+  const params: Record<string, string | number | boolean> = {}
+  if (options?.projectId != null) {
+    params.projectId = options.projectId
+  }
+  if (options?.unassigned) {
+    params.unassigned = true
+  }
+  return http.get<Result<ConversationVO[]>>('/conversations', { params })
 }
 
-export function createConversation(payload: { agentId: number; title?: string }) {
+export function createConversation(payload: { agentId: number; title?: string; projectId?: number | null }) {
   return http.post<Result<ConversationVO>>('/conversations', payload)
+}
+
+export function moveConversationToProject(id: number, projectId: number | null) {
+  return http.put<Result<ConversationVO>>(`/conversations/${id}/project`, { projectId })
 }
 
 export function getConversation(id: number) {

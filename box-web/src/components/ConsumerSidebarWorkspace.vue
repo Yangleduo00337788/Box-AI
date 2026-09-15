@@ -7,170 +7,13 @@
         :to="item.value"
         class="sidebar-line sidebar-line--nav"
         :class="{ 'sidebar-line--active': isWorkbenchItemActive(item.value) }"
-        @click="focusWorkbench(item.value)"
+        @click="onWorkbenchClick(item.value)"
       >
         <span class="sidebar-line__icon">
           <t-icon :name="resolveTIconName(item.icon)" />
         </span>
         <span class="sidebar-line__label">{{ item.label }}</span>
       </router-link>
-
-      <section class="sidebar-task-panel">
-        <div class="sidebar-task-panel__head">
-          <span class="sidebar-task-panel__title">对话历史</span>
-          <div class="sidebar-task-panel__tools">
-            <t-tooltip
-              :content="conversationsExpanded ? '收起列表' : '展开列表'"
-              placement="top"
-              theme="light"
-              :show-arrow="false"
-              attach="body"
-            >
-              <button
-                type="button"
-                class="sidebar-task-panel__tool"
-                :aria-label="conversationsExpanded ? '收起列表' : '展开列表'"
-                @click="toggleConversationsExpanded"
-              >
-                <t-icon :name="conversationsExpanded ? 'fullscreen-exit' : 'fullscreen'" />
-              </button>
-            </t-tooltip>
-            <t-dropdown :options="conversationFilterOptions" trigger="click" @click="onConversationFilter">
-              <t-tooltip content="筛选对话" placement="top" theme="light" :show-arrow="false" attach="body">
-                <button type="button" class="sidebar-task-panel__tool" aria-label="筛选对话">
-                  <t-icon name="filter" />
-                </button>
-              </t-tooltip>
-            </t-dropdown>
-          </div>
-        </div>
-
-        <t-loading v-show="conversationsExpanded" :loading="conversationsLoading" size="small">
-          <nav v-if="displayConversations.length" class="sidebar-task-panel__list">
-            <div
-              v-for="conversation in displayConversations"
-              :key="conversation.id"
-              class="sidebar-task-row-wrap"
-              :class="{ 'sidebar-task-row-wrap--active': isConversationRowActive(conversation.id) }"
-            >
-              <button
-                type="button"
-                class="sidebar-task-row"
-                @click="openConversation(conversation)"
-              >
-                <t-icon name="folder" class="sidebar-task-row__icon" />
-                <span class="sidebar-task-row__label">{{ conversationLabel(conversation) }}</span>
-              </button>
-              <div class="sidebar-task-row__actions">
-                <t-tooltip
-                  :content="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
-                  placement="top"
-                  theme="light"
-                  :show-arrow="false"
-                  attach="body"
-                >
-                  <button
-                    type="button"
-                    class="sidebar-task-row__action"
-                    :aria-label="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
-                    @click.stop="handleToggleConversationPin(conversation.id)"
-                  >
-                    <t-icon name="pin" />
-                  </button>
-                </t-tooltip>
-                <t-tooltip content="改名" placement="top" theme="light" :show-arrow="false" attach="body">
-                  <button
-                    type="button"
-                    class="sidebar-task-row__action"
-                    aria-label="改名"
-                    @click.stop="openRenameConversation(conversation)"
-                  >
-                    <t-icon name="edit-1" />
-                  </button>
-                </t-tooltip>
-                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false" attach="body">
-                  <button
-                    type="button"
-                    class="sidebar-task-row__action"
-                    aria-label="删除"
-                    @click.stop="handleDeleteConversation(conversation)"
-                  >
-                    <t-icon name="delete" />
-                  </button>
-                </t-tooltip>
-              </div>
-            </div>
-          </nav>
-          <p v-else class="sidebar-task-panel__empty">暂无对话</p>
-        </t-loading>
-      </section>
-
-      <template v-if="pinnedItems.length">
-        <div class="sidebar-section-row">
-          <button
-            type="button"
-            class="sidebar-line sidebar-line--nav sidebar-line--section"
-            @click="pinnedExpanded = !pinnedExpanded"
-          >
-            <span class="sidebar-line__icon">
-              <t-icon name="pin" />
-            </span>
-            <span class="sidebar-line__label">置顶</span>
-          </button>
-          <div class="sidebar-section-row__actions">
-            <t-tooltip
-              :content="pinnedExpanded ? '折叠置顶' : '展开置顶'"
-              placement="top"
-              theme="light"
-              :show-arrow="false"
-              attach="body"
-            >
-              <button
-                type="button"
-                class="sidebar-section-row__btn"
-                :aria-label="pinnedExpanded ? '折叠置顶' : '展开置顶'"
-                @click.stop="pinnedExpanded = !pinnedExpanded"
-              >
-                <t-icon :name="pinnedExpanded ? 'chevron-down' : 'chevron-right'" />
-              </button>
-            </t-tooltip>
-          </div>
-        </div>
-
-        <div v-show="pinnedExpanded" class="sidebar-group">
-          <div
-            v-for="item in pinnedItems"
-            :key="item.key"
-            class="sidebar-row-wrap"
-            :class="{ 'sidebar-row-wrap--active': isPinnedItemActive(item) }"
-          >
-            <router-link
-              :to="item.to"
-              class="sidebar-line sidebar-line--item"
-              @click="onPinnedItemClick(item)"
-            >
-              <t-avatar
-                size="20px"
-                shape="circle"
-                class="sidebar-line__avatar"
-                :image="item.avatarUrl || undefined"
-                :style="{ background: item.color }"
-              >
-                {{ item.avatarText }}
-              </t-avatar>
-              <span class="sidebar-line__label">{{ item.label }}</span>
-              <span class="sidebar-line__meta">{{ item.meta }}</span>
-            </router-link>
-            <div class="sidebar-row__actions">
-              <t-tooltip content="取消置顶" placement="top" theme="light" :show-arrow="false" attach="body">
-                <button type="button" class="sidebar-row__action" aria-label="取消置顶" @click.stop="item.onUnpin?.()">
-                  <t-icon name="pin" />
-                </button>
-              </t-tooltip>
-            </div>
-          </div>
-        </div>
-      </template>
 
       <div class="sidebar-section-row">
         <button
@@ -261,12 +104,235 @@
         </div>
       </t-loading>
 
+      <div class="sidebar-task-panels">
+      <section class="sidebar-task-panel">
+        <button
+          type="button"
+          class="sidebar-task-panel__head sidebar-task-panel__head--toggle"
+          :aria-expanded="projectsExpanded"
+          @click="toggleProjectsExpanded"
+        >
+          <span class="sidebar-task-panel__title">项目</span>
+          <div class="sidebar-task-panel__tools">
+            <t-icon
+              :name="projectsExpanded ? 'chevron-down' : 'chevron-right'"
+              class="sidebar-task-panel__chevron"
+            />
+            <t-tooltip content="创建项目" placement="top" theme="light" :show-arrow="false" attach="body">
+              <button type="button" class="sidebar-task-panel__tool" aria-label="创建项目" @click.stop="openCreateProject">
+                <t-icon name="add" />
+              </button>
+            </t-tooltip>
+          </div>
+        </button>
+
+        <t-loading v-if="projectsExpanded" :loading="projectsLoading" size="small" class="sidebar-task-panel__body">
+          <div v-if="!projects.length" class="sidebar-project-empty">
+            <p class="sidebar-project-empty__desc">
+              创建工作目录保存文件与对话<br />
+              适合需要持续推进的复杂任务
+            </p>
+            <button type="button" class="sidebar-project-empty__btn" @click="openCreateProject">创建</button>
+          </div>
+          <nav v-else class="sidebar-task-panel__list">
+            <t-popup
+              v-for="project in projects"
+              :key="project.id"
+              trigger="hover"
+              placement="right-top"
+              :delay="[120, 180]"
+              :z-index="5600"
+              attach="body"
+              :overlay-inner-style="{
+                padding: 0,
+                maxHeight: 'none',
+                overflow: 'visible',
+                boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+                borderRadius: '12px',
+              }"
+              @visible-change="(visible: boolean) => onProjectHover(project, visible)"
+            >
+              <div
+                class="sidebar-task-row-wrap"
+                :class="{ 'sidebar-task-row-wrap--active': activeProjectId === project.id }"
+              >
+                <button type="button" class="sidebar-task-row sidebar-task-row--project" @click="enterProject(project)">
+                  <t-icon name="folder" class="sidebar-task-row__icon" />
+                  <span class="sidebar-task-row__label">{{ project.name }}</span>
+                </button>
+              </div>
+              <template #content>
+                <project-conversation-panel
+                  :title="project.name"
+                  :loading="hoveredProjectId === project.id && projectConversationsLoading"
+                  :conversations="hoveredProjectId === project.id ? displayProjectConversations : []"
+                  :active-id="activeConversationId"
+                  :pinned-ids="pinnedConversationIds"
+                  @open="openConversation"
+                  @pin="handleToggleConversationPin"
+                  @rename="openRenameConversation"
+                  @delete="handleDeleteConversation"
+                />
+              </template>
+            </t-popup>
+          </nav>
+        </t-loading>
+      </section>
+
+      <section class="sidebar-task-panel">
+        <button
+          type="button"
+          class="sidebar-task-panel__head sidebar-task-panel__head--toggle"
+          :aria-expanded="conversationsExpanded"
+          @click="toggleConversationsExpanded"
+        >
+          <span class="sidebar-task-panel__title">任务列表</span>
+          <div class="sidebar-task-panel__tools">
+            <t-icon
+              :name="conversationsExpanded ? 'chevron-down' : 'chevron-right'"
+              class="sidebar-task-panel__chevron"
+            />
+            <t-dropdown :options="conversationFilterOptions" trigger="click" @click="onConversationFilter">
+              <t-tooltip content="筛选任务" placement="top" theme="light" :show-arrow="false" attach="body">
+                <button type="button" class="sidebar-task-panel__tool" aria-label="筛选任务" @click.stop>
+                  <t-icon name="filter" />
+                </button>
+              </t-tooltip>
+            </t-dropdown>
+          </div>
+        </button>
+
+        <t-loading v-if="conversationsExpanded" :loading="conversationsLoading" size="small" class="sidebar-task-panel__body">
+          <nav v-if="displayConversations.length" class="sidebar-task-panel__list">
+            <div
+              v-for="conversation in displayConversations"
+              :key="conversation.id"
+              class="sidebar-task-row-wrap"
+              :class="{ 'sidebar-task-row-wrap--active': isConversationRowActive(conversation.id) }"
+            >
+              <button
+                type="button"
+                class="sidebar-task-row"
+                @click="openConversation(conversation)"
+              >
+                <t-icon name="chat-bubble-history" class="sidebar-task-row__icon" />
+                <span class="sidebar-task-row__label">{{ conversationLabel(conversation) }}</span>
+              </button>
+              <div class="sidebar-task-row__actions">
+                <t-tooltip
+                  :content="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
+                  placement="top"
+                  theme="light"
+                  :show-arrow="false"
+                  attach="body"
+                >
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    :aria-label="isConversationPinned(conversation.id) ? '取消置顶' : '置顶'"
+                    @click.stop="handleToggleConversationPin(conversation.id)"
+                  >
+                    <t-icon name="pin" />
+                  </button>
+                </t-tooltip>
+                <t-tooltip content="改名" placement="top" theme="light" :show-arrow="false" attach="body">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    aria-label="改名"
+                    @click.stop="openRenameConversation(conversation)"
+                  >
+                    <t-icon name="edit-1" />
+                  </button>
+                </t-tooltip>
+                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false" attach="body">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    aria-label="删除"
+                    @click.stop="handleDeleteConversation(conversation)"
+                  >
+                    <t-icon name="delete" />
+                  </button>
+                </t-tooltip>
+              </div>
+            </div>
+          </nav>
+          <p v-else class="sidebar-task-panel__empty">暂无任务</p>
+        </t-loading>
+      </section>
+
+      <section v-if="pinnedConversationIds.length" class="sidebar-task-panel">
+        <button
+          type="button"
+          class="sidebar-task-panel__head sidebar-task-panel__head--toggle"
+          :aria-expanded="pinnedExpanded"
+          @click="pinnedExpanded = !pinnedExpanded"
+        >
+          <span class="sidebar-task-panel__title">已置顶</span>
+          <div class="sidebar-task-panel__tools">
+            <t-icon
+              :name="pinnedExpanded ? 'chevron-down' : 'chevron-right'"
+              class="sidebar-task-panel__chevron"
+            />
+          </div>
+        </button>
+        <div v-if="pinnedExpanded" class="sidebar-task-panel__body">
+          <nav class="sidebar-task-panel__list">
+            <div
+              v-for="conversation in pinnedConversations"
+              :key="conversation.id"
+              class="sidebar-task-row-wrap"
+              :class="{ 'sidebar-task-row-wrap--active': isConversationRowActive(conversation.id) }"
+            >
+              <button type="button" class="sidebar-task-row" @click="openConversation(conversation)">
+                <t-icon name="chat-bubble-history" class="sidebar-task-row__icon" />
+                <span class="sidebar-task-row__label">{{ conversationLabel(conversation) }}</span>
+              </button>
+              <div class="sidebar-task-row__actions">
+                <t-tooltip content="取消置顶" placement="top" theme="light" :show-arrow="false" attach="body">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    aria-label="取消置顶"
+                    @click.stop="handleToggleConversationPin(conversation.id)"
+                  >
+                    <t-icon name="pin" />
+                  </button>
+                </t-tooltip>
+                <t-tooltip content="改名" placement="top" theme="light" :show-arrow="false" attach="body">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    aria-label="改名"
+                    @click.stop="openRenameConversation(conversation)"
+                  >
+                    <t-icon name="edit-1" />
+                  </button>
+                </t-tooltip>
+                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false" attach="body">
+                  <button
+                    type="button"
+                    class="sidebar-task-row__action"
+                    aria-label="删除"
+                    @click.stop="handleDeleteConversation(conversation)"
+                  >
+                    <t-icon name="delete" />
+                  </button>
+                </t-tooltip>
+              </div>
+            </div>
+          </nav>
+        </div>
+      </section>
+      </div>
+
     </section>
 
     <t-dialog
       v-if="renameVisible"
       v-model:visible="renameVisible"
-      header="对话改名"
+      header="任务改名"
       width="400px"
       attach="body"
       :destroy-on-close="true"
@@ -280,7 +346,51 @@
         v-model="renameTitle"
         :maxlength="255"
         show-limit-number
-        placeholder="请输入对话名称"
+        placeholder="请输入任务名称"
+        :autofocus="true"
+      />
+    </t-dialog>
+
+    <t-dialog
+      v-if="projectCreateVisible"
+      v-model:visible="projectCreateVisible"
+      header="创建项目"
+      width="400px"
+      attach="body"
+      :destroy-on-close="true"
+      confirm-btn="创建"
+      cancel-btn="取消"
+      :confirm-loading="projectSaving"
+      :confirm-on-enter="true"
+      @confirm="confirmCreateProject"
+    >
+      <t-input
+        v-model="projectName"
+        :maxlength="128"
+        show-limit-number
+        placeholder="请输入项目名称"
+        :autofocus="true"
+      />
+    </t-dialog>
+
+    <t-dialog
+      v-if="projectRenameVisible"
+      v-model:visible="projectRenameVisible"
+      header="项目改名"
+      width="400px"
+      attach="body"
+      :destroy-on-close="true"
+      confirm-btn="保存"
+      cancel-btn="取消"
+      :confirm-loading="projectSaving"
+      :confirm-on-enter="true"
+      @confirm="confirmRenameProject"
+    >
+      <t-input
+        v-model="projectName"
+        :maxlength="128"
+        show-limit-number
+        placeholder="请输入项目名称"
         :autofocus="true"
       />
     </t-dialog>
@@ -295,10 +405,14 @@ import type { DropdownOption } from 'tdesign-vue-next'
 import type { AgentVO } from '@/api/agent'
 import { extractApiError } from '@/api/apiError'
 import { deleteConversation, renameConversation, type ConversationVO } from '@/api/conversation'
+import { createProject, deleteProject, renameProject, type ChatProjectVO } from '@/api/project'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
+import { useActiveProject } from '@/composables/useActiveProject'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
+import { useProjectNav } from '@/composables/useProjectNav'
+import ProjectConversationPanel from '@/components/ProjectConversationPanel.vue'
 import { useSidebarPins } from '@/composables/useSidebarPins'
 import { formatRelativeTime, getAvatarColor } from '@/utils/format'
 import { resolveTIconName } from '@/utils/icon'
@@ -313,10 +427,13 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const { agents, loading: agentsLoading, selectedAgentId, refresh: refreshAgents, selectAgent, selectAgentByConversation } = useAgentSelection()
-const { conversations, loading: conversationsLoading, refresh: refreshConversations } = useConversationNav()
+const { conversations, projectConversations, catalog, loading: conversationsLoading, projectLoading: projectConversationsLoading, refresh: refreshConversations, refreshProjectConversations, refreshCatalog } = useConversationNav()
+const { projects, loading: projectsLoading, refresh: refreshProjects } = useProjectNav()
+const { activeProjectId, selectProject, clearProject, syncActiveProject } = useActiveProject()
 const { openCreateAgentDialog } = useCreateAgentDialog()
 const {
   pinnedAgentIds,
+  pinnedConversationIds,
   isAgentPinned,
   isConversationPinned,
   toggleAgentPin,
@@ -327,13 +444,20 @@ const {
 
 const workbenchItems = CONSUMER_MENU_GROUPS[0]?.items ?? []
 const pinnedExpanded = ref(true)
-const conversationsExpanded = ref(false)
+const conversationsExpanded = ref(true)
+const projectsExpanded = ref(true)
+const hoveredProjectId = ref<number | null>(null)
 const conversationFilter = ref<'all' | 'current-agent'>('all')
-const agentsExpanded = ref(true)
+const agentsExpanded = ref(false)
 const renameVisible = ref(false)
 const renameSaving = ref(false)
 const renameTitle = ref('')
 const renamingConversationId = ref<number | null>(null)
+const projectCreateVisible = ref(false)
+const projectRenameVisible = ref(false)
+const projectSaving = ref(false)
+const projectName = ref('')
+const renamingProjectId = ref<number | null>(null)
 
 type SidebarFocus =
   | { type: 'workbench'; path: string }
@@ -344,6 +468,13 @@ const sidebarFocus = ref<SidebarFocus>({ type: 'workbench', path: '/chat' })
 
 function focusWorkbench(path: string) {
   sidebarFocus.value = { type: 'workbench', path }
+}
+
+function onWorkbenchClick(path: string) {
+  focusWorkbench(path)
+  if (path === '/chat') {
+    clearProject()
+  }
 }
 
 function focusAgent(agentId: number) {
@@ -366,36 +497,132 @@ function isConversationRowActive(conversationId: number) {
   return sidebarFocus.value.type === 'conversation' && sidebarFocus.value.id === conversationId
 }
 
-function isPinnedItemActive(item: PinnedSidebarItem) {
-  if (item.key.startsWith('conversation-')) {
-    const id = Number(item.key.slice('conversation-'.length))
-    return isConversationRowActive(id)
-  }
-  if (item.key.startsWith('agent-')) {
-    const id = Number(item.key.slice('agent-'.length))
-    return isAgentRowActive(id)
-  }
-  return false
-}
-
-function onPinnedItemClick(item: PinnedSidebarItem) {
-  if (item.key.startsWith('conversation-')) {
-    const id = Number(item.key.slice('conversation-'.length))
-    const conversation = conversations.value.find((row) => row.id === id)
-    if (conversation) {
-      openConversation(conversation)
-    }
-    return
-  }
-  if (item.key.startsWith('agent-')) {
-    const id = Number(item.key.slice('agent-'.length))
-    focusAgent(id)
-    item.onNavigate?.()
-  }
-}
-
 function toggleConversationsExpanded() {
   conversationsExpanded.value = !conversationsExpanded.value
+}
+
+function toggleProjectsExpanded() {
+  projectsExpanded.value = !projectsExpanded.value
+}
+
+async function refreshTaskList() {
+  await refreshConversations({ unassigned: true })
+}
+
+async function refreshProjectChats() {
+  await refreshProjectConversations(activeProjectId.value)
+}
+
+async function refreshAllSidebarConversations() {
+  const tasks = [refreshTaskList(), refreshCatalog(), refreshProjectChats()]
+  const hoveredId = hoveredProjectId.value
+  if (hoveredId != null && hoveredId !== activeProjectId.value) {
+    tasks.push(refreshProjectConversations(hoveredId))
+  }
+  await Promise.all(tasks)
+}
+
+async function refreshProjectsAndSync() {
+  try {
+    await refreshProjects()
+    syncActiveProject(projects.value.map((item) => item.id))
+  } catch {
+    clearProject()
+  }
+}
+
+async function enterProject(project: ChatProjectVO) {
+  selectProject(project.id)
+  await refreshProjectChats()
+  await router.push('/chat')
+}
+
+function onProjectHover(project: ChatProjectVO, visible: boolean) {
+  if (visible) {
+    hoveredProjectId.value = project.id
+    void refreshProjectConversations(project.id)
+    return
+  }
+  if (hoveredProjectId.value === project.id) {
+    hoveredProjectId.value = null
+  }
+}
+
+function openCreateProject() {
+  projectName.value = ''
+  projectCreateVisible.value = true
+}
+
+function openRenameProject(project: ChatProjectVO) {
+  renamingProjectId.value = project.id
+  projectName.value = project.name
+  projectRenameVisible.value = true
+}
+
+async function confirmCreateProject() {
+  const name = projectName.value.trim()
+  if (!name) {
+    MessagePlugin.warning('请输入项目名称')
+    return
+  }
+  projectSaving.value = true
+  try {
+    const { data } = await createProject(name)
+    await refreshProjects()
+    projectCreateVisible.value = false
+    if (data.data?.id) {
+      selectProject(data.data.id)
+      await refreshProjectChats()
+      await router.push('/chat')
+    }
+    MessagePlugin.success('项目已创建')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '创建失败'))
+  } finally {
+    projectSaving.value = false
+  }
+}
+
+async function confirmRenameProject() {
+  const id = renamingProjectId.value
+  const name = projectName.value.trim()
+  if (!id) {
+    projectRenameVisible.value = false
+    return
+  }
+  if (!name) {
+    MessagePlugin.warning('请输入项目名称')
+    return
+  }
+  projectSaving.value = true
+  try {
+    await renameProject(id, name)
+    await refreshProjects()
+    projectRenameVisible.value = false
+    MessagePlugin.success('已改名')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '改名失败'))
+  } finally {
+    projectSaving.value = false
+  }
+}
+
+async function handleDeleteProject(project: ChatProjectVO) {
+  await confirmResourceDelete({
+    header: '删除项目',
+    body: `确定删除项目「${project.name}」吗？项目内对话将回到任务列表，此操作不可恢复。`,
+    resourceLabel: '项目',
+    onDelete: async () => {
+      await deleteProject(project.id)
+    },
+    onSuccess: async () => {
+      if (activeProjectId.value === project.id) {
+        clearProject()
+      }
+      await Promise.all([refreshProjects(), refreshTaskList(), refreshProjectChats()])
+      MessagePlugin.success('已删除')
+    },
+  })
 }
 
 function onAgentsSectionClick() {
@@ -452,42 +679,23 @@ const activeConversationId = computed(() => {
   return Number.isFinite(num) ? num : null
 })
 
-interface PinnedSidebarItem {
-  key: string
-  label: string
-  avatarText: string
-  avatarUrl?: string
-  color: string
-  meta: string
-  to: string
-  onNavigate?: () => void
-  onUnpin?: () => void
-}
-
-const pinnedItems = computed<PinnedSidebarItem[]>(() => {
-  const items: PinnedSidebarItem[] = []
-
-  for (const id of pinnedAgentIds.value) {
-    const agent = agents.value.find((item) => item.id === id)
-    if (!agent) continue
-    items.push({
-      key: `agent-${id}`,
-      label: agent.name,
-      avatarText: agent.name.slice(0, 1),
-      avatarUrl: agent.avatarUrl,
-      color: getAvatarColor(agent.name),
-      meta: formatRelativeTime(agent.updatedAt),
-      to: '/chat',
-      onNavigate: () => selectAgent(agent.id),
-      onUnpin: () => handleToggleAgentPin(id),
-    })
+const pinnedConversations = computed(() => {
+  const lookup = new Map<number, ConversationVO>()
+  for (const item of [...catalog.value, ...conversations.value, ...projectConversations.value]) {
+    lookup.set(item.id, item)
   }
+  return pinnedConversationIds.value
+    .map((id) => lookup.get(id))
+    .filter((item): item is ConversationVO => item != null)
+})
 
-  return items
+const displayProjectConversations = computed(() => {
+  const pinnedSet = new Set(pinnedConversationIds.value)
+  return projectConversations.value.filter((item) => !pinnedSet.has(item.id))
 })
 
 const conversationFilterOptions: DropdownOption[] = [
-  { content: '全部对话', value: 'all' },
+  { content: '全部任务', value: 'all' },
   { content: '当前智能体', value: 'current-agent' },
 ]
 
@@ -500,10 +708,12 @@ const sortedConversations = computed(() =>
 )
 
 const displayConversations = computed(() => {
+  const pinnedSet = new Set(pinnedConversationIds.value)
+  let list = sortedConversations.value.filter((item) => !pinnedSet.has(item.id))
   if (conversationFilter.value === 'current-agent' && selectedAgentId.value != null) {
-    return sortedConversations.value.filter((item) => item.agentId === selectedAgentId.value)
+    list = list.filter((item) => item.agentId === selectedAgentId.value)
   }
-  return sortedConversations.value
+  return list
 })
 
 function conversationLabel(conversation: ConversationVO) {
@@ -539,8 +749,13 @@ async function handleToggleAgentPin(agentId: number) {
 }
 
 async function handleToggleConversationPin(conversationId: number) {
+  const wasPinned = isConversationPinned(conversationId)
   try {
     await toggleConversationPin(conversationId)
+    if (!wasPinned) {
+      pinnedExpanded.value = true
+    }
+    await refreshAllSidebarConversations()
   } catch {
     MessagePlugin.error('置顶操作失败')
   }
@@ -560,13 +775,13 @@ async function confirmRenameConversation() {
     return
   }
   if (!title) {
-    MessagePlugin.warning('请输入对话名称')
+    MessagePlugin.warning('请输入任务名称')
     return
   }
   renameSaving.value = true
   try {
     await renameConversation(id, title)
-    await refreshConversations()
+    await refreshAllSidebarConversations()
     renameVisible.value = false
     MessagePlugin.success('已改名')
   } catch (error) {
@@ -579,15 +794,15 @@ async function confirmRenameConversation() {
 async function handleDeleteConversation(conversation: ConversationVO) {
   const label = conversationLabel(conversation)
   await confirmResourceDelete({
-    header: '删除对话',
-    body: `确定删除对话「${label}」吗？消息将一并删除，此操作不可恢复。`,
-    resourceLabel: '对话',
+    header: '删除任务',
+    body: `确定删除任务「${label}」吗？消息将一并删除，此操作不可恢复。`,
+    resourceLabel: '任务',
     onDelete: async () => {
       await deleteConversation(conversation.id)
       await unpinConversation(conversation.id)
     },
     onSuccess: async () => {
-      await refreshConversations()
+      await Promise.all([refreshAllSidebarConversations(), refreshProjects()])
       if (activeConversationId.value === conversation.id) {
         await router.push('/chat')
       }
@@ -598,6 +813,11 @@ async function handleDeleteConversation(conversation: ConversationVO) {
 
 function openConversation(conversation: ConversationVO) {
   focusConversation(conversation.id)
+  if (conversation.projectId != null) {
+    selectProject(conversation.projectId)
+  } else {
+    clearProject()
+  }
   selectAgentByConversation(conversation.agentId)
   router.push(`/chat/${conversation.id}`)
 }
@@ -623,7 +843,14 @@ function onAgentMenu(data: { value?: string | number }) {
 }
 
 onMounted(async () => {
-  await Promise.all([refreshAgents(), refreshConversations(), refreshPins()])
+  await Promise.all([
+    refreshAgents(),
+    refreshProjectsAndSync(),
+    refreshTaskList(),
+    refreshProjectChats(),
+    refreshCatalog(),
+    refreshPins(),
+  ])
   syncSidebarFocusFromRoute()
 })
 
@@ -633,10 +860,21 @@ watch(
     if (!workspaceId || workspaceId === previousId) {
       return
     }
-    await Promise.all([refreshAgents(), refreshConversations(), refreshPins()])
+    await Promise.all([
+      refreshAgents(),
+      refreshProjectsAndSync(),
+      refreshTaskList(),
+      refreshProjectChats(),
+      refreshCatalog(),
+      refreshPins(),
+    ])
     syncSidebarFocusFromRoute()
   },
 )
+
+watch(activeProjectId, () => {
+  void refreshProjectChats()
+})
 </script>
 
 <style scoped>
@@ -737,8 +975,10 @@ watch(
 .sidebar-section-row__actions :deep(.t-popup__reference),
 .sidebar-row__actions :deep(.t-popup__reference),
 .sidebar-task-panel__tools :deep(.t-popup__reference),
+.sidebar-task-panel__tools :deep(.t-dropdown),
 .sidebar-task-row__actions :deep(.t-popup__reference) {
   display: inline-flex;
+  align-items: center;
 }
 
 .sidebar-section-row__btn {
@@ -920,9 +1160,16 @@ watch(
   width: 100%;
 }
 
+.sidebar-task-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
 .sidebar-task-panel {
-  margin-top: 10px;
-  padding-top: 2px;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .sidebar-task-panel__head {
@@ -930,21 +1177,59 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 28px;
-  padding: 0 var(--sidebar-row-pad-x) 6px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--sidebar-row-pad-x);
+  box-sizing: border-box;
+}
+
+.sidebar-task-panel__head--toggle {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sidebar-task-panel__head--toggle:hover {
+  background: var(--sidebar-row-bg);
+  color: var(--box-ink);
 }
 
 .sidebar-task-panel__title {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 0;
+  font-size: 13px;
   line-height: 20px;
+  color: var(--sidebar-text);
+  font-weight: inherit;
+}
+
+.sidebar-task-panel__chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  line-height: 1;
   color: var(--box-muted);
+  pointer-events: none;
 }
 
 .sidebar-task-panel__tools {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0;
   flex-shrink: 0;
+  height: 24px;
 }
 
 .sidebar-task-panel__tool {
@@ -954,16 +1239,22 @@ watch(
   width: 24px;
   height: 24px;
   padding: 0;
+  margin: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--box-muted);
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
+  vertical-align: middle;
 }
 
 .sidebar-task-panel__tool :deep(.t-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 14px;
+  line-height: 1;
 }
 
 .sidebar-task-panel__tool:hover {
@@ -977,6 +1268,55 @@ watch(
   gap: 2px;
 }
 
+.sidebar-task-panel__list :deep(.t-popup__reference) {
+  display: block;
+  width: 100%;
+}
+
+.sidebar-task-row--project {
+  padding-right: 0;
+}
+
+.sidebar-project-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin: 4px var(--sidebar-row-pad-x) 8px;
+  padding: 20px 16px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  text-align: center;
+}
+
+.sidebar-project-empty__desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--box-muted);
+}
+
+.sidebar-project-empty__btn {
+  min-width: 72px;
+  height: 32px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--box-surface);
+  color: var(--box-ink);
+  font-size: 13px;
+  line-height: 32px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.sidebar-project-empty__btn:hover {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
 .sidebar-task-panel__empty {
   margin: 0;
   padding: 8px var(--sidebar-row-pad-x) 4px;
@@ -984,6 +1324,19 @@ watch(
   font-size: 12px;
   line-height: 20px;
   color: var(--box-muted);
+}
+
+.sidebar-task-panel__empty--nested {
+  padding-left: calc(var(--sidebar-row-pad-x) + var(--sidebar-icon-col) + var(--sidebar-col-gap));
+}
+
+.sidebar-task-row__meta {
+  margin-left: auto;
+  padding-right: 4px;
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--box-muted);
+  flex-shrink: 0;
 }
 
 .sidebar-task-row-wrap {
@@ -1068,12 +1421,8 @@ watch(
   color: var(--box-ink);
 }
 
-.sidebar-task-panel :deep(.t-loading) {
-  display: block;
-  width: 100%;
-}
-
-.sidebar-task-panel :deep(.t-loading__parent) {
+.sidebar-task-panel__body :deep(.t-loading),
+.sidebar-task-panel__body :deep(.t-loading__parent) {
   display: flex;
   flex-direction: column;
   width: 100%;

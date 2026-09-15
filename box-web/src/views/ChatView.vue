@@ -149,17 +149,24 @@
           </t-dropdown>
           <span v-if="activeConversationTitle" class="chat-active__title">{{ activeConversationTitle }}</span>
         </div>
-        <t-tooltip :content="tracePanelOpen ? '收起 Trace' : '展开 Trace'" placement="left" theme="light" :show-arrow="false">
-          <t-button
-            variant="text"
-            shape="square"
-            size="small"
-            :class="{ 'trace-toggle--active': tracePanelOpen }"
-            @click="toggleTracePanel"
-          >
-            <template #icon><t-icon name="chart-bubble" /></template>
-          </t-button>
-        </t-tooltip>
+        <div class="chat-active__header-actions">
+          <t-tooltip content="导出 Markdown" placement="left" theme="light" :show-arrow="false">
+            <t-button variant="text" shape="square" size="small" :disabled="!messages.length" @click="exportConversation">
+              <template #icon><t-icon name="download" /></template>
+            </t-button>
+          </t-tooltip>
+          <t-tooltip :content="tracePanelOpen ? '收起 Trace' : '展开 Trace'" placement="left" theme="light" :show-arrow="false">
+            <t-button
+              variant="text"
+              shape="square"
+              size="small"
+              :class="{ 'trace-toggle--active': tracePanelOpen }"
+              @click="toggleTracePanel"
+            >
+              <template #icon><t-icon name="chart-bubble" /></template>
+            </t-button>
+          </t-tooltip>
+        </div>
       </div>
 
       <div ref="chatListRef" class="chat-messages box-hide-scrollbar">
@@ -367,6 +374,7 @@ import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceCh
 import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSuggestions'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
+import { useActiveProject } from '@/composables/useActiveProject'
 import { useOpsPlacements } from '@/composables/useOpsPlacements'
 import { getAvatarColor } from '@/utils/format'
 import { classifyModelChatKind } from '@/utils/modelCapability'
@@ -390,7 +398,15 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { refresh: refreshConversations, conversations } = useConversationNav()
+const { refresh: refreshConversations, refreshProjectConversations, conversations } = useConversationNav()
+const { activeProjectId } = useActiveProject()
+
+async function refreshConversationNav() {
+  await Promise.all([
+    refreshConversations({ unassigned: true }),
+    refreshProjectConversations(activeProjectId.value),
+  ])
+}
 const { openCreateAgentDialog } = useCreateAgentDialog()
 const { agents, selectedAgent, refresh: refreshAgents, selectAgent, selectAgentByConversation } = useAgentSelection()
 const { suggestions, loading: suggestionsLoading, refresh: refreshSuggestions } = useChatSuggestions()
@@ -623,6 +639,27 @@ function toggleTracePanel() {
   }
 }
 
+function exportConversation() {
+  if (!messages.value.length) {
+    MessagePlugin.warning('暂无消息可导出')
+    return
+  }
+  const title = activeConversationTitle.value || `conversation-${conversationId.value || 'draft'}`
+  const lines = [`# ${title}`, '']
+  for (const item of messages.value) {
+    const role = item.role === 'ASSISTANT' ? 'Assistant' : item.role === 'USER' ? 'User' : item.role
+    lines.push(`## ${role}`, '', item.content || '（空）', '')
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}.md`
+  anchor.click()
+  URL.revokeObjectURL(url)
+  MessagePlugin.success('对话已导出')
+}
+
 async function loadLatestTrace(convId: number, executionId?: number) {
   traceLoading.value = true
   try {
@@ -662,7 +699,7 @@ async function removeMessage(item: MessageVO, index: number) {
     }
     messages.value.splice(index, 1)
     MessagePlugin.success('消息已删除')
-    await refreshConversations()
+    await refreshConversationNav()
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '删除失败'))
   }
@@ -740,6 +777,7 @@ async function startNewChat(text: string) {
     const { data } = await createConversation({
       agentId,
       title: prompt.slice(0, 24),
+      projectId: activeProjectId.value ?? undefined,
     })
     const id = data.data?.id
     if (!id) return
@@ -828,7 +866,7 @@ async function sendChat(id?: number, preset?: string) {
     } else if (!messages.value[assistantIndex]?.content) {
       messages.value[assistantIndex].content = '（无回复）'
     }
-    await refreshConversations()
+    await refreshConversationNav()
     if (!stoppedByUser.value) {
       await loadMessages(targetId)
     }
@@ -888,7 +926,7 @@ async function regenerateReply(index: number) {
     } else if (!messages.value[index]?.content) {
       messages.value[index].content = '（无回复）'
     }
-    await refreshConversations()
+    await refreshConversationNav()
     if (!stoppedByUser.value) {
       await loadMessages(targetId)
     }
@@ -1492,6 +1530,13 @@ useReloadOnWorkspaceChange(async () => {
   gap: 6px;
   flex: 1;
   min-width: 0;
+}
+
+.chat-active__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .trace-toggle--active {
