@@ -43,7 +43,7 @@ const { items, openLink } = useOpsPlacements('CHAT_AD')
   height: 88px;
   padding: 0;
   border: none;
-  background: #f5f6f8;
+  background: var(--box-shell);
   cursor: pointer;
 }
 

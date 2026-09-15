@@ -39,7 +39,7 @@ const { items, openLink } = useOpsPlacements('CHAT_BANNER')
   height: 140px;
   padding: 0;
   border: none;
-  background: #f5f6f8;
+  background: var(--box-shell);
   cursor: pointer;
 }
 

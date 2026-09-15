@@ -83,6 +83,7 @@
               v-model="selectedModelKey"
               :models="platformModels"
               :disabled="!modelPickerEnabled"
+              :auto-hint="autoModelHint"
             />
             <t-tooltip :content="listening ? '停止语音输入' : '语音输入'" placement="top" theme="light" :show-arrow="false">
               <t-button
@@ -292,6 +293,7 @@
               v-model="selectedModelKey"
               :models="platformModels"
               :disabled="!modelPickerEnabled"
+              :auto-hint="autoModelHint"
             />
             <t-button
               v-if="chatting"
@@ -361,11 +363,13 @@ import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { uploadImageAsset } from '@/api/asset'
 import { appPreferences } from '@/composables/useAppPreferences'
 import { useAgentSelection } from '@/composables/useAgentSelection'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSuggestions'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
 import { useOpsPlacements } from '@/composables/useOpsPlacements'
 import { getAvatarColor } from '@/utils/format'
+import { classifyModelChatKind } from '@/utils/modelCapability'
 import {
   createConversation,
   deleteMessage,
@@ -434,6 +438,7 @@ interface BrowserSpeechRecognition {
 let speechRecognition: BrowserSpeechRecognition | null = null
 const selectedModelKey = ref('auto')
 const platformModels = ref<PlatformModelVO[]>([])
+const modelChoiceByAgent = new Map<number, string>()
 
 const modelPickerEnabled = computed(() => {
   const agent = selectedAgent.value
@@ -441,12 +446,47 @@ const modelPickerEnabled = computed(() => {
   return agent.modelSource !== 'BYOK'
 })
 
+function pickAutoPlatformModel(): PlatformModelVO | undefined {
+  const models = platformModels.value
+  if (!models.length) return undefined
+  const needsVision = composerAttachments.value.some((item) => item.kind === 'image')
+  const ranked = needsVision
+    ? [...models].sort((left, right) => Number(isVisionModel(right)) - Number(isVisionModel(left)))
+    : models
+  const preferredId = selectedAgent.value?.platformModelId
+  if (!needsVision && preferredId != null) {
+    const preferred = ranked.find((item) => item.id === preferredId)
+    if (preferred) return preferred
+  }
+  return ranked[0]
+}
+
+function isVisionModel(model: PlatformModelVO) {
+  return classifyModelChatKind(model.modelCode, model.modelName, model.description) === 'vision'
+}
+
+const autoResolvedModel = computed(() => pickAutoPlatformModel())
+
+const autoModelHint = computed(() => {
+  const model = autoResolvedModel.value
+  if (!model) {
+    return '暂无可用平台模型。请在管理端为已上架模型绑定密钥。'
+  }
+  const needsVision = composerAttachments.value.some((item) => item.kind === 'image')
+  return needsVision
+    ? `有图片附件时优先选用多模态模型，当前会使用 ${model.modelName}。`
+    : `自动选用当前可用的平台模型，当前会使用 ${model.modelName}。`
+})
+
 function resolvePlatformModelId(): number | undefined {
-  if (!modelPickerEnabled.value || selectedModelKey.value === 'auto') {
+  if (!modelPickerEnabled.value) {
     return undefined
   }
+  if (selectedModelKey.value === 'auto') {
+    return autoResolvedModel.value?.id
+  }
   const id = Number(selectedModelKey.value)
-  return Number.isFinite(id) ? id : undefined
+  return Number.isFinite(id) ? id : autoResolvedModel.value?.id
 }
 
 function syncModelPickerWithAgent() {
@@ -455,15 +495,21 @@ function syncModelPickerWithAgent() {
     selectedModelKey.value = 'auto'
     return
   }
-  if (agent.platformModelId != null) {
-    selectedModelKey.value = String(agent.platformModelId)
-    return
-  }
-  selectedModelKey.value = 'auto'
+  selectedModelKey.value = modelChoiceByAgent.get(agent.id) || 'auto'
 }
 
-watch(selectedAgent, () => {
-  syncModelPickerWithAgent()
+watch(
+  () => selectedAgent.value?.id,
+  () => {
+    syncModelPickerWithAgent()
+  },
+)
+
+watch(selectedModelKey, (value) => {
+  const agentId = selectedAgent.value?.id
+  if (agentId != null && modelPickerEnabled.value) {
+    modelChoiceByAgent.set(agentId, value)
+  }
 })
 const activeConversationTitle = ref('')
 /** 新会话首条消息发送中，避免路由切换时 loadMessages 覆盖乐观更新 */
@@ -716,6 +762,12 @@ async function sendChat(id?: number, preset?: string) {
   const text = (preset ?? buildComposerPayload()).trim()
   if (!text || chatting.value) return
 
+  const platformModelId = resolvePlatformModelId()
+  if (modelPickerEnabled.value && platformModelId == null) {
+    MessagePlugin.warning('暂无可用平台模型，请先在管理端绑定密钥，或手动选择模型')
+    return
+  }
+
   chatting.value = true
   let assistantIndex = -1
   const usedPreset = Boolean(preset)
@@ -752,7 +804,7 @@ async function sendChat(id?: number, preset?: string) {
       scrollChatToBottom()
     }, {
       signal: controller.signal,
-      platformModelId: resolvePlatformModelId(),
+      platformModelId,
       onCitations: (citations) => applyStreamCitations(assistantIndex, citations),
       onDone: (executionId) => {
         if (tracePanelOpen.value) {
@@ -1041,6 +1093,11 @@ onMounted(async () => {
   await Promise.all([refreshAgents(), refreshSuggestions(), loadPlatformModels()])
   syncModelPickerWithAgent()
 })
+useReloadOnWorkspaceChange(async () => {
+  messages.value = []
+  await Promise.all([refreshAgents(), refreshSuggestions(), loadPlatformModels()])
+  syncModelPickerWithAgent()
+})
 </script>
 
 <style scoped>
@@ -1051,7 +1108,7 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   min-height: 0;
-  background: #fff;
+  background: var(--box-surface);
 }
 
 .chat-new {
@@ -1119,7 +1176,7 @@ onMounted(async () => {
 }
 
 .chat-new__agent:hover {
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--box-hover);
 }
 
 .chat-new__agent-avatar {
@@ -1130,7 +1187,7 @@ onMounted(async () => {
 
 .chat-new__agent-arrow {
   font-size: 18px;
-  color: var(--box-ink-muted, #8f959e);
+  color: var(--box-muted);
 }
 
 .composer-stack {
@@ -1138,11 +1195,11 @@ onMounted(async () => {
 }
 
 .composer-stack--ops {
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--box-border);
   border-radius: 24px;
-  background: #fff;
+  background: var(--box-surface);
   padding: 10px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--box-shadow-card);
 }
 
 .composer-stack--ops :deep(.ops-notice) {
@@ -1151,11 +1208,11 @@ onMounted(async () => {
   min-height: 36px;
   margin-bottom: 4px;
   padding: 8px 12px;
-  background: #f5f6f8;
+  background: var(--box-shell);
 }
 
 .composer-stack--ops :deep(.ops-notice--promo) {
-  background: #fff6ec;
+  background: var(--td-warning-color-1);
 }
 
 .composer-stack--ops .composer {
@@ -1175,16 +1232,16 @@ onMounted(async () => {
   gap: 8px;
   width: 100%;
   padding: 8px 10px 10px;
-  border: 1px solid #d9dde3;
+  border: 1px solid var(--box-border);
   border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  background: var(--box-surface);
+  box-shadow: var(--box-shadow-card);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .composer:focus-within {
-  border-color: #b8bec8;
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.04);
+  border-color: var(--td-component-border);
+  box-shadow: 0 0 0 3px var(--box-hover);
 }
 
 .composer--bottom {
@@ -1205,7 +1262,7 @@ onMounted(async () => {
 }
 
 .composer__input :deep(.t-textarea__inner::placeholder) {
-  color: #b0b4bc;
+  color: var(--box-muted);
 }
 
 .composer__file-input {
@@ -1225,9 +1282,9 @@ onMounted(async () => {
   gap: 8px;
   max-width: 100%;
   padding: 6px 8px;
-  border: 1px solid #e7e9ee;
+  border: 1px solid var(--box-border);
   border-radius: 10px;
-  background: #f7f8fa;
+  background: var(--td-bg-color-secondarycontainer);
 }
 
 .composer-file__thumb {
@@ -1257,13 +1314,13 @@ onMounted(async () => {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #8f959e;
+  color: var(--box-muted);
   cursor: pointer;
 }
 
 .composer-file__remove:hover {
-  background: #eceef1;
-  color: #1f2329;
+  background: var(--box-hover);
+  color: var(--box-ink);
 }
 
 .composer__toolbar {
@@ -1286,9 +1343,9 @@ onMounted(async () => {
   gap: 6px;
   padding: 4px 12px 4px 4px;
   border-radius: 999px;
-  border: 1px solid #ebebeb;
-  background: #fff;
-  color: #646a73;
+  border: 1px solid var(--box-border);
+  background: var(--box-surface);
+  color: var(--box-muted);
   font-size: 13px;
   cursor: pointer;
 }
@@ -1298,8 +1355,8 @@ onMounted(async () => {
 }
 
 .agent-pill:hover {
-  border-color: #d0d3d6;
-  color: #1f2329;
+  border-color: var(--td-component-border);
+  color: var(--box-ink);
 }
 
 .agent-pill__avatar {
@@ -1311,32 +1368,37 @@ onMounted(async () => {
 
 .agent-pill__arrow {
   font-size: 14px;
-  color: #8f959e;
+  color: var(--box-muted);
 }
 
 .composer__send {
   min-width: 32px;
   width: 32px;
   height: 32px;
-  background: #c9cdd4 !important;
-  border-color: #c9cdd4 !important;
-  color: #fff !important;
+  background: var(--td-bg-color-component) !important;
+  border-color: var(--td-bg-color-component) !important;
+  color: var(--td-text-color-anti) !important;
 }
 
 .composer__send :deep(.t-icon) {
-  color: #fff;
+  color: var(--td-text-color-anti);
 }
 
 .composer__send--ready:not(:disabled) {
-  background: #1f2329 !important;
-  border-color: #1f2329 !important;
+  background: var(--box-ink) !important;
+  border-color: var(--box-ink) !important;
+  color: var(--box-bg) !important;
+}
+
+.composer__send--ready:not(:disabled) :deep(.t-icon) {
+  color: var(--box-bg);
 }
 
 .composer__send:disabled {
   opacity: 1;
   cursor: not-allowed;
-  background: #c9cdd4 !important;
-  border-color: #c9cdd4 !important;
+  background: var(--td-bg-color-component) !important;
+  border-color: var(--td-bg-color-component) !important;
 }
 
 .suggestions {
@@ -1354,10 +1416,10 @@ onMounted(async () => {
   gap: 6px;
   min-height: 72px;
   padding: 12px 14px;
-  border: 1px solid #d9dde3;
+  border: 1px solid var(--box-border);
   border-radius: 16px;
-  background: #fff;
-  color: #1f2329;
+  background: var(--box-surface);
+  color: var(--box-ink);
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -1380,7 +1442,7 @@ onMounted(async () => {
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
-  color: #8f959e;
+  color: var(--box-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1389,13 +1451,13 @@ onMounted(async () => {
 
 .suggestion-card :deep(.t-icon) {
   flex-shrink: 0;
-  color: #8f959e;
+  color: var(--box-muted);
   font-size: 16px;
 }
 
 .suggestion-card:hover {
-  border-color: #b8bec8;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  border-color: var(--td-component-border);
+  box-shadow: var(--box-shadow-soft);
 }
 
 .chat-active {
@@ -1474,7 +1536,7 @@ onMounted(async () => {
   padding: 10px 12px;
   border: 1px solid var(--box-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--box-surface);
 }
 
 .trace-span__head {
@@ -1489,7 +1551,7 @@ onMounted(async () => {
   margin: 0;
   padding: 8px;
   border-radius: 6px;
-  background: #f7f8fa;
+  background: var(--td-bg-color-secondarycontainer);
   font-size: 11px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1499,7 +1561,7 @@ onMounted(async () => {
 
 .chat-active__title {
   font-size: 13px;
-  color: #8f959e;
+  color: var(--box-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1571,7 +1633,7 @@ onMounted(async () => {
 
 .chat-message--assistant .chat-message__content {
   background: transparent;
-  color: #1f2329;
+  color: var(--box-ink);
   padding-left: 0;
   white-space: normal;
 }
@@ -1659,7 +1721,7 @@ onMounted(async () => {
 }
 
 .chat-message__content--loading {
-  color: #8f959e;
+  color: var(--box-muted);
 }
 
 .typing-dots {
@@ -1673,7 +1735,7 @@ onMounted(async () => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #c9cdd4;
+  background: var(--td-bg-color-component);
   animation: typing-bounce 1.1s infinite ease-in-out;
 }
 

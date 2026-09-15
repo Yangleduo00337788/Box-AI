@@ -146,12 +146,40 @@
     --td-brand-color-focus: var(--td-brand-color-2);
     --td-brand-color-disabled: var(--td-brand-color-3);
     --td-brand-color-hover: var(--td-brand-color-5);
-    --td-brand-color: var(--td-brand-color-6);
+    --td-brand-color: var(--td-brand-color-8);
     --td-brand-color-active: var(--td-brand-color-7);
-    --td-bg-color-page: var(--td-gray-color-14);
-    --td-bg-color-container: var(--td-gray-color-13);
     --td-text-color-primary: var(--td-font-white-1);
     --td-text-color-secondary: var(--td-font-white-2);
+    --td-text-color-placeholder: var(--td-font-white-3);
+    --td-text-color-disabled: var(--td-font-white-4);
+    --td-text-color-anti: var(--td-font-gray-1);
+    --td-text-color-brand: var(--td-brand-color);
+    --td-text-color-link: var(--td-brand-color);
+    --td-bg-color-page: var(--td-gray-color-14);
+    --td-bg-color-container: var(--td-gray-color-13);
+    --td-bg-color-container-hover: var(--td-gray-color-12);
+    --td-bg-color-container-active: var(--td-gray-color-10);
+    --td-bg-color-container-select: var(--td-gray-color-11);
+    --td-bg-color-secondarycontainer: var(--td-gray-color-12);
+    --td-bg-color-secondarycontainer-hover: var(--td-gray-color-11);
+    --td-bg-color-secondarycontainer-active: var(--td-gray-color-10);
+    --td-bg-color-component: var(--td-gray-color-11);
+    --td-bg-color-component-hover: var(--td-gray-color-10);
+    --td-bg-color-component-active: var(--td-gray-color-9);
+    --td-bg-color-component-disabled: var(--td-gray-color-12);
+    --td-bg-color-secondarycomponent: var(--td-gray-color-11);
+    --td-bg-color-secondarycomponent-hover: var(--td-gray-color-10);
+    --td-bg-color-secondarycomponent-active: var(--td-gray-color-9);
+    --td-bg-color-specialcomponent: transparent;
+    --td-component-stroke: var(--td-gray-color-11);
+    --td-component-border: var(--td-gray-color-9);
+    --td-border-level-1-color: var(--td-gray-color-11);
+    --td-border-level-2-color: var(--td-gray-color-10);
+    --td-scroll-track-color: var(--td-gray-color-14);
+    --td-shadow-inset-top: inset 0 0.5px 0 #5e5e5e;
+    --td-shadow-inset-right: inset 0.5px 0 0 #5e5e5e;
+    --td-shadow-inset-bottom: inset 0 -0.5px 0 #5e5e5e;
+    --td-shadow-inset-left: inset -0.5px 0 0 #5e5e5e;
 }
 
 :root {

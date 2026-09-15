@@ -5,6 +5,8 @@
   --box-ink: var(--td-text-color-primary);
   --box-muted: var(--td-text-color-secondary);
   --box-border: rgba(0, 0, 0, 0.06);
+  --box-hover: rgba(0, 0, 0, 0.04);
+  --box-active: rgba(0, 0, 0, 0.06);
   --box-sidebar-width: 260px;
   --box-sidebar-collapsed: 72px;
   --box-radius-lg: 16px;
@@ -122,6 +124,11 @@ a:hover {
   line-height: 36px;
   margin: 2px 8px;
   border-radius: 8px;
+  color: var(--box-ink);
+}
+
+.t-default-menu .t-menu__item .t-icon {
+  color: inherit;
 }
 
 .t-default-menu__inner .t-menu-group__title {
@@ -138,7 +145,7 @@ a:hover {
 
 .t-default-menu .t-menu__item.t-is-active:not(.t-is-opened),
 .t-default-menu .t-submenu.t-is-active > .t-menu__item {
-  background: var(--td-gray-color-2) !important;
+  background: var(--box-active, rgba(0, 0, 0, 0.06)) !important;
   color: var(--box-ink) !important;
   font-weight: 500;
 }
@@ -149,7 +156,7 @@ a:hover {
 }
 
 .t-default-menu .t-menu__item:hover:not(.t-is-active):not(.t-is-disabled) {
-  background: var(--td-gray-color-1);
+  background: var(--box-hover, rgba(0, 0, 0, 0.04));
 }
 
 .t-table {
@@ -172,4 +179,17 @@ a:hover {
 .t-checkbox.t-is-checked .t-checkbox__input {
   border-color: var(--td-brand-color);
   background-color: var(--td-brand-color);
+}
+
+html[data-box-theme='dark'] {
+  --box-bg: #17181a;
+  --box-sidebar-bg: #1a1b1e;
+  --box-surface: #232427;
+  --box-ink: #f0f1f2;
+  --box-muted: #a2a6ad;
+  --box-border: rgba(255, 255, 255, 0.08);
+  --box-hover: rgba(255, 255, 255, 0.06);
+  --box-active: rgba(255, 255, 255, 0.12);
+  --box-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.24);
+  --box-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.28);
 }

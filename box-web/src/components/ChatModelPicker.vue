@@ -57,8 +57,8 @@
               :class="{ 'model-picker__item--active': modelValue === item.value }"
               @click.stop="select(item.value)"
             >
-              <span v-if="item.value === 'auto'" class="model-picker__logo model-picker__logo--auto">
-                <t-icon name="view-module" size="14px" />
+              <span v-if="item.value === 'auto'" class="model-picker__brand model-picker__auto-icon" aria-hidden="true">
+                <t-icon name="high-level-filled" size="20px" />
               </span>
               <img
                 v-else-if="item.logo"
@@ -117,8 +117,9 @@ const props = withDefaults(
     modelValue: string
     models: PlatformModelVO[]
     disabled?: boolean
+    autoHint?: string
   }>(),
-  { disabled: false },
+  { disabled: false, autoHint: '' },
 )
 
 const emit = defineEmits<{
@@ -142,16 +143,16 @@ interface PickerItem {
   streaming: boolean
 }
 
-const autoItem: PickerItem = {
+const autoItem = computed<PickerItem>(() => ({
   value: 'auto',
   label: 'Auto',
   provider: '',
-  description: '自动选用当前可用、已配置密钥的平台模型。',
+  description: props.autoHint || '自动选用当前可用、已配置密钥的平台模型。',
   color: '#1f2329',
   kind: 'text',
   kindLabel: '自动调度',
   streaming: true,
-}
+}))
 
 const mapped = computed<PickerItem[]>(() =>
   props.models.map((item) => {
@@ -175,7 +176,7 @@ const visibleModels = computed(() => {
   if (tab.value === 'multi') {
     return mapped.value.filter((item) => isMultimodalCapability(item.kind))
   }
-  return [autoItem, ...mapped.value.filter((item) => item.kind === 'text')]
+  return [autoItem.value, ...mapped.value.filter((item) => item.kind === 'text')]
 })
 
 const currentLabel = computed(() => {
@@ -314,8 +315,11 @@ function goCustom() {
   flex-shrink: 0;
 }
 
-.model-picker__logo--auto {
-  background: #1f2329;
+.model-picker__auto-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--box-ink);
 }
 
 .model-picker__brand {

@@ -7,6 +7,7 @@ import 'tdesign-vue-next/es/style/index.css'
 import '@box/ui/styles/theme.css'
 import '@box/ui/styles/fonts.css'
 import '@box/ui/styles/index.css'
+import '@/styles/theme.css'
 import '@/styles/index.css'
 import { initAppPreferences } from '@/composables/useAppPreferences'
 

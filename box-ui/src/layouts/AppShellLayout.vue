@@ -387,8 +387,8 @@ function onSearch() {
 
 .sidebar-header-btn:hover,
 .sidebar-collapse:hover {
-  border-color: var(--td-gray-color-4);
-  background: var(--td-gray-color-1);
+  border-color: var(--box-border);
+  background: var(--box-hover);
   color: var(--box-ink);
 }
 
@@ -448,13 +448,13 @@ function onSearch() {
 }
 
 .nav-item:hover {
-  background: var(--td-gray-color-1);
+  background: var(--box-hover);
   color: var(--box-ink);
   opacity: 1;
 }
 
 .nav-item--active {
-  background: var(--td-gray-color-2);
+  background: var(--box-active);
   color: var(--box-ink);
   font-weight: 500;
 }
@@ -492,7 +492,7 @@ function onSearch() {
 }
 
 .sidebar-user:hover {
-  background: var(--td-gray-color-1);
+  background: var(--box-hover);
 }
 
 .sidebar-user--collapsed {
@@ -591,7 +591,7 @@ function onSearch() {
 }
 
 .sidebar-expand-trigger:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--box-hover);
   color: var(--box-ink);
 }
 
@@ -627,7 +627,7 @@ function onSearch() {
 
 .app-layout--consumer .sidebar-collapse:hover,
 .app-layout--consumer .sidebar-header-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--box-hover);
   color: var(--box-ink);
 }
 
@@ -651,11 +651,11 @@ function onSearch() {
 }
 
 .app-layout--consumer .nav-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--box-hover);
 }
 
 .app-layout--consumer .nav-item--active {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--box-active);
   color: var(--box-ink);
   font-weight: 500;
 }

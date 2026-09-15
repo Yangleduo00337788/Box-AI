@@ -303,6 +303,7 @@ import { useSidebarPins } from '@/composables/useSidebarPins'
 import { formatRelativeTime, getAvatarColor } from '@/utils/format'
 import { resolveTIconName } from '@/utils/icon'
 import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
+import { useAuthStore } from '@/stores/auth'
 
 defineProps<{
   active: string
@@ -310,6 +311,7 @@ defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const { agents, loading: agentsLoading, selectedAgentId, refresh: refreshAgents, selectAgent, selectAgentByConversation } = useAgentSelection()
 const { conversations, loading: conversationsLoading, refresh: refreshConversations } = useConversationNav()
 const { openCreateAgentDialog } = useCreateAgentDialog()
@@ -624,6 +626,17 @@ onMounted(async () => {
   await Promise.all([refreshAgents(), refreshConversations(), refreshPins()])
   syncSidebarFocusFromRoute()
 })
+
+watch(
+  () => auth.currentWorkspaceId,
+  async (workspaceId, previousId) => {
+    if (!workspaceId || workspaceId === previousId) {
+      return
+    }
+    await Promise.all([refreshAgents(), refreshConversations(), refreshPins()])
+    syncSidebarFocusFromRoute()
+  },
+)
 </script>
 
 <style scoped>
@@ -632,7 +645,7 @@ onMounted(async () => {
   --sidebar-icon-size: 20px;
   --sidebar-col-gap: 6px;
   --sidebar-icon-col: var(--sidebar-icon-size);
-  --sidebar-row-bg: rgba(0, 0, 0, 0.04);
+  --sidebar-row-bg: var(--box-hover);
   --sidebar-text: var(--box-ink);
 
   display: flex;
@@ -748,7 +761,7 @@ onMounted(async () => {
 }
 
 .sidebar-section-row__btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--box-hover);
   color: var(--box-ink);
 }
 
@@ -788,7 +801,7 @@ onMounted(async () => {
   grid-template-columns: minmax(0, 1fr);
   min-height: 32px;
   cursor: default;
-  color: #646a73;
+  color: var(--box-muted);
 }
 
 .sidebar-line__placeholder {
@@ -886,7 +899,7 @@ onMounted(async () => {
 }
 
 .sidebar-row__action:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--box-hover);
   color: var(--box-ink);
 }
 
@@ -954,7 +967,7 @@ onMounted(async () => {
 }
 
 .sidebar-task-panel__tool:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--box-hover);
   color: var(--box-ink);
 }
 
@@ -1051,7 +1064,7 @@ onMounted(async () => {
 }
 
 .sidebar-task-row__action:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--box-hover);
   color: var(--box-ink);
 }
 
