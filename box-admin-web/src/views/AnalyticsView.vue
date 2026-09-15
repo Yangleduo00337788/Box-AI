@@ -34,11 +34,37 @@
         </t-table>
       </t-card>
     </t-loading>
+
+    <t-drawer v-model:visible="detailVisible" :header="detailTitle" size="560px" :footer="false">
+      <t-loading :loading="detailLoading" size="small">
+        <t-descriptions v-if="tenantDetail" :column="2" bordered>
+          <t-descriptions-item label="执行次数">{{ tenantDetail.totalExecutions }}</t-descriptions-item>
+          <t-descriptions-item label="成功率">{{ tenantDetail.successRate.toFixed(1) }}%</t-descriptions-item>
+          <t-descriptions-item label="Token 消耗" :span="2">
+            {{ Number(tenantDetail.totalTokens || 0).toLocaleString() }}
+          </t-descriptions-item>
+        </t-descriptions>
+        <t-card v-if="tenantDetail" :bordered="false" title="错误分布" class="error-card">
+          <t-table
+            row-key="errorCode"
+            :data="tenantDetail.modelErrors || []"
+            :columns="errorColumns"
+            size="small"
+            hover
+          >
+            <template #empty>
+              <t-empty description="暂无失败记录" />
+            </template>
+          </t-table>
+        </t-card>
+      </t-loading>
+    </t-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Link } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
@@ -46,8 +72,10 @@ import PageHeader from '@box/ui/components/PageHeader.vue'
 import {
   fetchPlatformAnalyticsOverview,
   fetchPlatformAnalyticsTrends,
+  fetchTenantAnalyticsDetail,
   type PlatformAnalyticsOverviewVO,
   type PlatformTopTenantVO,
+  type TenantAnalyticsDetailVO,
 } from '@/api/analytics'
 import { useAppearanceStore } from '@/stores/appearance'
 
@@ -55,6 +83,10 @@ const appearance = useAppearanceStore()
 const loading = ref(false)
 const periodDays = ref(7)
 const overview = ref<PlatformAnalyticsOverviewVO | null>(null)
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const tenantDetail = ref<TenantAnalyticsDetailVO | null>(null)
+const activeTenant = ref<PlatformTopTenantVO | null>(null)
 const execRef = ref<HTMLDivElement | null>(null)
 const successRef = ref<HTMLDivElement | null>(null)
 let execChart: ECharts | null = null
@@ -75,7 +107,13 @@ const stats = computed(() => {
 })
 
 const tenantColumns: PrimaryTableCol<PlatformTopTenantVO>[] = [
-  { colKey: 'tenantName', title: '租户', minWidth: 180 },
+  {
+    colKey: 'tenantName',
+    title: '租户',
+    minWidth: 180,
+    cell: (_, { row }) =>
+      h(Link, { theme: 'primary', hover: 'color', onClick: () => openTenantDetail(row) }, () => row.tenantName),
+  },
   { colKey: 'aiCalls', title: 'AI 调用', width: 120 },
   {
     colKey: 'tokens',
@@ -84,6 +122,35 @@ const tenantColumns: PrimaryTableCol<PlatformTopTenantVO>[] = [
     cell: (_, { row }) => Number(row.tokens || 0).toLocaleString(),
   },
 ]
+
+const errorColumns: PrimaryTableCol<{ errorCode: string; count: number; totalExecutions: number }>[] = [
+  { colKey: 'errorCode', title: '错误码', minWidth: 160 },
+  { colKey: 'count', title: '次数', width: 80 },
+  {
+    colKey: 'totalExecutions',
+    title: '占比',
+    width: 100,
+    cell: (_, { row }) =>
+      row.totalExecutions ? `${((row.count / row.totalExecutions) * 100).toFixed(1)}%` : '-',
+  },
+]
+
+const detailTitle = computed(() =>
+  activeTenant.value ? `租户分析 · ${activeTenant.value.tenantName}` : '租户分析',
+)
+
+async function openTenantDetail(row: PlatformTopTenantVO) {
+  activeTenant.value = row
+  tenantDetail.value = null
+  detailVisible.value = true
+  detailLoading.value = true
+  try {
+    const { data } = await fetchTenantAnalyticsDetail(row.tenantId)
+    tenantDetail.value = data.data
+  } finally {
+    detailLoading.value = false
+  }
+}
 
 function renderCharts(dates: string[], executions: number[], rates: number[]) {
   const palette = appearance.brandPreset.chartColors
@@ -195,5 +262,9 @@ onBeforeUnmount(() => {
   .chart-row {
     grid-template-columns: 1fr;
   }
+}
+
+.error-card {
+  margin-top: 16px;
 }
 </style>

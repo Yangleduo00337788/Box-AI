@@ -49,6 +49,9 @@
         <t-form-item label="知识库上限" name="quotaKnowledgeBases">
           <t-input-number v-model="form.quotaKnowledgeBases" :min="0" theme="column" />
         </t-form-item>
+        <t-form-item label="超量策略" name="overagePolicy">
+          <t-select v-model="form.overagePolicy" :options="overageOptions" />
+        </t-form-item>
         <t-form-item v-if="editing" label="状态" name="status">
           <t-radio-group v-model="form.status">
             <t-radio :value="1">启用</t-radio>
@@ -86,8 +89,21 @@ const form = reactive({
   quotaMembers: 0,
   quotaWorkspaces: 0,
   quotaKnowledgeBases: 0,
+  overagePolicy: 'REJECT',
   status: 1,
 })
+
+const overageOptions = [
+  { label: '拒绝（REJECT）', value: 'REJECT' },
+  { label: '降级（DEGRADE）', value: 'DEGRADE' },
+  { label: '计量（METERED）', value: 'METERED' },
+]
+
+const overageLabel: Record<string, string> = {
+  REJECT: '拒绝',
+  DEGRADE: '降级',
+  METERED: '计量',
+}
 
 const rules: FormProps['rules'] = {
   code: [{ required: true, message: '请输入编码' }],
@@ -113,6 +129,12 @@ const columns: PrimaryTableCol<PlanVO>[] = [
   { colKey: 'quotaMembers', title: '成员', width: 80, cell: (_, { row }) => formatLimit(row.quotaMembers) },
   { colKey: 'quotaWorkspaces', title: '空间', width: 80, cell: (_, { row }) => formatLimit(row.quotaWorkspaces) },
   { colKey: 'quotaKnowledgeBases', title: '知识库', width: 90, cell: (_, { row }) => formatLimit(row.quotaKnowledgeBases) },
+  {
+    colKey: 'overagePolicy',
+    title: '超量',
+    width: 80,
+    cell: (_, { row }) => overageLabel[row.overagePolicy || ''] || row.overagePolicy || '拒绝',
+  },
   {
     colKey: 'status',
     title: '状态',
@@ -159,6 +181,7 @@ function resetForm() {
   form.quotaMembers = 1
   form.quotaWorkspaces = 1
   form.quotaKnowledgeBases = 1
+  form.overagePolicy = 'REJECT'
   form.status = 1
 }
 
@@ -180,6 +203,7 @@ function openEdit(row: PlanVO) {
   form.quotaMembers = row.quotaMembers
   form.quotaWorkspaces = row.quotaWorkspaces
   form.quotaKnowledgeBases = row.quotaKnowledgeBases ?? 0
+  form.overagePolicy = row.overagePolicy || 'REJECT'
   form.status = row.status
   dialogVisible.value = true
 }
@@ -199,6 +223,7 @@ async function onSave() {
         quotaMembers: form.quotaMembers,
         quotaWorkspaces: form.quotaWorkspaces,
         quotaKnowledgeBases: form.quotaKnowledgeBases,
+        overagePolicy: form.overagePolicy,
         status: form.status,
       })
       MessagePlugin.success('套餐已更新')
@@ -213,6 +238,7 @@ async function onSave() {
         quotaMembers: form.quotaMembers,
         quotaWorkspaces: form.quotaWorkspaces,
         quotaKnowledgeBases: form.quotaKnowledgeBases,
+        overagePolicy: form.overagePolicy,
       })
       MessagePlugin.success('套餐已创建')
     }

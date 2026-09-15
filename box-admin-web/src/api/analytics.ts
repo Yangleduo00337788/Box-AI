@@ -41,3 +41,22 @@ export function fetchPlatformAnalyticsOverview(days = 7) {
 export function fetchPlatformAnalyticsTrends(days = 7) {
   return http.get<Result<AnalyticsTrendsVO>>('/analytics/trends', { params: { days } })
 }
+
+export interface ModelErrorStatVO {
+  errorCode: string
+  count: number
+  totalExecutions: number
+}
+
+export interface TenantAnalyticsDetailVO {
+  tenantId: number
+  tenantName: string
+  totalExecutions: number
+  successRate: number
+  totalTokens: number
+  modelErrors: ModelErrorStatVO[]
+}
+
+export function fetchTenantAnalyticsDetail(tenantId: number) {
+  return http.get<Result<TenantAnalyticsDetailVO>>(`/analytics/tenants/${tenantId}`)
+}

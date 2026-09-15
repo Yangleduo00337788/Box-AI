@@ -45,20 +45,45 @@
         <t-form-item label="昵称" name="nickname">
           <t-input v-model="form.nickname" placeholder="可选，默认取邮箱前缀" />
         </t-form-item>
+        <t-form-item label="平台角色" name="platformAdminRole">
+          <t-select v-model="form.platformAdminRole" :options="roleOptions" />
+        </t-form-item>
       </t-form>
     </t-dialog>
+
+    <t-drawer v-model:visible="contextVisible" :header="contextTitle" size="480px" :footer="false">
+      <t-loading :loading="contextLoading" size="small">
+        <t-descriptions v-if="context" :column="1" bordered>
+          <t-descriptions-item label="邮箱">{{ context.email || '-' }}</t-descriptions-item>
+          <t-descriptions-item label="昵称">{{ context.nickname || '-' }}</t-descriptions-item>
+          <t-descriptions-item label="主租户">{{ context.primaryTenantName || '-' }}</t-descriptions-item>
+          <t-descriptions-item label="租户类型">{{ tenantTypeLabel(context.tenantType) }}</t-descriptions-item>
+          <t-descriptions-item label="工作空间">
+            {{ context.workspaceNames?.length ? context.workspaceNames.join('、') : '-' }}
+          </t-descriptions-item>
+          <t-descriptions-item label="本月 AI 调用">{{ context.monthAiCalls ?? 0 }}</t-descriptions-item>
+          <t-descriptions-item label="本月 Token">{{ Number(context.monthTokens || 0).toLocaleString() }}</t-descriptions-item>
+          <t-descriptions-item label="近期失败率">
+            {{ context.recentFailureRate != null ? `${context.recentFailureRate.toFixed(1)}%` : '-' }}
+          </t-descriptions-item>
+        </t-descriptions>
+        <t-empty v-else-if="!contextLoading" description="暂无上下文数据" />
+      </t-loading>
+    </t-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from 'vue'
+import { computed, h, onMounted, reactive, ref } from 'vue'
 import { DialogPlugin, Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { FormInstanceFunctions, FormProps, PageInfo, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
 import {
   createPlatformAdmin,
+  fetchUserContext,
   listPlatformUsers,
   updatePlatformUserStatus,
+  type PlatformUserContextVO,
   type PlatformUserVO,
 } from '@/api/user'
 import { useAuthStore } from '@/stores/auth'
@@ -78,10 +103,15 @@ const pagination = reactive({
 const dialogVisible = ref(false)
 const saving = ref(false)
 const formRef = ref<FormInstanceFunctions>()
+const contextVisible = ref(false)
+const contextLoading = ref(false)
+const context = ref<PlatformUserContextVO | null>(null)
+const contextUser = ref<PlatformUserVO | null>(null)
 const form = reactive({
   email: '',
   password: '',
   nickname: '',
+  platformAdminRole: 'SUPER_ADMIN',
 })
 const rules: FormProps['rules'] = {
   email: [
@@ -102,10 +132,35 @@ const statusOptions = [
   { label: '正常', value: 1 },
   { label: '停用', value: 0 },
 ]
+const roleOptions = [
+  { label: '超级管理员', value: 'SUPER_ADMIN' },
+  { label: '运营', value: 'OPS' },
+  { label: '财务', value: 'FINANCE' },
+  { label: '内容', value: 'CONTENT' },
+]
 
 const typeLabel: Record<string, string> = {
   TENANT_USER: '租户用户',
   PLATFORM_ADMIN: '平台管理员',
+}
+
+const roleLabel: Record<string, string> = {
+  SUPER_ADMIN: '超级管理员',
+  OPS: '运营',
+  FINANCE: '财务',
+  CONTENT: '内容',
+}
+
+const contextTitle = computed(() => {
+  const user = contextUser.value
+  if (!user) return '用户上下文'
+  return `用户上下文 · ${user.nickname || user.email || user.id}`
+})
+
+function tenantTypeLabel(value?: string) {
+  if (value === 'PERSONAL') return '个人'
+  if (value === 'ENTERPRISE') return '企业'
+  return value || '-'
 }
 
 const columns: PrimaryTableCol<PlatformUserVO>[] = [
@@ -123,6 +178,15 @@ const columns: PrimaryTableCol<PlatformUserVO>[] = [
         { theme: row.userType === 'PLATFORM_ADMIN' ? 'warning' : 'default', variant: 'light' },
         () => typeLabel[row.userType || ''] || row.userType || '-',
       ),
+  },
+  {
+    colKey: 'platformAdminRole',
+    title: '平台角色',
+    width: 120,
+    cell: (_, { row }) =>
+      row.userType === 'PLATFORM_ADMIN'
+        ? roleLabel[row.platformAdminRole || ''] || row.platformAdminRole || '-'
+        : '-',
   },
   {
     colKey: 'status',
@@ -148,19 +212,22 @@ const columns: PrimaryTableCol<PlatformUserVO>[] = [
   {
     colKey: 'actions',
     title: '操作',
-    width: 90,
+    width: 140,
     fixed: 'right',
     cell: (_, { row }) =>
-      h(
-        Link,
-        {
-          theme: row.status === 1 ? 'warning' : 'success',
-          hover: 'color',
-          disabled: auth.user?.id === row.id,
-          onClick: () => toggleStatus(row),
-        },
-        () => (row.status === 1 ? '停用' : '启用'),
-      ),
+      h('div', { class: 'admin-ops' }, [
+        h(Link, { theme: 'primary', hover: 'color', onClick: () => openContext(row) }, () => '上下文'),
+        h(
+          Link,
+          {
+            theme: row.status === 1 ? 'warning' : 'success',
+            hover: 'color',
+            disabled: auth.user?.id === row.id,
+            onClick: () => toggleStatus(row),
+          },
+          () => (row.status === 1 ? '停用' : '启用'),
+        ),
+      ]),
   },
 ]
 
@@ -179,6 +246,19 @@ async function loadUsers() {
     pagination.total = page?.total || 0
   } finally {
     loading.value = false
+  }
+}
+
+async function openContext(row: PlatformUserVO) {
+  contextUser.value = row
+  context.value = null
+  contextVisible.value = true
+  contextLoading.value = true
+  try {
+    const { data } = await fetchUserContext(row.id)
+    context.value = data.data
+  } finally {
+    contextLoading.value = false
   }
 }
 
@@ -224,6 +304,7 @@ function openCreate() {
   form.email = ''
   form.password = ''
   form.nickname = ''
+  form.platformAdminRole = 'SUPER_ADMIN'
   dialogVisible.value = true
 }
 
@@ -236,6 +317,7 @@ async function onCreate() {
       email: form.email.trim(),
       password: form.password,
       nickname: form.nickname.trim() || undefined,
+      platformAdminRole: form.platformAdminRole,
     })
     MessagePlugin.success('管理员已创建')
     dialogVisible.value = false

@@ -25,6 +25,9 @@
           </template>
         </t-input>
       </t-form-item>
+      <div class="form-extra">
+        <router-link class="form-link" to="/forgot-password">忘记密码</router-link>
+      </div>
       <t-form-item>
         <t-button theme="primary" type="submit" block size="large" shape="round" :loading="loading">
           登录管理端
@@ -100,5 +103,21 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   margin: 0 0 28px;
   font: var(--td-font-body-medium);
   color: var(--box-muted);
+}
+
+.form-extra {
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px 0 16px;
+}
+
+.form-link {
+  font-size: 13px;
+  color: var(--td-brand-color);
+  text-decoration: none;
+}
+
+.form-link:hover {
+  text-decoration: underline;
 }
 </style>

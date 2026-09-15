@@ -10,6 +10,11 @@ const router = createRouter({
       meta: { public: true, title: '登录' },
     },
     {
+      path: '/forgot-password',
+      component: () => import('@/views/ForgotPasswordView.vue'),
+      meta: { public: true, title: '忘记密码' },
+    },
+    {
       path: '/',
       component: () => import('@/layouts/AppLayout.vue'),
       children: [
@@ -38,6 +43,11 @@ const router = createRouter({
           path: 'plans',
           component: () => import('@/views/PlansView.vue'),
           meta: { title: '套餐管理' },
+        },
+        {
+          path: 'billing-invoices',
+          component: () => import('@/views/BillingInvoicesView.vue'),
+          meta: { title: '账单对账' },
         },
         {
           path: 'ops-placements',
