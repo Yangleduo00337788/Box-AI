@@ -2,8 +2,14 @@ package com.boxai.analytics.application;
 
 import com.boxai.analytics.api.AnalyticsTrendPointVO;
 import com.boxai.analytics.api.AnalyticsTrendsVO;
+import com.boxai.analytics.api.ModelErrorStatVO;
 import com.boxai.analytics.api.PlatformAnalyticsOverviewVO;
 import com.boxai.analytics.api.PlatformTopTenantVO;
+import com.boxai.analytics.api.TenantAnalyticsDetailVO;
+import com.boxai.common.exception.BusinessException;
+import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.workspace.Workspace;
+import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.domain.plan.TenantUsage;
 import com.boxai.domain.plan.TenantUsageRepository;
 import com.boxai.domain.tenant.Tenant;
@@ -30,13 +36,16 @@ public class AdminPlatformAnalyticsApplicationService {
     private final ExecutionRepository executionRepository;
     private final TenantUsageRepository tenantUsageRepository;
     private final TenantRepository tenantRepository;
+    private final WorkspaceRepository workspaceRepository;
 
     public AdminPlatformAnalyticsApplicationService(ExecutionRepository executionRepository,
                                                     TenantUsageRepository tenantUsageRepository,
-                                                    TenantRepository tenantRepository) {
+                                                    TenantRepository tenantRepository,
+                                                    WorkspaceRepository workspaceRepository) {
         this.executionRepository = executionRepository;
         this.tenantUsageRepository = tenantUsageRepository;
         this.tenantRepository = tenantRepository;
+        this.workspaceRepository = workspaceRepository;
     }
 
     public PlatformAnalyticsOverviewVO overview(int days) {
@@ -121,6 +130,37 @@ public class AdminPlatformAnalyticsApplicationService {
                 })
                 .toList();
         return new AnalyticsTrendsVO(periodDays, points);
+    }
+
+    public TenantAnalyticsDetailVO tenantDetail(Long tenantId) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "租户不存在"));
+        List<Long> workspaceIds = workspaceRepository.listByTenantId(tenantId).stream()
+                .map(Workspace::getId)
+                .toList();
+        List<Execution> executions = executionRepository.listRecent(5000).stream()
+                .filter(item -> item.getWorkspaceId() != null && workspaceIds.contains(item.getWorkspaceId()))
+                .toList();
+        int succeededCount = (int) executions.stream().filter(this::succeeded).count();
+        double successRate = executions.isEmpty() ? 0D : succeededCount * 100D / executions.size();
+        long totalTokens = executions.stream()
+                .map(Execution::getTotalTokens)
+                .filter(value -> value != null && value > 0)
+                .mapToLong(Integer::longValue)
+                .sum();
+        List<ModelErrorStatVO> modelErrors = executions.stream()
+                .filter(item -> !succeeded(item))
+                .collect(Collectors.groupingBy(item -> item.getErrorCode() == null ? "UNKNOWN" : item.getErrorCode(), Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> new ModelErrorStatVO(entry.getKey(), entry.getValue().intValue(), executions.size()))
+                .toList();
+        return new TenantAnalyticsDetailVO(
+                tenant.getId(),
+                tenant.getName(),
+                executions.size(),
+                successRate,
+                totalTokens,
+                modelErrors);
     }
 
     private boolean succeeded(Execution execution) {

@@ -2,9 +2,11 @@ package com.boxai.analytics.controller;
 
 import com.boxai.analytics.api.AnalyticsTrendsVO;
 import com.boxai.analytics.api.PlatformAnalyticsOverviewVO;
+import com.boxai.analytics.api.TenantAnalyticsDetailVO;
 import com.boxai.analytics.application.AdminPlatformAnalyticsApplicationService;
 import com.boxai.common.result.Result;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,5 +30,10 @@ public class AdminPlatformAnalyticsController {
     @GetMapping("/trends")
     public Result<AnalyticsTrendsVO> trends(@RequestParam(defaultValue = "7") int days) {
         return Result.success(adminPlatformAnalyticsApplicationService.trends(days));
+    }
+
+    @GetMapping("/tenants/{tenantId}")
+    public Result<TenantAnalyticsDetailVO> tenantDetail(@PathVariable Long tenantId) {
+        return Result.success(adminPlatformAnalyticsApplicationService.tenantDetail(tenantId));
     }
 }
