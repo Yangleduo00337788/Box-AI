@@ -62,6 +62,21 @@ export function fetchTenantQuota(id: number) {
   return http.get<Result<QuotaSnapshotVO>>(`/tenants/${id}/quota`)
 }
 
+export interface AdminWorkspaceVO {
+  id: number
+  name: string
+  slug: string
+  description?: string
+  avatarUrl?: string
+  status: number
+  ownerId?: number
+  createdAt?: string
+}
+
+export function fetchTenantWorkspaces(tenantId: number) {
+  return http.get<Result<AdminWorkspaceVO[]>>(`/tenants/${tenantId}/workspaces`)
+}
+
 export interface TenantMemberVO {
   id: number
   userId: number

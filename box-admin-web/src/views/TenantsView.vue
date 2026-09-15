@@ -74,6 +74,12 @@
       :tenant-name="activeTenant?.name ?? ''"
       @close="membersVisible = false"
     />
+    <tenant-workspaces-drawer
+      :visible="workspacesVisible"
+      :tenant-id="activeTenant?.id ?? null"
+      :tenant-name="activeTenant?.name ?? ''"
+      @close="workspacesVisible = false"
+    />
 
     <t-dialog
       v-model:visible="planVisible"
@@ -112,6 +118,7 @@ import { DialogPlugin, Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { FormInstanceFunctions, FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
 import TenantMembersDrawer from '@/components/TenantMembersDrawer.vue'
+import TenantWorkspacesDrawer from '@/components/TenantWorkspacesDrawer.vue'
 import { fetchPlans, type PlanVO } from '@/api/plan'
 import {
   assignTenantPlan,
@@ -152,6 +159,7 @@ const loading = ref(false)
 const createVisible = ref(false)
 const creating = ref(false)
 const membersVisible = ref(false)
+const workspacesVisible = ref(false)
 const planVisible = ref(false)
 const assigningPlan = ref(false)
 const quotaVisible = ref(false)
@@ -211,11 +219,12 @@ const columns: PrimaryTableCol<TenantVO>[] = [
   {
     colKey: 'actions',
     title: '操作',
-    width: 260,
+    width: 320,
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openMembers(row) }, () => '成员'),
+        h(Link, { theme: 'primary', hover: 'color', onClick: () => openWorkspaces(row) }, () => '空间'),
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openPlan(row) }, () => '套餐'),
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openQuota(row) }, () => '额度'),
         h(
@@ -240,6 +249,11 @@ async function loadTenants() {
 function openMembers(row: TenantVO) {
   activeTenant.value = row
   membersVisible.value = true
+}
+
+function openWorkspaces(row: TenantVO) {
+  activeTenant.value = row
+  workspacesVisible.value = true
 }
 
 function openPlan(row: TenantVO) {

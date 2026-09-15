@@ -30,6 +30,7 @@ declare module 'vue' {
     TDropdown: typeof import('tdesign-vue-next')['Dropdown']
     TEmpty: typeof import('tdesign-vue-next')['Empty']
     TenantMembersDrawer: typeof import('./src/components/TenantMembersDrawer.vue')['default']
+    TenantWorkspacesDrawer: typeof import('./src/components/TenantWorkspacesDrawer.vue')['default']
     TForm: typeof import('tdesign-vue-next')['Form']
     TFormItem: typeof import('tdesign-vue-next')['FormItem']
     THeader: typeof import('tdesign-vue-next')['Header']
