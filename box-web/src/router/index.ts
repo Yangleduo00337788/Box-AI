@@ -51,6 +51,11 @@ const router = createRouter({
       meta: { public: true, title: '法律条款' },
     },
     {
+      path: '/invite/:token',
+      component: () => import('@/views/InviteAcceptView.vue'),
+      meta: { public: true, title: '接受邀请' },
+    },
+    {
       path: '/',
       component: () => import('@/layouts/AppLayout.vue'),
       children: [
@@ -94,8 +99,8 @@ const router = createRouter({
         { path: 'team', component: () => import('@/views/TeamView.vue'), meta: { title: '团队', permission: 'member:manage' } },
         { path: 'market', component: () => import('@/views/MarketView.vue'), meta: { title: '市场' } },
         { path: 'analytics', component: () => import('@/views/AnalyticsView.vue'), meta: { title: '分析' } },
-        { path: 'executions', component: () => import('@/views/ExecutionsView.vue'), meta: { title: '执行记录' } },
-        { path: 'debug', component: () => import('@/views/DebugConsoleView.vue'), meta: { title: 'Debug Console' } },
+        { path: 'executions', redirect: '/debug' },
+        { path: 'debug', component: () => import('@/views/DebugConsoleView.vue'), meta: { title: '执行与调试' } },
         {
           path: 'settings',
           component: () => import('@/layouts/SettingsLayout.vue'),
@@ -123,6 +128,14 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  const queryToken = to.query.token
+  if (typeof queryToken === 'string' && queryToken.trim()) {
+    localStorage.setItem('box.token', queryToken.trim())
+    const nextQuery = { ...to.query }
+    delete nextQuery.token
+    return { path: to.path, query: nextQuery, hash: to.hash, replace: true }
+  }
+
   const host = window.location.hostname
   if ((to.path === '/' || to.path === '/chat') && !APP_HOSTS.has(host)) {
     const agentId = await resolveEmbedAgentId(host)

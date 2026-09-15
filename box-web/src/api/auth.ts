@@ -105,3 +105,20 @@ export function selectCurrentWorkspace(workspaceId: number) {
 export function fetchHealth() {
   return http.get<Result<Record<string, unknown>>>('/system/health')
 }
+
+export interface UserSessionVO {
+  sessionId: string
+  deviceName?: string
+  ipAddress?: string
+  lastActiveAt?: string
+  expiresAt?: string
+  current: boolean
+}
+
+export function fetchSessions() {
+  return http.get<Result<UserSessionVO[]>>('/auth/sessions')
+}
+
+export function revokeSession(sessionId: string) {
+  return http.delete<Result<void>>(`/auth/sessions/${sessionId}`)
+}

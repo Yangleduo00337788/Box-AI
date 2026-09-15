@@ -33,16 +33,31 @@
           <t-empty v-else description="暂无额度数据" />
         </t-loading>
       </t-tab-panel>
+      <t-tab-panel value="plans" label="换套餐" :destroy-on-hide="false">
+        <t-loading :loading="plansLoading" size="small">
+          <div v-if="plans.length" class="plan-grid">
+            <t-card v-for="plan in plans" :key="plan.id" :bordered="true" class="plan-offer">
+              <h3>{{ plan.name }}</h3>
+              <p class="plan-offer__price">{{ plan.priceMonthly }} CNY / 月</p>
+              <p class="plan-offer__desc">{{ plan.description || '—' }}</p>
+              <t-button theme="primary" variant="outline" :loading="subscribingId === plan.id" @click="onSubscribe(plan.id)">
+                订阅并模拟支付
+              </t-button>
+            </t-card>
+          </div>
+          <t-empty v-else description="暂无可用套餐" />
+        </t-loading>
+      </t-tab-panel>
       <t-tab-panel value="billing" label="账单" :destroy-on-hide="false">
         <t-loading :loading="billingLoading" size="small">
           <section v-if="overview" class="settings-card plan-card">
             <t-descriptions :column="2" layout="horizontal">
               <t-descriptions-item label="账期">{{ overview.period }}</t-descriptions-item>
               <t-descriptions-item label="当前套餐">{{ overview.planName }}</t-descriptions-item>
-              <t-descriptions-item label="套餐月费">
+              <t-descriptions-item label="参考月费">
                 {{ overview.currency }} {{ overview.planPriceMonthly }}
               </t-descriptions-item>
-              <t-descriptions-item label="预估应付">
+              <t-descriptions-item :label="overview.paymentEnabled ? '预估应付' : '参考应付（未开通支付）'">
                 {{ overview.currency }} {{ overview.estimatedAmount }}
               </t-descriptions-item>
             </t-descriptions>
@@ -50,6 +65,8 @@
               <h3 class="bar-wrap__title">本月用量</h3>
               <div ref="billingBarRef" class="bar-chart" />
             </div>
+            <h3 class="bar-wrap__title">发票记录</h3>
+            <t-table row-key="id" :data="invoices" :columns="invoiceColumns" size="small" />
           </section>
           <t-empty v-else description="暂无账单数据" />
         </t-loading>
@@ -63,8 +80,18 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
-import type { TabValue } from 'tdesign-vue-next'
-import { fetchBillingOverview, type BillingOverviewVO } from '@/api/billing'
+import { MessagePlugin } from 'tdesign-vue-next'
+import type { PrimaryTableCol, TabValue } from 'tdesign-vue-next'
+import {
+  confirmPayment,
+  fetchBillingOverview,
+  fetchInvoices,
+  listPlans,
+  subscribePlan,
+  type BillingInvoiceVO,
+  type BillingOverviewVO,
+  type PlanVO,
+} from '@/api/billing'
 import { fetchQuota, type QuotaSnapshotVO } from '@/api/quota'
 import { useAuthStore } from '@/stores/auth'
 import { appPreferences } from '@/composables/useAppPreferences'
@@ -77,9 +104,13 @@ const auth = useAuthStore()
 
 const quotaLoading = ref(false)
 const billingLoading = ref(false)
+const plansLoading = ref(false)
 const quota = ref<QuotaSnapshotVO | null>(null)
 const overview = ref<BillingOverviewVO | null>(null)
-const tab = ref<'usage' | 'billing'>(route.query.tab === 'billing' ? 'billing' : 'usage')
+const plans = ref<PlanVO[]>([])
+const invoices = ref<BillingInvoiceVO[]>([])
+const subscribingId = ref<number | null>(null)
+const tab = ref<'usage' | 'billing' | 'plans'>(route.query.tab === 'billing' ? 'billing' : route.query.tab === 'plans' ? 'plans' : 'usage')
 const usageBarRef = ref<HTMLElement | null>(null)
 const billingBarRef = ref<HTMLElement | null>(null)
 
@@ -246,12 +277,20 @@ async function renderCharts() {
   }
 }
 
+const invoiceColumns: PrimaryTableCol<BillingInvoiceVO>[] = [
+  { colKey: 'invoiceNo', title: '发票号', minWidth: 140 },
+  { colKey: 'period', title: '账期', width: 90 },
+  { colKey: 'totalAmount', title: '金额', width: 100 },
+  { colKey: 'status', title: '状态', width: 90 },
+]
+
 function onTabChange(value: TabValue) {
-  const next = value === 'billing' ? 'billing' : 'usage'
+  const next = value === 'billing' ? 'billing' : value === 'plans' ? 'plans' : 'usage'
   tab.value = next
-  void router.replace({
-    query: next === 'billing' ? { tab: 'billing' } : {},
-  })
+  const query = next === 'usage' ? {} : { tab: next }
+  void router.replace({ query })
+  if (next === 'plans') void loadPlans()
+  if (next === 'billing') void loadInvoices()
   void renderCharts()
 }
 
@@ -270,17 +309,59 @@ async function loadQuota() {
 async function loadBilling() {
   billingLoading.value = true
   try {
-    const { data } = await fetchBillingOverview()
-    overview.value = data.data
+    const [{ data: overviewRes }, { data: invoiceRes }] = await Promise.all([
+      fetchBillingOverview(),
+      fetchInvoices(),
+    ])
+    overview.value = overviewRes.data
+    invoices.value = invoiceRes.data || []
   } catch {
     overview.value = null
+    invoices.value = []
   } finally {
     billingLoading.value = false
   }
 }
 
+async function loadInvoices() {
+  try {
+    const { data } = await fetchInvoices()
+    invoices.value = data.data || []
+  } catch {
+    invoices.value = []
+  }
+}
+
+async function loadPlans() {
+  plansLoading.value = true
+  try {
+    const { data } = await listPlans()
+    plans.value = (data.data || []).filter((item) => item.status === 1)
+  } catch {
+    plans.value = []
+  } finally {
+    plansLoading.value = false
+  }
+}
+
+async function onSubscribe(planId: number) {
+  subscribingId.value = planId
+  try {
+    const { data } = await subscribePlan(planId)
+    const order = data.data
+    if (order?.paymentId) {
+      await confirmPayment(order.paymentId)
+    }
+    MessagePlugin.success('套餐已更新')
+    await loadAll()
+    tab.value = 'billing'
+  } finally {
+    subscribingId.value = null
+  }
+}
+
 async function loadAll() {
-  await Promise.all([loadQuota(), loadBilling()])
+  await Promise.all([loadQuota(), loadBilling(), loadPlans()])
   await renderCharts()
 }
 
@@ -292,7 +373,7 @@ function handleResize() {
 watch(
   () => route.query.tab,
   (value) => {
-    tab.value = value === 'billing' ? 'billing' : 'usage'
+    tab.value = value === 'billing' ? 'billing' : value === 'plans' ? 'plans' : 'usage'
     void renderCharts()
   },
 )
@@ -365,5 +446,23 @@ onBeforeUnmount(() => {
 .bar-chart {
   width: 100%;
   height: 220px;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.plan-offer__price {
+  margin: 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.plan-offer__desc {
+  margin: 0 0 16px;
+  color: var(--box-muted);
+  font-size: 13px;
 }
 </style>

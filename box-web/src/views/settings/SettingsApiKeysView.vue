@@ -77,6 +77,17 @@
         <t-button variant="outline" @click="secretVisible = false">我已保存</t-button>
       </t-space>
     </t-dialog>
+
+    <section class="settings-card">
+      <h2 class="settings-card__heading">开发者文档</h2>
+      <p class="settings-card__hint">
+        OpenAPI：<a href="/v3/api-docs" target="_blank" rel="noopener">/v3/api-docs</a>
+      </p>
+      <pre class="code-sample">curl -X POST "{{ apiBase }}/published/agents/{agentId}/chat" \
+  -H "Authorization: Bearer ax_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"你好"}'</pre>
+    </section>
   </div>
 </template>
 
@@ -107,6 +118,7 @@ const createVisible = ref(false)
 const secretVisible = ref(false)
 const createdSecret = ref('')
 const createForm = reactive({ name: '' })
+const apiBase = `${window.location.origin}/api/v1`
 
 const columns: PrimaryTableCol<ApiKeyVO>[] = [
   { colKey: 'name', title: '名称', ellipsis: true },
@@ -236,5 +248,25 @@ useReloadOnWorkspaceChange(loadKeys)
 
 .secret-box code {
   font-size: 13px;
+}
+
+.settings-card__heading {
+  margin: 0 0 12px;
+  font: var(--td-font-title-small);
+}
+
+.settings-card__hint {
+  margin: 0 0 12px;
+  color: var(--box-muted);
+  font-size: 13px;
+}
+
+.code-sample {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--td-bg-color-secondarycontainer);
+  font-size: 12px;
+  overflow-x: auto;
 }
 </style>

@@ -28,6 +28,11 @@
       <t-button theme="primary" :loading="changingPassword" @click="submitPassword">更新密码</t-button>
     </section>
 
+    <section class="settings-card">
+      <h2 class="settings-card__heading">登录设备</h2>
+      <t-table row-key="sessionId" :data="sessions" :columns="sessionColumns" size="small" />
+    </section>
+
     <section class="settings-card settings-card--danger">
       <h2 class="settings-card__heading">退出登录</h2>
       <p class="settings-card__hint">退出后需要重新登录才能访问此工作台。</p>
@@ -37,21 +42,55 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref, h } from 'vue'
 import { useRouter } from 'vue-router'
-import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
-import { changePassword } from '@/api/auth'
+import { DialogPlugin, Link, MessagePlugin } from 'tdesign-vue-next'
+import type { PrimaryTableCol } from 'tdesign-vue-next'
+import { changePassword, fetchSessions, revokeSession, type UserSessionVO } from '@/api/auth'
 import { extractApiError } from '@/api/apiError'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
 const changingPassword = ref(false)
+const sessions = ref<UserSessionVO[]>([])
 const passwordForm = reactive({
   oldPassword: '',
   newPassword: '',
   confirmPassword: '',
 })
+
+const sessionColumns: PrimaryTableCol<UserSessionVO>[] = [
+  { colKey: 'deviceName', title: '设备', width: 140 },
+  { colKey: 'ipAddress', title: 'IP', width: 120 },
+  { colKey: 'lastActiveAt', title: '最近活跃', minWidth: 160 },
+  {
+    colKey: 'actions',
+    title: '操作',
+    width: 100,
+    cell: (_, { row }) =>
+      row.current
+        ? '当前会话'
+        : h(Link, { theme: 'primary', hover: 'color', onClick: () => onRevokeSession(row.sessionId) }, () => '退出'),
+  },
+]
+
+async function loadSessions() {
+  try {
+    const { data } = await fetchSessions()
+    sessions.value = data.data || []
+  } catch {
+    sessions.value = []
+  }
+}
+
+async function onRevokeSession(sessionId: string) {
+  await revokeSession(sessionId)
+  MessagePlugin.success('已退出该设备')
+  await loadSessions()
+}
+
+onMounted(loadSessions)
 
 async function submitPassword() {
   if (!passwordForm.oldPassword || !passwordForm.newPassword) {

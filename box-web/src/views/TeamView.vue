@@ -6,10 +6,17 @@
       :desc="isEnterprise ? '管理企业租户成员，邀请同事加入协作。' : '个人版账号无需团队管理。'"
     />
 
-    <t-empty
-      v-if="!isEnterprise"
-      description="个人版账号无需团队管理，切换企业版后可邀请同事协作。"
-    />
+    <t-empty v-if="!isEnterprise">
+      <template #description>
+        <p>个人版账号无需团队管理，升级企业版后可邀请同事协作。</p>
+      </template>
+      <t-form layout="vertical" class="upgrade-form" @submit="onUpgrade">
+        <t-form-item label="企业名称">
+          <t-input v-model="companyName" placeholder="填写企业或团队名称" />
+        </t-form-item>
+        <t-button theme="primary" type="submit" :loading="upgrading">升级为企业版</t-button>
+      </t-form>
+    </t-empty>
 
     <template v-else>
       <div class="team-toolbar">
@@ -63,6 +70,14 @@
           bordered
           stripe
         />
+        <h3 class="section-title">待接受邀请</h3>
+        <t-table
+          row-key="id"
+          :data="pendingInvites"
+          :columns="inviteColumns"
+          bordered
+          stripe
+        />
       </template>
     </template>
   </div>
@@ -77,13 +92,17 @@ import {
   addTenantMember,
   fetchTenantMembers,
   updateTenantMemberStatus,
+  upgradeEnterprise,
   type TenantMemberVO,
 } from '@/api/tenant'
 import {
-  inviteWorkspaceMember,
+  createInvitation,
+  listInvitations,
   listWorkspaceMembers,
   removeWorkspaceMember,
+  revokeInvitation,
   updateWorkspaceMemberRole,
+  type WorkspaceInvitationVO,
   type WorkspaceMemberVO,
 } from '@/api/workspace'
 import { useAuthStore } from '@/stores/auth'
@@ -100,6 +119,9 @@ const wsLoading = ref(false)
 const wsAdding = ref(false)
 const wsAddEmail = ref('')
 const wsAddRole = ref('MEMBER')
+const companyName = ref('')
+const upgrading = ref(false)
+const pendingInvites = ref<WorkspaceInvitationVO[]>([])
 
 const isEnterprise = computed(() => auth.tenant?.tenantType === 'ENTERPRISE')
 const canManageWorkspace = computed(() => auth.currentWorkspace?.roleCode === 'TENANT_ADMIN')
@@ -158,6 +180,21 @@ const wsColumns: PrimaryTableCol<WorkspaceMemberVO>[] = [
         '移除',
       )
     },
+  },
+]
+
+const inviteColumns: PrimaryTableCol<WorkspaceInvitationVO>[] = [
+  { colKey: 'email', title: '邮箱', minWidth: 180 },
+  { colKey: 'roleCode', title: '角色', width: 100 },
+  { colKey: 'status', title: '状态', width: 100 },
+  {
+    colKey: 'actions',
+    title: '操作',
+    width: 120,
+    cell: (_, { row }) =>
+      row.status === 'PENDING'
+        ? h('a', { href: 'javascript:void(0)', onClick: () => onRevokeInvite(row.id) }, '撤销')
+        : '-',
   },
 ]
 
@@ -244,6 +281,33 @@ async function loadWorkspaceMembers() {
   }
 }
 
+async function onUpgrade() {
+  if (!companyName.value.trim()) {
+    MessagePlugin.warning('请填写企业名称')
+    return
+  }
+  upgrading.value = true
+  try {
+    await upgradeEnterprise(companyName.value.trim())
+    MessagePlugin.success('已升级为企业版')
+    await auth.hydrate()
+    companyName.value = ''
+    await loadMembers()
+  } finally {
+    upgrading.value = false
+  }
+}
+
+async function loadPendingInvites() {
+  if (!canManageWorkspace.value) return
+  try {
+    const { data } = await listInvitations()
+    pendingInvites.value = data.data || []
+  } catch {
+    pendingInvites.value = []
+  }
+}
+
 async function onInviteWorkspace() {
   if (!wsAddEmail.value.trim()) {
     MessagePlugin.warning('请输入同事邮箱')
@@ -251,16 +315,29 @@ async function onInviteWorkspace() {
   }
   wsAdding.value = true
   try {
-    await inviteWorkspaceMember({
+    const { data } = await createInvitation({
       email: wsAddEmail.value.trim(),
       roleCode: wsAddRole.value,
     })
-    MessagePlugin.success('已加入工作空间')
+    const invite = data.data
+    if (invite?.status === 'PENDING' && invite.token) {
+      const link = `${window.location.origin}/invite/${invite.token}`
+      MessagePlugin.success(`邀请已发送，链接：${link}`)
+    } else {
+      MessagePlugin.success('成员已加入工作空间')
+    }
     wsAddEmail.value = ''
     await loadWorkspaceMembers()
+    await loadPendingInvites()
   } finally {
     wsAdding.value = false
   }
+}
+
+async function onRevokeInvite(id: number) {
+  await revokeInvitation(id)
+  MessagePlugin.success('已撤销邀请')
+  await loadPendingInvites()
 }
 
 async function removeWorkspace(userId: number) {
@@ -284,6 +361,7 @@ onMounted(() => {
   loadMembers()
   if (canManageWorkspace.value) {
     loadWorkspaceMembers()
+    loadPendingInvites()
   }
 })
 

@@ -26,3 +26,14 @@ export function addTenantMember(payload: AddTenantMemberRequest) {
 export function updateTenantMemberStatus(userId: number, status: number) {
   return http.put<Result<TenantMemberVO>>(`/tenant/members/${userId}/status`, { status })
 }
+
+export interface TenantVO {
+  id: number
+  name: string
+  slug: string
+  tenantType?: 'PERSONAL' | 'ENTERPRISE'
+}
+
+export function upgradeEnterprise(companyName: string) {
+  return http.post<Result<TenantVO>>('/tenant/upgrade-enterprise', { companyName })
+}
