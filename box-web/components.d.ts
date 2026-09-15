@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AuthAgreement: typeof import('./src/components/AuthAgreement.vue')['default']
+    BoxChatSender: typeof import('./src/components/BoxChatSender.vue')['default']
     BrandWordmark: typeof import('./src/components/BrandWordmark.vue')['default']
     ChatComposerShell: typeof import('./src/components/ChatComposerShell.vue')['default']
     ChatMarkdown: typeof import('./src/components/ChatMarkdown.vue')['default']
@@ -39,6 +40,9 @@ declare module 'vue' {
     TBadge: typeof import('tdesign-vue-next')['Badge']
     TButton: typeof import('tdesign-vue-next')['Button']
     TCard: typeof import('tdesign-vue-next')['Card']
+    TChatActionbar: typeof import('@tdesign-vue-next/chat')['ChatActionbar']
+    TChatMessage: typeof import('@tdesign-vue-next/chat')['ChatMessage']
+    TChatSender: typeof import('@tdesign-vue-next/chat')['ChatSender']
     TCheckbox: typeof import('tdesign-vue-next')['Checkbox']
     TCheckboxGroup: typeof import('tdesign-vue-next')['CheckboxGroup']
     TColorPicker: typeof import('tdesign-vue-next')['ColorPicker']

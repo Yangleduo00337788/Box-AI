@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
 import { TDesignResolver } from 'unplugin-vue-components/resolvers'
 import path from 'path'
+import { TDesignChatResolver } from './src/resolvers/tdesignChatResolver'
 
 export default defineConfig({
   build: {
@@ -20,6 +21,7 @@ export default defineConfig({
     vue(),
     Components({
       resolvers: [
+        TDesignChatResolver(),
         TDesignResolver({
           library: 'vue-next',
         }),
