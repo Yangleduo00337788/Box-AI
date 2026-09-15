@@ -9,28 +9,18 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@Table("conversation")
-public class ConversationDO {
+@Table("chat_project")
+public class ChatProjectDO {
 
     @Id(keyType = KeyType.Auto)
     private Long id;
     @Column("workspace_id")
     private Long workspaceId;
-    @Column("agent_id")
-    private Long agentId;
-    @Column("agent_version_id")
-    private Long agentVersionId;
     @Column("user_id")
     private Long userId;
-    @Column("project_id")
-    private Long projectId;
-    private String title;
-    private String status;
-    @Column("message_count")
-    private Integer messageCount;
-    @Column("last_message_at")
-    private LocalDateTime lastMessageAt;
-    private String metadata;
+    private String name;
+    @Column("sort_order")
+    private Integer sortOrder;
     @Column("created_at")
     private LocalDateTime createdAt;
     @Column("updated_at")

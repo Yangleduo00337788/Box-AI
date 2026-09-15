@@ -7,19 +7,13 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
-public class Conversation {
+public class ChatProject {
 
     private Long id;
     private Long workspaceId;
-    private Long agentId;
-    private Long agentVersionId;
     private Long userId;
-    private Long projectId;
-    private String title;
-    private String status;
-    private Integer messageCount;
-    private LocalDateTime lastMessageAt;
-    private String metadataJson;
+    private String name;
+    private Integer sortOrder;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

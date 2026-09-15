@@ -9,6 +9,7 @@ import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.conversation.api.ConversationVO;
 import com.boxai.conversation.api.CreateConversationRequest;
+import com.boxai.conversation.api.MoveConversationProjectRequest;
 import com.boxai.conversation.api.RenameConversationRequest;
 import com.boxai.conversation.api.MessageVO;
 import com.boxai.conversation.api.SendMessageRequest;
@@ -59,6 +60,7 @@ public class ConversationApplicationService {
     private final ExecutionRecorder executionRecorder;
     private final WorkspacePermissionService workspacePermissionService;
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
+    private final ChatProjectApplicationService chatProjectApplicationService;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
 
@@ -71,6 +73,7 @@ public class ConversationApplicationService {
                                           ExecutionRecorder executionRecorder,
                                           WorkspacePermissionService workspacePermissionService,
                                           AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
+                                          ChatProjectApplicationService chatProjectApplicationService,
                                           PlatformTransactionManager transactionManager,
                                           ObjectMapper objectMapper) {
         this.conversationRepository = conversationRepository;
@@ -82,6 +85,7 @@ public class ConversationApplicationService {
         this.executionRecorder = executionRecorder;
         this.workspacePermissionService = workspacePermissionService;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
+        this.chatProjectApplicationService = chatProjectApplicationService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.objectMapper = objectMapper;
     }
@@ -95,6 +99,10 @@ public class ConversationApplicationService {
         conversation.setWorkspaceId(workspaceId());
         conversation.setAgentId(agent.getId());
         conversation.setUserId(userId);
+        if (request.projectId() != null) {
+            chatProjectApplicationService.requireProject(request.projectId());
+            conversation.setProjectId(request.projectId());
+        }
         conversation.setTitle(trimToNull(request.title()));
         conversation.setStatus("ACTIVE");
         conversation.setMessageCount(0);
@@ -102,15 +110,39 @@ public class ConversationApplicationService {
         return toVO(conversation, agent.getName());
     }
 
-    public List<ConversationVO> list() {
+    public List<ConversationVO> list(Long projectId, Boolean unassigned) {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Long userId = WorkspaceContext.require().userId();
-        List<Conversation> conversations = conversationRepository.listByWorkspaceAndUser(workspaceId(), userId);
+        List<Conversation> conversations;
+        if (Boolean.TRUE.equals(unassigned)) {
+            conversations = conversationRepository.listByWorkspaceAndUser(workspaceId(), userId, null, true);
+        } else if (projectId != null) {
+            if (chatProjectApplicationService.findAccessible(projectId).isEmpty()) {
+                return List.of();
+            }
+            conversations = conversationRepository.listByWorkspaceAndUser(workspaceId(), userId, projectId, false);
+        } else {
+            conversations = conversationRepository.listByWorkspaceAndUser(workspaceId(), userId);
+        }
         Map<Long, Agent> agentMap = agentRepository.listByWorkspace(workspaceId()).stream()
                 .collect(Collectors.toMap(Agent::getId, Function.identity()));
         return conversations.stream()
                 .map(item -> toVO(item, agentName(agentMap.get(item.getAgentId()))))
                 .toList();
+    }
+
+    @Transactional
+    public ConversationVO moveToProject(Long id, MoveConversationProjectRequest request) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
+        Conversation conversation = requireConversation(id);
+        Long projectId = request.projectId();
+        if (projectId != null) {
+            chatProjectApplicationService.requireProject(projectId);
+        }
+        conversation.setProjectId(projectId);
+        conversationRepository.update(conversation);
+        Agent agent = requireAgent(conversation.getAgentId());
+        return toVO(conversation, agent.getName());
     }
 
     public ConversationVO detail(Long id) {
@@ -441,6 +473,7 @@ public class ConversationApplicationService {
                 conversation.getId(),
                 conversation.getAgentId(),
                 agentName,
+                conversation.getProjectId(),
                 conversation.getTitle(),
                 conversation.getStatus(),
                 conversation.getMessageCount(),

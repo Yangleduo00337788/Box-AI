@@ -13,6 +13,8 @@ public interface ConversationRepository {
 
     List<Conversation> listByWorkspaceAndUser(Long workspaceId, Long userId);
 
+    List<Conversation> listByWorkspaceAndUser(Long workspaceId, Long userId, Long projectId, boolean unassignedOnly);
+
     List<Conversation> searchByTitle(Long workspaceId, Long userId, String keyword, int limit);
 
     int countByWorkspaceAndUser(Long workspaceId, Long userId);

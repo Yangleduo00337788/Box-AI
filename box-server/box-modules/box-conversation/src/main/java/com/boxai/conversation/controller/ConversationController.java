@@ -4,6 +4,7 @@ import com.boxai.common.result.Result;
 import com.boxai.conversation.api.ConversationVO;
 import com.boxai.conversation.api.CreateConversationRequest;
 import com.boxai.conversation.api.MessageVO;
+import com.boxai.conversation.api.MoveConversationProjectRequest;
 import com.boxai.conversation.api.RegenerateMessageRequest;
 import com.boxai.conversation.api.RenameConversationRequest;
 import com.boxai.conversation.api.SendMessageRequest;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -39,8 +41,9 @@ public class ConversationController {
     }
 
     @GetMapping
-    public Result<List<ConversationVO>> list() {
-        return Result.success(conversationApplicationService.list());
+    public Result<List<ConversationVO>> list(@RequestParam(required = false) Long projectId,
+                                             @RequestParam(required = false) Boolean unassigned) {
+        return Result.success(conversationApplicationService.list(projectId, unassigned));
     }
 
     @GetMapping("/{id}")
@@ -57,6 +60,12 @@ public class ConversationController {
     public Result<Void> delete(@PathVariable Long id) {
         conversationApplicationService.delete(id);
         return Result.success();
+    }
+
+    @PutMapping("/{id}/project")
+    public Result<ConversationVO> moveToProject(@PathVariable Long id,
+                                                @RequestBody MoveConversationProjectRequest request) {
+        return Result.success(conversationApplicationService.moveToProject(id, request));
     }
 
     @GetMapping("/{id}/messages")

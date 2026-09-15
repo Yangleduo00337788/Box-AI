@@ -49,11 +49,21 @@ public class ConversationRepositoryImpl implements ConversationRepository {
 
     @Override
     public List<Conversation> listByWorkspaceAndUser(Long workspaceId, Long userId) {
+        return listByWorkspaceAndUser(workspaceId, userId, null, false);
+    }
+
+    @Override
+    public List<Conversation> listByWorkspaceAndUser(Long workspaceId, Long userId, Long projectId, boolean unassignedOnly) {
+        QueryWrapper query = QueryWrapper.create()
+                .eq("workspace_id", workspaceId)
+                .eq("user_id", userId);
+        if (unassignedOnly) {
+            query.isNull("project_id");
+        } else if (projectId != null) {
+            query.eq("project_id", projectId);
+        }
         return mapper.selectListByQuery(
-                        QueryWrapper.create()
-                                .eq("workspace_id", workspaceId)
-                                .eq("user_id", userId)
-                                .orderBy("last_message_at", false)
+                        query.orderBy("last_message_at", false)
                                 .orderBy("updated_at", false))
                 .stream()
                 .map(this::toDomain)
@@ -94,6 +104,7 @@ public class ConversationRepositoryImpl implements ConversationRepository {
         conversation.setAgentId(row.getAgentId());
         conversation.setAgentVersionId(row.getAgentVersionId());
         conversation.setUserId(row.getUserId());
+        conversation.setProjectId(row.getProjectId());
         conversation.setTitle(row.getTitle());
         conversation.setStatus(row.getStatus());
         conversation.setMessageCount(row.getMessageCount());
@@ -110,6 +121,7 @@ public class ConversationRepositoryImpl implements ConversationRepository {
         row.setAgentId(conversation.getAgentId());
         row.setAgentVersionId(conversation.getAgentVersionId());
         row.setUserId(conversation.getUserId());
+        row.setProjectId(conversation.getProjectId());
         row.setTitle(conversation.getTitle());
         row.setStatus(conversation.getStatus() == null ? "ACTIVE" : conversation.getStatus());
         row.setMessageCount(conversation.getMessageCount() == null ? 0 : conversation.getMessageCount());

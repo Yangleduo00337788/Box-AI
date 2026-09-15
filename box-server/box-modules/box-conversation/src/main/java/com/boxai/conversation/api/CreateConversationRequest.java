@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 
 public record CreateConversationRequest(
         @NotNull Long agentId,
-        @Size(max = 255) String title
+        @Size(max = 255) String title,
+        Long projectId
 ) {
 }
