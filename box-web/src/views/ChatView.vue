@@ -27,9 +27,10 @@
       <ops-chat-banner />
 
       <chat-composer-shell>
-      <div class="composer-stack" :class="{ 'composer-stack--ops': !!currentChatOps }">
+      <div class="composer-stack">
         <ops-notice-bar
           v-if="currentChatOps"
+          class="composer-stack__ops"
           :item="currentChatOps"
           :index="chatOpsIndex"
           :total="chatOps.length"
@@ -37,78 +38,26 @@
           @open="openOpsLink"
           @page="chatOpsIndex = $event"
         />
-      <div class="composer">
-        <t-textarea
-          v-model="composerText"
-          data-testid="chat-composer-input"
-          :placeholder="composerPlaceholder"
-          :autosize="{ minRows: 2, maxRows: 8 }"
-          class="composer__input"
-          :disabled="chatting"
-          @keydown="onComposerKeydown"
-        />
-        <div v-if="composerAttachments.length" class="composer__files">
-          <div v-for="file in composerAttachments" :key="file.id" class="composer-file">
-            <img v-if="file.previewUrl" :src="file.previewUrl" alt="" class="composer-file__thumb" />
-            <t-icon v-else name="file-1" size="18px" />
-            <span class="composer-file__name">{{ file.uploading ? '正在上传…' : file.name }}</span>
-            <button type="button" class="composer-file__remove" aria-label="移除文件" @click="removeComposerAttachment(file.id)">
-              <t-icon name="close" size="14px" />
-            </button>
-          </div>
-        </div>
-        <input
-          ref="fileInputRef"
-          type="file"
-          class="composer__file-input"
-          accept=".txt,.md,.json,.csv,.log,.png,.jpg,.jpeg,text/plain,image/png,image/jpeg"
-          @change="onFileSelected"
-        />
-        <div class="composer__toolbar">
-          <div class="composer__left">
-            <t-tooltip content="添加文件" placement="top" theme="light" :show-arrow="false">
-              <t-button variant="text" shape="square" size="small" @click="openFilePicker">
-                <template #icon><t-icon name="add" /></template>
-              </t-button>
-            </t-tooltip>
-            <t-tooltip content="任务运行环境：云端" placement="top" theme="light" :show-arrow="false">
-              <t-button variant="text" size="small" tag="div">
-                <template #icon><t-icon name="cloud" /></template>
-                云端
-              </t-button>
-            </t-tooltip>
-          </div>
-          <div class="composer__right">
-            <chat-model-picker
-              v-model="selectedModelKey"
-              :models="platformModels"
-              :disabled="!modelPickerEnabled"
-              :auto-hint="autoModelHint"
-            />
-            <t-tooltip :content="listening ? '停止语音输入' : '语音输入'" placement="top" theme="light" :show-arrow="false">
-              <t-button
-                variant="text"
-                shape="square"
-                size="small"
-                :class="{ 'composer__voice--active': listening }"
-                @click="toggleVoiceInput"
-              >
-                <template #icon><t-icon name="microphone-1" /></template>
-              </t-button>
-            </t-tooltip>
-            <t-button
-              class="composer__send"
-              :class="{ 'composer__send--ready': canSendNewChat }"
-              shape="circle"
-              :loading="chatting"
-              :disabled="!canSendNewChat"
-              @click="startNewChat(composerText)"
-            >
-              <template #icon><t-icon name="chevron-up" /></template>
-            </t-button>
-          </div>
-        </div>
-      </div>
+      <box-chat-sender
+        v-model="composerText"
+        data-testid="chat-composer-input"
+        :loading="chatting"
+        :can-send="canSendNewChat"
+        :placeholder="composerPlaceholder"
+        :show-voice="true"
+        :show-model-picker="true"
+        :listening="listening"
+        :models="platformModels"
+        :model-picker-disabled="!modelPickerEnabled"
+        :auto-hint="autoModelHint"
+        v-model:selected-model-key="selectedModelKey"
+        :attachment-items="composerAttachmentItems"
+        @send="onComposerSend"
+        @stop="stopGeneration"
+        @toggle-voice="toggleVoiceInput"
+        @remove-attachment="removeComposerAttachment"
+        @file-change="onFileSelected"
+      />
       </div>
       </chat-composer-shell>
 
@@ -147,7 +96,10 @@
               <t-icon name="chevron-down" class="agent-pill__arrow" />
             </button>
           </t-dropdown>
-          <span v-if="activeConversationTitle" class="chat-active__title">{{ activeConversationTitle }}</span>
+          <p class="chat-active__title-line">
+            <span v-if="activeConversationTitle" class="chat-active__title">{{ activeConversationTitle }}</span>
+            <span class="chat-active__disclaimer">- 内容由AI生成</span>
+          </p>
         </div>
         <div class="chat-active__header-actions">
           <t-tooltip content="导出 Markdown" placement="left" theme="light" :show-arrow="false">
@@ -169,160 +121,102 @@
         </div>
       </div>
 
-      <div ref="chatListRef" class="chat-messages box-hide-scrollbar">
-        <div
-          v-for="(item, index) in messages"
-          :key="item.id ?? index"
-          class="chat-message"
-          :class="`chat-message--${item.role.toLowerCase()}`"
-        >
-          <div class="chat-message__body">
-            <div class="chat-message__content" :class="{ 'chat-message__content--loading': isLoadingBubble(item, index) }">
-              <span v-if="isLoadingBubble(item, index)" class="typing-dots" aria-label="思考中">
-                <i /><i /><i />
-              </span>
-              <template v-else-if="item.role === 'USER'">
-                <div v-if="userMessageParts(item, index).images.length" class="chat-message__images">
-                  <a
-                    v-for="(image, imageIndex) in userMessageParts(item, index).images"
-                    :key="`${image.url}-${imageIndex}`"
-                    class="chat-message__image"
-                    :href="image.url"
-                    target="_blank"
-                    rel="noreferrer"
-                    @click.stop
-                  >
-                    <t-image :src="image.url" :alt="image.name" fit="cover" shape="round" />
-                  </a>
-                </div>
-                <span v-if="userMessageParts(item, index).text">{{ userMessageParts(item, index).text }}</span>
-              </template>
-              <chat-markdown v-else :content="displayContent(item, index)" />
-            </div>
-            <div v-if="messageCitations(item).length" class="chat-citations">
-              <span class="chat-citations__label">引用来源</span>
-              <div class="chat-citations__list">
-                <t-popup
-                  v-for="cite in messageCitations(item)"
-                  :key="cite.index"
-                  placement="top"
-                  trigger="hover"
-                  show-arrow
-                  destroy-on-close
+      <div ref="chatListRef" class="chat-messages box-hide-scrollbar chat-messages--td">
+        <div v-for="(item, index) in messages" :key="item.id ?? index" class="chat-message-wrap">
+          <ChatMessage
+            :role="toChatUiRole(item.role)"
+            :content="toChatUiContent(item, index, messages, chatting)"
+            :status="toChatUiStatus(item, index, messages, chatting)"
+            :placement="item.role === 'USER' ? 'right' : 'left'"
+            variant="text"
+            :animation="isLoadingBubble(item, index) ? 'gradient' : undefined"
+            class="chat-message-td"
+          >
+            <template v-if="item.role === 'USER' && userMessageImages(item).length" #content>
+              <div class="chat-message__images">
+                <a
+                  v-for="(image, imageIndex) in userMessageImages(item)"
+                  :key="`${image.url}-${imageIndex}`"
+                  class="chat-message__image"
+                  :href="image.url"
+                  target="_blank"
+                  rel="noreferrer"
+                  @click.stop
                 >
-                  <template #content>
-                    <div class="chat-citation-popup">
-                      <div class="chat-citation-popup__title">{{ cite.documentName }}</div>
-                      <div class="chat-citation-popup__body">{{ cite.content }}</div>
-                    </div>
-                  </template>
-                  <button type="button" class="chat-citation-chip">
-                    [{{ cite.index }}] {{ cite.documentName }}
-                  </button>
-                </t-popup>
+                  <t-image :src="image.url" :alt="image.name" fit="cover" shape="round" />
+                </a>
               </div>
-            </div>
-            <div
-              v-if="canShowMessageActions(item, index)"
-              class="chat-message__actions"
-            >
-              <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
-                <t-button variant="text" shape="square" size="small" @click="copyMessage(item)">
-                  <template #icon><t-icon name="file-copy" /></template>
-                </t-button>
-              </t-tooltip>
-              <t-tooltip
-                v-if="canRegenerate(item, index)"
-                content="重新生成"
+              <span v-if="userMessageParts(item, index).text">{{ userMessageParts(item, index).text }}</span>
+            </template>
+            <template v-if="canShowMessageActions(item, index)" #actionbar>
+              <div class="t-chat__actions chat-message-td__actions">
+                <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
+                  <t-button theme="default" size="small" :disabled="chatting" @click="copyMessage(item)">
+                    <template #icon><t-icon name="file-copy" /></template>
+                  </t-button>
+                </t-tooltip>
+                <template v-if="canRegenerate(item, index)">
+                  <span class="t-chat__refresh-line" aria-hidden="true" />
+                  <t-tooltip content="重新生成" placement="top" theme="light" :show-arrow="false">
+                    <t-button theme="default" size="small" :disabled="chatting" @click="regenerateReply(index)">
+                      <template #icon><t-icon name="refresh" /></template>
+                    </t-button>
+                  </t-tooltip>
+                </template>
+                <span class="t-chat__refresh-line" aria-hidden="true" />
+                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false">
+                  <t-button theme="default" size="small" :disabled="chatting" @click="removeMessage(item, index)">
+                    <template #icon><t-icon name="delete" /></template>
+                  </t-button>
+                </t-tooltip>
+              </div>
+            </template>
+          </ChatMessage>
+          <div v-if="messageCitations(item).length" class="chat-citations">
+            <span class="chat-citations__label">引用来源</span>
+            <div class="chat-citations__list">
+              <t-popup
+                v-for="cite in messageCitations(item)"
+                :key="cite.index"
                 placement="top"
-                theme="light"
-                :show-arrow="false"
+                trigger="hover"
+                show-arrow
+                destroy-on-close
               >
-                <t-button
-                  variant="text"
-                  shape="square"
-                  size="small"
-                  data-testid="chat-regenerate"
-                  :disabled="chatting"
-                  @click="regenerateReply(index)"
-                >
-                  <template #icon><t-icon name="refresh" /></template>
-                </t-button>
-              </t-tooltip>
-              <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false">
-                <t-button variant="text" shape="square" size="small" :disabled="chatting" @click="removeMessage(item, index)">
-                  <template #icon><t-icon name="delete" /></template>
-                </t-button>
-              </t-tooltip>
+                <template #content>
+                  <div class="chat-citation-popup">
+                    <div class="chat-citation-popup__title">{{ cite.documentName }}</div>
+                    <div class="chat-citation-popup__body">{{ cite.content }}</div>
+                  </div>
+                </template>
+                <button type="button" class="chat-citation-chip">
+                  [{{ cite.index }}] {{ cite.documentName }}
+                </button>
+              </t-popup>
             </div>
           </div>
         </div>
       </div>
 
       <chat-composer-shell>
-      <div class="composer composer--bottom">
-        <t-textarea
+        <box-chat-sender
           v-model="composerText"
           data-testid="chat-composer-input"
+          :loading="chatting"
+          :can-send="canSendMessage"
           placeholder="继续对话..."
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          class="composer__input"
-          :disabled="chatting"
-          @keydown="onComposerKeydown"
+          :max-rows="6"
+          :show-model-picker="true"
+          :models="platformModels"
+          :model-picker-disabled="!modelPickerEnabled"
+          :auto-hint="autoModelHint"
+          v-model:selected-model-key="selectedModelKey"
+          :attachment-items="composerAttachmentItems"
+          @send="onComposerSend"
+          @stop="stopGeneration"
+          @remove-attachment="removeComposerAttachment"
+          @file-change="onFileSelected"
         />
-        <div v-if="composerAttachments.length" class="composer__files">
-          <div v-for="file in composerAttachments" :key="file.id" class="composer-file">
-            <img v-if="file.previewUrl" :src="file.previewUrl" alt="" class="composer-file__thumb" />
-            <t-icon v-else name="file-1" size="18px" />
-            <span class="composer-file__name">{{ file.uploading ? '正在上传…' : file.name }}</span>
-            <button type="button" class="composer-file__remove" aria-label="移除文件" @click="removeComposerAttachment(file.id)">
-              <t-icon name="close" size="14px" />
-            </button>
-          </div>
-        </div>
-        <input
-          ref="activeFileInputRef"
-          type="file"
-          class="composer__file-input"
-          accept=".txt,.md,.json,.csv,.log,.png,.jpg,.jpeg,text/plain,image/png,image/jpeg"
-          @change="onFileSelected"
-        />
-        <div class="composer__toolbar">
-          <div class="composer__left">
-            <t-tooltip content="添加文件" placement="top" theme="light" :show-arrow="false">
-              <t-button variant="text" shape="square" size="small" @click="openActiveFilePicker">
-                <template #icon><t-icon name="add" /></template>
-              </t-button>
-            </t-tooltip>
-          </div>
-          <div class="composer__right">
-            <chat-model-picker
-              v-model="selectedModelKey"
-              :models="platformModels"
-              :disabled="!modelPickerEnabled"
-              :auto-hint="autoModelHint"
-            />
-            <t-button
-              v-if="chatting"
-              variant="outline"
-              size="small"
-              @click="stopGeneration"
-            >
-              停止生成
-            </t-button>
-            <t-button
-              v-else
-              class="composer__send"
-              :class="{ 'composer__send--ready': canSendMessage }"
-              shape="circle"
-              :disabled="!canSendMessage"
-              @click="sendChat()"
-            >
-              <template #icon><t-icon name="chevron-up" /></template>
-            </t-button>
-          </div>
-        </div>
-      </div>
       </chat-composer-shell>
       </div>
 
@@ -358,17 +252,22 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
+import { ChatMessage, type TdAttachmentItem } from '@tdesign-vue-next/chat'
+import BoxChatSender from '@/components/BoxChatSender.vue'
 import ChatComposerShell from '@/components/ChatComposerShell.vue'
 import OpsNoticeBar from '@/components/OpsNoticeBar.vue'
 import OpsChatBanner from '@/components/OpsChatBanner.vue'
-import ChatMarkdown from '@/components/ChatMarkdown.vue'
-import ChatModelPicker from '@/components/ChatModelPicker.vue'
 import { parseUserContent } from '@/utils/chatContent'
+import {
+  toChatUiContent,
+  toChatUiRole,
+  toChatUiStatus,
+  userMessageImages,
+} from '@/utils/chatMessageAdapter'
 import { extractApiError } from '@/api/apiError'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { uploadImageAsset } from '@/api/asset'
-import { appPreferences } from '@/composables/useAppPreferences'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSuggestions'
@@ -426,8 +325,6 @@ const composerText = ref('')
 const composerAttachments = ref<ComposerAttachment[]>([])
 const messages = ref<MessageVO[]>([])
 const chatListRef = ref<HTMLElement | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const activeFileInputRef = ref<HTMLInputElement | null>(null)
 const listening = ref(false)
 
 interface ComposerAttachment {
@@ -545,6 +442,16 @@ const attachmentsReady = computed(() =>
   ),
 )
 const attachmentsUploading = computed(() => composerAttachments.value.some((item) => item.uploading))
+
+const composerAttachmentItems = computed<TdAttachmentItem[]>(() =>
+  composerAttachments.value.map((file) => ({
+    key: file.id,
+    name: file.name,
+    url: file.previewUrl || file.remoteUrl,
+    status: file.uploading ? 'progress' : 'success',
+    description: file.uploading ? '上传中' : undefined,
+  })),
+)
 
 const canSendNewChat = computed(
   () =>
@@ -945,31 +852,14 @@ async function regenerateReply(index: number) {
   }
 }
 
-function onComposerKeydown(_value: string, context: { e: KeyboardEvent }) {
-  const event = context.e
-  if (chatting.value || event.key !== 'Enter') return
-
-  const modifier = event.ctrlKey || event.metaKey
-  const shouldSend = appPreferences.sendWithEnter
-    ? !event.shiftKey && !modifier
-    : modifier && !event.shiftKey
-
-  if (!shouldSend) return
-
-  event.preventDefault()
+function onComposerSend(value: string) {
+  if (chatting.value) return
+  composerText.value = value
   if (conversationId.value) {
-    sendChat()
+    void sendChat()
   } else {
-    startNewChat(composerText.value)
+    void startNewChat(value)
   }
-}
-
-function openFilePicker() {
-  fileInputRef.value?.click()
-}
-
-function openActiveFilePicker() {
-  activeFileInputRef.value?.click()
 }
 
 function buildComposerPayload(raw?: string) {
@@ -1229,39 +1119,23 @@ useReloadOnWorkspaceChange(async () => {
 }
 
 .composer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
 }
 
-.composer-stack--ops {
+.composer-stack__ops :deep(.ops-notice) {
   border: 1px solid var(--box-border);
-  border-radius: 24px;
-  background: var(--box-surface);
-  padding: 10px;
+  border-radius: 16px;
+  min-height: 36px;
+  padding: 8px 12px;
+  background: var(--box-shell);
   box-shadow: var(--box-shadow-card);
 }
 
-.composer-stack--ops :deep(.ops-notice) {
-  border: none;
-  border-radius: 16px;
-  min-height: 36px;
-  margin-bottom: 4px;
-  padding: 8px 12px;
-  background: var(--box-shell);
-}
-
-.composer-stack--ops :deep(.ops-notice--promo) {
+.composer-stack__ops :deep(.ops-notice--promo) {
   background: var(--td-warning-color-1);
-}
-
-.composer-stack--ops .composer {
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 4px 4px 2px;
-}
-
-.composer-stack--ops .composer:focus-within {
-  box-shadow: none;
 }
 
 .composer {
@@ -1604,12 +1478,31 @@ useReloadOnWorkspaceChange(async () => {
   overflow-y: auto;
 }
 
+.chat-active__title-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .chat-active__title {
   font-size: 13px;
   color: var(--box-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.chat-active__disclaimer {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--box-muted);
+  opacity: 0.85;
 }
 
 .chat-messages {
@@ -1622,6 +1515,30 @@ useReloadOnWorkspaceChange(async () => {
   gap: 16px;
   width: 100%;
   box-sizing: border-box;
+}
+
+.chat-messages--td {
+  gap: 20px;
+}
+
+.chat-message-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.chat-message-td__actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chat-message-td__actions .t-button:last-child {
+  margin-right: 0;
+}
+
+.chat-message-td__actions .t-tooltip:last-of-type .t-button {
+  margin-right: 0;
 }
 
 .chat-message {
