@@ -27,3 +27,7 @@ export interface OpsPlacementVO {
 export function fetchOpsPlacements(slot?: OpsSlot) {
   return http.get<Result<OpsPlacementVO[]>>('/ops/placements', { params: slot ? { slot } : undefined })
 }
+
+export function trackOpsPlacement(id: number, event: 'impression' | 'click' = 'impression') {
+  return http.post<Result<void>>(`/ops/placements/${id}/track`, null, { params: { event } })
+}

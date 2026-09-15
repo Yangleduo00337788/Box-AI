@@ -1,6 +1,6 @@
 :root {
   --box-bg: #f5f6f7;
-  --box-sidebar-bg: rgb(245, 246, 247);
+  --box-sidebar-bg: rgb(247, 247, 245);
   --box-surface: #ffffff;
   --box-ink: var(--td-text-color-primary);
   --box-muted: var(--td-text-color-secondary);

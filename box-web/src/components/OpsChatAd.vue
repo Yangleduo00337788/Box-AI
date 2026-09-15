@@ -7,7 +7,7 @@
       :navigation="items.length > 1 ? { showSlideBtn: 'never', type: 'dots' } : { showSlideBtn: 'never' }"
     >
       <t-swiper-item v-for="item in items.slice(0, 3)" :key="item.id">
-        <button type="button" class="ops-sidebar-ad__slide" @click="openLink(item.linkUrl)">
+        <button type="button" class="ops-sidebar-ad__slide" @click="openLink(item.linkUrl, item.id)">
           <img :src="item.imageUrl" :alt="item.title" />
         </button>
       </t-swiper-item>

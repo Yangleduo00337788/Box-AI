@@ -44,7 +44,8 @@
           @change="onUpload"
         />
         <t-button theme="primary" :loading="uploading" @click="fileRef?.click()">上传文档</t-button>
-        <span class="upload-hint">支持 TXT、MD、PDF、DOCX</span>
+        <t-button variant="outline" @click="urlVisible = true">从 URL 导入</t-button>
+        <span class="upload-hint">支持 TXT、MD、PDF、DOCX 或网页 URL</span>
       </div>
       <t-table row-key="id" :data="documents" :columns="docColumns" size="small" :bordered="true" stripe>
         <template #empty><t-empty description="暂无文档" /></template>
@@ -117,6 +118,22 @@
         <t-empty v-else description="暂无分块数据" />
       </t-loading>
     </t-drawer>
+
+    <t-dialog
+      v-model:visible="urlVisible"
+      header="从 URL 导入"
+      :confirm-btn="{ content: '导入', loading: urlImporting }"
+      @confirm="submitUrlImport"
+    >
+      <t-form label-width="88px">
+        <t-form-item label="网页地址">
+          <t-input v-model="importUrl" placeholder="https://example.com/docs/guide" />
+        </t-form-item>
+        <t-form-item label="同步周期">
+          <t-input v-model="importCron" placeholder="可选，如 0 0 * * *" />
+        </t-form-item>
+      </t-form>
+    </t-dialog>
   </div>
 </template>
 
@@ -136,6 +153,7 @@ import {
   listKnowledgeBases,
   listDocumentChunks,
   listKnowledgeDocuments,
+  importKnowledgeUrl,
   retryKnowledgeDocument,
   searchKnowledge,
   testKnowledgeAnswer,
@@ -152,6 +170,10 @@ const { can } = usePermission()
 const loading = ref(false)
 const saving = ref(false)
 const uploading = ref(false)
+const urlVisible = ref(false)
+const urlImporting = ref(false)
+const importUrl = ref('')
+const importCron = ref('')
 const items = ref<KnowledgeBaseVO[]>([])
 const documents = ref<KnowledgeDocumentVO[]>([])
 const createVisible = ref(false)
@@ -337,6 +359,26 @@ async function onUpload(e: Event) {
     uploading.value = false
     input.value = ''
   }
+}
+
+async function submitUrlImport() {
+  if (!activeKb.value || !importUrl.value.trim()) {
+    MessagePlugin.warning('请输入 URL')
+    return false
+  }
+  urlImporting.value = true
+  try {
+    await importKnowledgeUrl(activeKb.value.id, importUrl.value.trim(), importCron.value.trim() || undefined)
+    MessagePlugin.success('已开始从 URL 导入')
+    urlVisible.value = false
+    importUrl.value = ''
+    importCron.value = ''
+    await refreshDocuments()
+    await load()
+  } finally {
+    urlImporting.value = false
+  }
+  return true
 }
 
 function remove(item: KnowledgeBaseVO) {

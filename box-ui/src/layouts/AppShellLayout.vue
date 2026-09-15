@@ -276,6 +276,7 @@ function onSearch() {
 .app-layout--consumer .sidebar {
   width: 260px;
   min-width: 260px;
+  background: var(--box-sidebar-bg);
   transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

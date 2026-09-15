@@ -52,6 +52,13 @@ export function uploadKnowledgeDocument(knowledgeBaseId: number, file: File) {
   })
 }
 
+export function importKnowledgeUrl(knowledgeBaseId: number, url: string, syncCron?: string) {
+  return http.post<Result<KnowledgeDocumentVO>>(`/knowledge-bases/${knowledgeBaseId}/documents/import-url`, {
+    url,
+    syncCron,
+  })
+}
+
 export interface KnowledgeSearchHit {
   chunkId: number
   documentId: number

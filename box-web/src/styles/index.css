@@ -1,9 +1,9 @@
 :root {
   --box-bg: #ffffff;
   --box-surface: #ffffff;
-  --box-shell: #f5f6f8;
-  --box-sidebar: #f5f6f8;
-  --box-sidebar-bg: #f5f6f8;
+  --box-shell: rgb(247, 247, 245);
+  --box-sidebar: rgb(247, 247, 245);
+  --box-sidebar-bg: rgb(247, 247, 245);
   --box-ink: var(--td-text-color-primary);
   --box-muted: var(--td-text-color-secondary);
   --box-border: rgba(0, 0, 0, 0.06);

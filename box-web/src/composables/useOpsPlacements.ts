@@ -1,8 +1,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchOpsPlacements, type OpsPlacementVO, type OpsSlot } from '@/api/ops'
+import { fetchOpsPlacements, trackOpsPlacement, type OpsPlacementVO, type OpsSlot } from '@/api/ops'
 
 const STORAGE_KEY = 'box.ops.dismissed'
+const TRACKED_IMPRESSIONS_KEY = 'box.ops.trackedImpressions'
 const placements = ref<OpsPlacementVO[]>([])
 const dismissedIds = ref<number[]>(readDismissed())
 let loaded = false
@@ -20,6 +21,25 @@ function readDismissed(): number[] {
 
 function persistDismissed() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(dismissedIds.value))
+}
+
+function readTrackedImpressions(): Set<number> {
+  try {
+    const raw = sessionStorage.getItem(TRACKED_IMPRESSIONS_KEY)
+    const parsed = raw ? (JSON.parse(raw) as number[]) : []
+    return new Set(parsed.filter((id) => Number.isFinite(id)))
+  } catch {
+    return new Set()
+  }
+}
+
+const trackedImpressions = readTrackedImpressions()
+
+function markImpression(id: number) {
+  if (trackedImpressions.has(id)) return
+  trackedImpressions.add(id)
+  sessionStorage.setItem(TRACKED_IMPRESSIONS_KEY, JSON.stringify([...trackedImpressions]))
+  void trackOpsPlacement(id, 'impression').catch(() => undefined)
 }
 
 function visible(item: OpsPlacementVO) {
@@ -49,6 +69,11 @@ export function useOpsPlacements(slot?: OpsSlot) {
         const { data } = await fetchOpsPlacements()
         placements.value = data.data || []
         loaded = true
+        for (const item of placements.value) {
+          if ((!slot || item.slot === slot) && visible(item)) {
+            markImpression(item.id)
+          }
+        }
       } catch {
         placements.value = []
       } finally {
@@ -66,7 +91,10 @@ export function useOpsPlacements(slot?: OpsSlot) {
     }
   }
 
-  function openLink(url?: string) {
+  function openLink(url?: string, placementId?: number) {
+    if (placementId) {
+      void trackOpsPlacement(placementId, 'click').catch(() => undefined)
+    }
     if (!url) return
     if (url.startsWith('/')) {
       void router.push(url)
