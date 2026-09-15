@@ -1,6 +1,7 @@
 <template>
   <div class="settings-page">
     <h1 class="settings-page__title">隐私与协议</h1>
+    <p class="settings-page__desc">了解我们如何处理你的数据，以及使用 Box 需遵守的条款。</p>
     <t-loading :loading="loading" size="small">
       <div v-if="content" class="settings-card legal-card">
         <section class="legal-section">
@@ -38,18 +39,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.settings-page__title {
-  margin: 0 0 24px;
-  font: var(--td-font-title-large);
-}
-
-.settings-card {
-  max-width: 720px;
-  padding: 28px;
-  border-radius: 16px;
-  background: #f7f8fa;
-}
-
 .legal-section {
   margin-bottom: 24px;
 }

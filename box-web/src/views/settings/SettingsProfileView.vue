@@ -1,7 +1,9 @@
 <template>
   <div class="settings-page">
     <h1 class="settings-page__title">个人信息</h1>
-    <div class="profile-card">
+    <p class="settings-page__desc">头像和显示名称会出现在对话、团队与工作空间菜单中。</p>
+
+    <section class="settings-card profile-card">
       <image-picker
         :model-value="auth.user?.avatarUrl"
         :fallback-text="avatarText"
@@ -13,9 +15,6 @@
         <t-form-item label="显示名称" name="nickname" required-mark>
           <t-input v-model="form.nickname" placeholder="给你自己起个名字" maxlength="64" />
         </t-form-item>
-        <t-form-item label="用户名">
-          <t-input :value="auth.user?.username" disabled />
-        </t-form-item>
         <t-form-item label="个性签名">
           <t-textarea
             v-model="form.bio"
@@ -24,25 +23,25 @@
             :autosize="{ minRows: 3, maxRows: 4 }"
           />
         </t-form-item>
-        <t-form-item label="所属企业">
-          <t-input :value="auth.tenant?.name || '—'" disabled />
-        </t-form-item>
-        <t-form-item label="企业身份">
-          <t-input :value="roleLabel" disabled />
-        </t-form-item>
-        <t-form-item label="用户 ID">
-          <t-input :value="String(auth.user?.id || '')" disabled>
-            <template #suffix>
-              <t-button variant="text" size="small" @click="copyId">复制</t-button>
-            </template>
-          </t-input>
-        </t-form-item>
         <div class="profile-card__actions">
           <t-button variant="outline" @click="resetForm">取消</t-button>
           <t-button theme="primary" :loading="saving" @click="save">保存</t-button>
         </div>
       </t-form>
-    </div>
+    </section>
+
+    <section class="settings-card">
+      <h2 class="settings-card__heading">账号信息</h2>
+      <t-descriptions :column="1" item-layout="horizontal">
+        <t-descriptions-item label="用户名">{{ auth.user?.username || '—' }}</t-descriptions-item>
+        <t-descriptions-item label="所属企业">{{ auth.tenant?.name || '—' }}</t-descriptions-item>
+        <t-descriptions-item label="当前空间角色">{{ roleLabel }}</t-descriptions-item>
+        <t-descriptions-item label="用户 ID">
+          <span>{{ auth.user?.id || '—' }}</span>
+          <t-button variant="text" size="small" @click="copyId">复制</t-button>
+        </t-descriptions-item>
+      </t-descriptions>
+    </section>
   </div>
 </template>
 
@@ -107,27 +106,10 @@ async function save() {
 </script>
 
 <style scoped>
-.profile-page__title {
-  margin: 0 0 24px;
-  font: var(--td-font-title-large);
-  color: var(--box-ink);
-}
-
 .profile-card {
   display: flex;
   align-items: flex-start;
   gap: 32px;
-  width: 100%;
-  padding: 28px;
-  border-radius: 16px;
-  background: #f7f8fa;
-}
-
-.profile-card__avatar {
-  flex-shrink: 0;
-  background: var(--td-brand-color);
-  color: #fff;
-  font-weight: 600;
 }
 
 .profile-card__form {
@@ -140,5 +122,16 @@ async function save() {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 8px;
+}
+
+.settings-card__heading {
+  margin: 0 0 16px;
+  font: var(--td-font-title-small);
+}
+
+@media (max-width: 640px) {
+  .profile-card {
+    flex-direction: column;
+  }
 }
 </style>

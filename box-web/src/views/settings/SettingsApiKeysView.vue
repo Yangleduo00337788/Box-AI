@@ -86,6 +86,7 @@ import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import { extractApiError } from '@/api/apiError'
 import { usePermission } from '@/composables/usePermission'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { PermissionCodes } from '@/constants/permissions'
 import {
   createApiKey,
@@ -209,32 +210,15 @@ function removeKey(id: number) {
 }
 
 onMounted(loadKeys)
+useReloadOnWorkspaceChange(loadKeys)
 </script>
 
 <style scoped>
-.settings-page__title {
-  margin: 0 0 8px;
-  font: var(--td-font-title-large);
-}
-
-.settings-page__desc {
-  margin: 0 0 24px;
-  color: var(--box-muted);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
 .settings-page__desc code {
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--td-bg-color-secondarycontainer, var(--box-hover));
   font-size: 13px;
-}
-
-.settings-card {
-  padding: 24px;
-  border-radius: 16px;
-  background: #f7f8fa;
 }
 
 .toolbar {
@@ -245,7 +229,7 @@ onMounted(loadKeys)
   margin-top: 16px;
   padding: 12px;
   border-radius: 8px;
-  background: #fff;
+  background: var(--td-bg-color-container);
   border: 1px solid var(--box-border);
   word-break: break-all;
 }

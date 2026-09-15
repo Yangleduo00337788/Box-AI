@@ -45,6 +45,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import { extractApiError } from '@/api/apiError'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { listAuditLogs, type AuditLogVO } from '@/api/audit'
 
 const loading = ref(false)
@@ -103,6 +104,7 @@ function onPageChange(pageInfo: { current: number; pageSize: number }) {
 }
 
 onMounted(loadLogs)
+useReloadOnWorkspaceChange(loadLogs)
 </script>
 
 <style scoped>

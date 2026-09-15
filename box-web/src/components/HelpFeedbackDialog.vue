@@ -13,7 +13,7 @@
           <h3 class="help-dialog__title">快捷操作</h3>
           <ul class="help-dialog__list">
             <li><kbd>Ctrl</kbd> + <kbd>K</kbd> 打开全局搜索</li>
-            <li><kbd>Enter</kbd> 发送消息（可在通用设置中关闭）</li>
+            <li><kbd>Enter</kbd> 发送消息（可在偏好设置中关闭）</li>
           </ul>
         </section>
 

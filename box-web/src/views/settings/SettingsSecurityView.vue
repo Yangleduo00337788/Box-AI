@@ -1,50 +1,45 @@
 <template>
   <div class="settings-page">
     <h1 class="settings-page__title">账号与安全</h1>
-    <div class="settings-card">
-      <t-form label-align="top">
-        <t-form-item label="登录邮箱">
-          <t-input :value="auth.user?.email || '—'" disabled />
+    <p class="settings-page__desc">管理登录邮箱与密码。切换工作空间请使用左下角账号菜单。</p>
+
+    <section class="settings-card">
+      <h2 class="settings-card__heading">登录信息</h2>
+      <t-descriptions :column="1">
+        <t-descriptions-item label="登录邮箱">{{ auth.user?.email || '—' }}</t-descriptions-item>
+        <t-descriptions-item label="用户名">{{ auth.user?.username || '—' }}</t-descriptions-item>
+        <t-descriptions-item label="所属企业">{{ auth.tenant?.name || '—' }}</t-descriptions-item>
+      </t-descriptions>
+    </section>
+
+    <section class="settings-card">
+      <h2 class="settings-card__heading">修改密码</h2>
+      <t-form label-align="top" class="password-form">
+        <t-form-item label="当前密码">
+          <t-input v-model="passwordForm.oldPassword" type="password" placeholder="输入当前密码" />
         </t-form-item>
-        <t-form-item label="用户名">
-          <t-input :value="auth.user?.username || '—'" disabled />
+        <t-form-item label="新密码">
+          <t-input v-model="passwordForm.newPassword" type="password" placeholder="至少 6 位" />
         </t-form-item>
-        <t-form-item label="所属企业">
-          <t-input :value="auth.tenant?.name || '—'" disabled />
-        </t-form-item>
-        <t-form-item label="当前工作空间">
-          <t-input :value="auth.currentWorkspace?.name || '—'" disabled />
+        <t-form-item label="确认新密码">
+          <t-input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码" />
         </t-form-item>
       </t-form>
+      <t-button theme="primary" :loading="changingPassword" @click="submitPassword">更新密码</t-button>
+    </section>
 
-      <section class="password-section">
-        <h2 class="password-section__title">修改密码</h2>
-        <t-form label-align="top">
-          <t-form-item label="当前密码">
-            <t-input v-model="passwordForm.oldPassword" type="password" placeholder="输入当前密码" />
-          </t-form-item>
-          <t-form-item label="新密码">
-            <t-input v-model="passwordForm.newPassword" type="password" placeholder="至少 6 位" />
-          </t-form-item>
-          <t-form-item label="确认新密码">
-            <t-input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码" />
-          </t-form-item>
-        </t-form>
-      </section>
-
-      <div class="security-actions">
-        <t-button theme="primary" :loading="changingPassword" @click="submitPassword">更新密码</t-button>
-        <t-button variant="outline" @click="router.push('/settings/profile')">编辑个人信息</t-button>
-        <t-button theme="danger" variant="outline" @click="logout">退出登录</t-button>
-      </div>
-    </div>
+    <section class="settings-card settings-card--danger">
+      <h2 class="settings-card__heading">退出登录</h2>
+      <p class="settings-card__hint">退出后需要重新登录才能访问此工作台。</p>
+      <t-button theme="danger" variant="outline" @click="confirmLogout">退出登录</t-button>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { changePassword } from '@/api/auth'
 import { extractApiError } from '@/api/apiError'
 import { useAuthStore } from '@/stores/auth'
@@ -88,42 +83,39 @@ async function submitPassword() {
   }
 }
 
-function logout() {
-  auth.logout()
-  MessagePlugin.success('已退出登录')
-  router.push('/login')
+function confirmLogout() {
+  const dialog = DialogPlugin.confirm({
+    header: '退出登录',
+    body: '确定退出当前账号吗？',
+    confirmBtn: '退出',
+    theme: 'danger',
+    onConfirm: () => {
+      auth.logout()
+      dialog.hide()
+      MessagePlugin.success('已退出登录')
+      void router.push('/login')
+    },
+  })
 }
 </script>
 
 <style scoped>
-.settings-page__title {
-  margin: 0 0 24px;
-  font: var(--td-font-title-large);
-}
-
-.settings-card {
-  max-width: 720px;
-  padding: 24px;
-  border-radius: 16px;
-  background: #f7f8fa;
-}
-
-.password-section {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--box-border);
-}
-
-.password-section__title {
-  margin: 0 0 12px;
+.settings-card__heading {
+  margin: 0 0 16px;
   font: var(--td-font-title-small);
 }
 
-.security-actions {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 24px;
+.settings-card__hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--box-muted);
+}
+
+.password-form {
+  max-width: 420px;
+}
+
+.settings-card--danger {
+  border-color: var(--td-error-color-3);
 }
 </style>

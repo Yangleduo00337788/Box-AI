@@ -60,6 +60,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import { extractApiError } from '@/api/apiError'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import {
   createRole,
   deleteRole,
@@ -158,25 +159,10 @@ async function removeRole(id: number) {
 }
 
 onMounted(loadData)
+useReloadOnWorkspaceChange(loadData)
 </script>
 
 <style scoped>
-.settings-page__title {
-  margin: 0 0 8px;
-  font: var(--td-font-title-large);
-}
-
-.settings-page__desc {
-  margin: 0 0 24px;
-  color: var(--box-muted);
-}
-
-.settings-card {
-  padding: 24px;
-  border-radius: 16px;
-  background: #f7f8fa;
-}
-
 .toolbar {
   margin-bottom: 16px;
 }

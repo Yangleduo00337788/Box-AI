@@ -113,10 +113,30 @@ onMounted(() => {
 })
 
 watch(
+  () => route.fullPath,
+  (path) => {
+    if (!path.startsWith('/settings')) {
+      sessionStorage.setItem('box.settingsReturnPath', route.path)
+    }
+  },
+  { immediate: true },
+)
+
+watch(
   () => auth.currentWorkspaceId,
-  () => {
-    if (auth.token) {
-      void permissionStore.load(true)
+  (workspaceId, previousId) => {
+    if (!auth.token || !workspaceId || workspaceId === previousId) {
+      return
+    }
+    void permissionStore.load(true)
+    void refreshAgents()
+    const path = route.path
+    if (/^\/chat\/\d+/.test(path)) {
+      void router.replace('/chat')
+    } else if (/^\/agents\/\d+/.test(path)) {
+      void router.replace('/agents')
+    } else if (/^\/workflows\/\d+/.test(path)) {
+      void router.replace('/workflows')
     }
   },
 )

@@ -1,6 +1,7 @@
 <template>
   <div class="settings-page">
     <h1 class="settings-page__title">关于盒子</h1>
+    <p class="settings-page__desc">产品信息与版本。</p>
     <t-loading :loading="loading" size="small">
       <div v-if="content" class="settings-card about-card">
         <div class="about-card__brand">{{ content.about.productName }}</div>
@@ -11,8 +12,7 @@
           <div><dt>定位</dt><dd>{{ content.about.positioning }}</dd></div>
         </dl>
         <t-space>
-          <t-button variant="outline" @click="router.push('/legal/terms')">用户协议</t-button>
-          <t-button variant="outline" @click="router.push('/legal/privacy')">隐私政策</t-button>
+          <t-button variant="outline" @click="router.push('/settings/legal')">隐私与协议</t-button>
         </t-space>
       </div>
     </t-loading>
@@ -40,18 +40,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.settings-page__title {
-  margin: 0 0 24px;
-  font: var(--td-font-title-large);
-}
-
-.settings-card {
-  max-width: 720px;
-  padding: 28px;
-  border-radius: 16px;
-  background: #f7f8fa;
-}
-
 .about-card__brand {
   font-size: 28px;
   font-weight: 700;
