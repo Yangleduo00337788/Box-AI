@@ -44,6 +44,7 @@ import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
 import { useResourceManageBack } from '@/composables/useResourceManageBack'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { PermissionCodes } from '@/constants/permissions'
 import { createWorkflow, listWorkflows, type WorkflowVO } from '@/api/workflow'
@@ -96,6 +97,7 @@ function openEditor(item: WorkflowVO) {
 }
 
 load()
+useReloadOnWorkspaceChange(load)
 </script>
 
 <style scoped>

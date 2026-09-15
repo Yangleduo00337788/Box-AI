@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { MessagePlugin, Select } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
@@ -286,6 +286,17 @@ onMounted(() => {
     loadWorkspaceMembers()
   }
 })
+
+watch(
+  () => auth.currentWorkspaceId,
+  () => {
+    if (canManageWorkspace.value) {
+      loadWorkspaceMembers()
+    } else {
+      workspaceMembers.value = []
+    }
+  },
+)
 </script>
 
 <style scoped>

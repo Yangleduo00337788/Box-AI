@@ -9,10 +9,7 @@ export const usePermissionStore = defineStore('permission', () => {
   const loading = ref(false)
 
   async function load(force = false) {
-    if (loading.value) {
-      return
-    }
-    if (loaded.value && !force) {
+    if (!force && (loading.value || loaded.value)) {
       return
     }
     loading.value = true

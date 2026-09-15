@@ -16,7 +16,10 @@
           >
             {{ avatarText }}
           </t-avatar>
-          <span v-if="!collapsed" class="user-pill__name">{{ userName }}</span>
+          <span v-if="!collapsed" class="user-pill__meta">
+            <span class="user-pill__name">{{ userName }}</span>
+            <span class="user-pill__workspace">{{ currentWorkspaceName }}</span>
+          </span>
         </button>
 
         <template #content>
@@ -33,9 +36,48 @@
             </div>
 
             <button type="button" class="user-menu__create" @click="onCreateWorkspace">
-              <t-icon name="user-add" />
+              <t-icon name="folder-add" />
               创建工作空间
             </button>
+
+            <div v-if="displayWorkspaces.length" class="user-menu__workspaces">
+              <p class="user-menu__label">工作空间</p>
+              <div
+                v-for="item in displayWorkspaces"
+                :key="item.id"
+                class="user-menu__workspace-row"
+                :class="{ 'user-menu__item--active': String(item.id) === auth.currentWorkspaceId }"
+              >
+                <button type="button" class="user-menu__item user-menu__item--workspace" @click="onSwitchWorkspace(item)">
+                  <t-avatar
+                    size="20px"
+                    shape="circle"
+                    class="user-menu__workspace-avatar"
+                    :image="item.avatarUrl || undefined"
+                  >
+                    {{ item.name.slice(0, 1) }}
+                  </t-avatar>
+                  <span class="user-menu__workspace-name">{{ item.name }}</span>
+                  <t-icon v-if="isWorkspacePinned(item.id)" name="pin" class="user-menu__pin" />
+                  <t-icon
+                    v-if="String(item.id) === auth.currentWorkspaceId"
+                    name="check"
+                    class="user-menu__check"
+                  />
+                </button>
+                <t-dropdown
+                  :options="workspaceActionOptions(item)"
+                  trigger="click"
+                  placement="right-top"
+                  :popup-props="{ zIndex: 5700, attach: 'body' }"
+                  @click="(option) => onWorkspaceAction(item, option)"
+                >
+                  <button type="button" class="user-menu__more" aria-label="工作空间操作" @click.stop>
+                    <t-icon name="more" />
+                  </button>
+                </t-dropdown>
+              </div>
+            </div>
 
             <div class="user-menu__section">
               <button type="button" class="user-menu__item" @click="openDialog('overview')">
@@ -98,7 +140,12 @@
       </t-popup>
     </div>
 
-    <create-workspace-dialog v-model:visible="workspaceDialogVisible" />
+    <create-workspace-dialog
+      v-model:visible="workspaceDialogVisible"
+      :workspace="editingWorkspace"
+      @created="onWorkspaceCreated"
+      @updated="onWorkspaceUpdated"
+    />
     <help-feedback-dialog v-model:visible="helpDialogVisible" />
 
     <t-dialog
@@ -155,6 +202,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { MessagePlugin } from 'tdesign-vue-next'
+import type { DropdownOption } from 'tdesign-vue-next'
+import type { WorkspaceVO } from '@/api/auth'
+import { deleteWorkspace } from '@/api/workspace'
+import { confirmResourceDelete } from '@/composables/useResourceDelete'
+import { useWorkspacePins } from '@/composables/useWorkspacePins'
 import AnalyticsView from '@/views/AnalyticsView.vue'
 import CreateWorkspaceDialog from '@/components/CreateWorkspaceDialog.vue'
 import DashboardView from '@/views/DashboardView.vue'
@@ -180,10 +233,18 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const auth = useAuthStore()
+const { isWorkspacePinned, toggleWorkspacePin } = useWorkspacePins()
 const isEnterprise = computed(() => auth.tenant?.tenantType === 'ENTERPRISE')
+const currentWorkspaceName = computed(() => auth.currentWorkspace?.name || '未选择工作空间')
+const displayWorkspaces = computed(() => {
+  const pinned = auth.workspaces.filter((item) => isWorkspacePinned(item.id))
+  const rest = auth.workspaces.filter((item) => !isWorkspacePinned(item.id))
+  return [...pinned, ...rest]
+})
 
 const menuVisible = ref(false)
 const workspaceDialogVisible = ref(false)
+const editingWorkspace = ref<WorkspaceVO | null>(null)
 const helpDialogVisible = ref(false)
 const overviewVisible = ref(false)
 const analyticsVisible = ref(false)
@@ -219,7 +280,84 @@ function onHelp() {
 
 function onCreateWorkspace() {
   menuVisible.value = false
+  editingWorkspace.value = null
   workspaceDialogVisible.value = true
+}
+
+function onWorkspaceCreated() {
+  closeWorkspaceOverlays()
+}
+
+function onWorkspaceUpdated() {
+  closeWorkspaceOverlays()
+}
+
+function onSwitchWorkspace(item: WorkspaceVO) {
+  closeWorkspaceOverlays()
+  if (String(item.id) === auth.currentWorkspaceId) {
+    return
+  }
+  auth.setWorkspace(item.id)
+  MessagePlugin.success(`已切换到「${item.name}」`)
+}
+
+function canManageWorkspace(item: WorkspaceVO) {
+  return item.roleCode === 'TENANT_ADMIN'
+}
+
+function workspaceActionOptions(item: WorkspaceVO): DropdownOption[] {
+  const options: DropdownOption[] = [
+    { content: isWorkspacePinned(item.id) ? '取消置顶' : '置顶', value: 'pin' },
+  ]
+  if (canManageWorkspace(item)) {
+    options.push({ content: '编辑', value: 'edit' })
+    options.push({ content: '删除', value: 'delete', theme: 'error' })
+  }
+  return options
+}
+
+function onWorkspaceAction(item: WorkspaceVO, option: DropdownOption) {
+  const value = String(option.value ?? '')
+  if (value === 'pin') {
+    toggleWorkspacePin(item.id)
+    return
+  }
+  if (value === 'edit') {
+    menuVisible.value = false
+    editingWorkspace.value = item
+    workspaceDialogVisible.value = true
+    return
+  }
+  if (value === 'delete') {
+    menuVisible.value = false
+    void removeWorkspace(item)
+  }
+}
+
+async function removeWorkspace(item: WorkspaceVO) {
+  await confirmResourceDelete({
+    header: '删除工作空间',
+    body: `确定删除工作空间「${item.name}」？空间内的智能体、知识库等资源将一并不可访问。`,
+    resourceLabel: '工作空间',
+    onDelete: async () => {
+      await deleteWorkspace(item.id)
+    },
+    onSuccess: async () => {
+      const wasCurrent = String(item.id) === auth.currentWorkspaceId
+      await auth.refreshWorkspaces()
+      if (wasCurrent && auth.workspaces.length > 0) {
+        auth.setWorkspace(auth.workspaces[0].id)
+      }
+      MessagePlugin.success('工作空间已删除')
+    },
+  })
+}
+
+function closeWorkspaceOverlays() {
+  menuVisible.value = false
+  overviewVisible.value = false
+  analyticsVisible.value = false
+  teamVisible.value = false
 }
 
 async function refreshUnread() {
@@ -272,7 +410,7 @@ onUnmounted(() => {
 }
 
 .user-pill:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--box-hover);
 }
 
 .user-pill__avatar {
@@ -286,20 +424,38 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 
-.user-pill__name {
+.user-pill__meta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.user-pill__name,
+.user-pill__workspace {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
+}
+
+.user-pill__name {
   font-size: 14px;
   font-weight: 500;
   color: var(--box-ink);
+}
+
+.user-pill__workspace {
+  font-size: 12px;
+  color: var(--box-muted);
 }
 
 .user-menu {
   width: 260px;
   padding: 12px 0 8px;
   border-radius: 12px;
-  background: #fff;
+  background: var(--box-surface);
   overflow: visible;
 }
 
@@ -324,23 +480,93 @@ onUnmounted(() => {
   width: calc(100% - 32px);
   margin: 0 16px 8px;
   padding: 8px 12px;
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--box-border);
   border-radius: 10px;
-  background: #fff;
-  color: #1f2329;
+  background: var(--box-surface);
+  color: var(--box-ink);
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
 }
 
 .user-menu__create:hover {
-  border-color: #d0d3d6;
-  background: #fafbfc;
+  border-color: var(--box-border);
+  background: var(--box-hover);
+}
+
+.user-menu__workspaces {
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px 8px 8px;
+}
+
+.user-menu__label {
+  margin: 0 8px 4px;
+  font-size: 12px;
+  color: var(--box-muted);
+}
+
+.user-menu__workspace-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.user-menu__item--workspace {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-menu__workspace-avatar {
+  flex-shrink: 0;
+  background: var(--box-ink);
+  color: #fff;
+  font-size: 11px;
+}
+
+.user-menu__workspace-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu__more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--box-muted);
+  cursor: pointer;
+}
+
+.user-menu__more:hover {
+  background: var(--box-hover);
+  color: var(--box-ink);
+}
+
+.user-menu__pin {
+  font-size: 12px;
+  color: var(--box-muted);
+}
+
+.user-menu__check {
+  margin-left: auto;
+  color: var(--td-brand-color);
+}
+
+.user-menu__item--active {
+  background: var(--box-active);
 }
 
 .user-menu__section {
   padding: 4px 8px;
-  border-top: 1px solid #f0f1f2;
+  border-top: 1px solid var(--box-border);
 }
 
 .user-menu__section--last {
@@ -356,7 +582,7 @@ onUnmounted(() => {
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #1f2329;
+  color: var(--box-ink);
   font-size: 14px;
   text-align: left;
   cursor: pointer;
@@ -364,16 +590,16 @@ onUnmounted(() => {
 }
 
 .user-menu__item:hover {
-  background: #f5f6f7;
+  background: var(--box-hover);
 }
 
 .user-menu__item--hint {
-  color: #646a73;
+  color: var(--box-muted);
 }
 
 .user-menu__chevron {
   font-size: 14px;
-  color: #b0b4bc;
+  color: var(--box-muted);
 }
 
 .user-menu :deep(.t-popup) {

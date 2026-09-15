@@ -80,6 +80,7 @@ import { onMounted, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { extractApiError } from '@/api/apiError'
 import { getExecution, getExecutionTrace, listExecutions, type ExecutionVO, type TraceSpanVO } from '@/api/execution'
 
@@ -145,6 +146,7 @@ async function openDetail(context: { row: TableRowData }) {
 }
 
 onMounted(loadExecutions)
+useReloadOnWorkspaceChange(loadExecutions)
 </script>
 
 <style scoped>

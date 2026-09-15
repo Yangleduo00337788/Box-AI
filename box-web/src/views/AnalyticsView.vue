@@ -80,6 +80,7 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import PageHeader from '@/components/PageHeader.vue'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import {
   fetchAnalyticsOverview,
   fetchAnalyticsTrends,
@@ -258,6 +259,7 @@ onMounted(async () => {
     topAgentsChart?.resize()
   }, 80)
 })
+useReloadOnWorkspaceChange(loadData)
 
 onBeforeUnmount(() => {
   executionChart?.dispose()

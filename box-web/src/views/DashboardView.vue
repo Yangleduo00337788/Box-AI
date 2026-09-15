@@ -94,6 +94,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { fetchAnalyticsOverview, type AnalyticsOverviewVO } from '@/api/analytics'
 
 const router = useRouter()
@@ -147,6 +148,7 @@ async function loadOverview() {
 }
 
 onMounted(loadOverview)
+useReloadOnWorkspaceChange(loadOverview)
 </script>
 
 <style scoped>

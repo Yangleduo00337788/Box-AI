@@ -5,6 +5,7 @@ import {
   fetchMe,
   login as loginApi,
   register as registerApi,
+  selectCurrentWorkspace,
   updateProfile as updateProfileApi,
   type AuthVO,
   type RegisterRequest,
@@ -13,6 +14,7 @@ import {
   type WorkspaceVO,
 } from '@/api/auth'
 import { uploadAvatar as uploadAvatarApi } from '@/api/asset'
+import { fetchWorkspaces } from '@/api/workspace'
 
 const TOKEN_KEY = 'box.token'
 const WORKSPACE_KEY = 'box.workspaceId'
@@ -37,17 +39,70 @@ export const useAuthStore = defineStore('auth', () => {
     tenant.value = payload.tenant || null
     workspaces.value = payload.workspaces || []
     localStorage.setItem(TOKEN_KEY, payload.token)
-    if (!currentWorkspaceId.value && workspaces.value.length > 0) {
-      setWorkspace(workspaces.value[0].id)
+    applyWorkspaceSelection(payload.currentWorkspaceId, false)
+  }
+
+  function applyLocalWorkspace(id: number) {
+    currentWorkspaceId.value = String(id)
+    localStorage.setItem(WORKSPACE_KEY, String(id))
+  }
+
+  function applyWorkspaceSelection(preferredId: number | null | undefined, persistRemote: boolean) {
+    const ids = new Set(workspaces.value.map((item) => String(item.id)))
+    const preferred = preferredId != null ? String(preferredId) : ''
+    if (preferred && ids.has(preferred)) {
+      applyLocalWorkspace(Number(preferred))
+      return
+    }
+    if (currentWorkspaceId.value && ids.has(currentWorkspaceId.value)) {
+      if (persistRemote) {
+        void persistCurrentWorkspace(Number(currentWorkspaceId.value))
+      }
+      return
+    }
+    if (workspaces.value.length > 0) {
+      const nextId = workspaces.value[0].id
+      applyLocalWorkspace(nextId)
+      if (persistRemote) {
+        void persistCurrentWorkspace(nextId)
+      }
+      reloadPermissions()
+      return
+    }
+    currentWorkspaceId.value = ''
+    localStorage.removeItem(WORKSPACE_KEY)
+  }
+
+  function reloadPermissions() {
+    const permissionStore = usePermissionStore()
+    permissionStore.reset()
+    void permissionStore.load(true)
+  }
+
+  async function persistCurrentWorkspace(id: number) {
+    try {
+      await selectCurrentWorkspace(id)
+    } catch {
+      /* keep local selection even if sync fails */
     }
   }
 
   function setWorkspace(id: number) {
-    currentWorkspaceId.value = String(id)
-    localStorage.setItem(WORKSPACE_KEY, String(id))
-    const permissionStore = usePermissionStore()
-    permissionStore.reset()
-    void permissionStore.load(true)
+    if (String(id) === currentWorkspaceId.value) {
+      return
+    }
+    applyLocalWorkspace(id)
+    reloadPermissions()
+    void persistCurrentWorkspace(id)
+  }
+
+  async function refreshWorkspaces() {
+    if (!token.value) {
+      return
+    }
+    const { data } = await fetchWorkspaces()
+    workspaces.value = data.data || []
+    applyWorkspaceSelection(Number(currentWorkspaceId.value) || undefined, true)
   }
 
   async function login(account: string, password: string, accountType: 'PERSONAL' | 'ENTERPRISE') {
@@ -72,9 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = data.data.user
     tenant.value = data.data.tenant || null
     workspaces.value = data.data.workspaces || []
-    if (!currentWorkspaceId.value && workspaces.value.length > 0) {
-      setWorkspace(workspaces.value[0].id)
-    }
+    applyWorkspaceSelection(data.data.currentWorkspaceId, true)
   }
 
   async function updateProfile(payload: { nickname?: string; bio?: string; avatarUrl?: string }) {
@@ -108,6 +161,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     hydrate,
+    refreshWorkspaces,
     updateProfile,
     uploadAvatar,
     logout,

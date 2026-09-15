@@ -50,6 +50,8 @@ export interface WorkspaceVO {
   slug: string
   roleCode?: string
   description?: string
+  avatarUrl?: string
+  status?: number
 }
 
 export interface AuthVO {
@@ -57,6 +59,7 @@ export interface AuthVO {
   user: UserVO
   tenant?: TenantSummaryVO | null
   workspaces: WorkspaceVO[]
+  currentWorkspaceId?: number | null
 }
 
 export function login(account: string, password: string, accountType: 'PERSONAL' | 'ENTERPRISE') {
@@ -95,8 +98,8 @@ export function updatePreferences(payload: Partial<UserPreferenceVO>) {
   return http.put<Result<UserPreferenceVO>>('/auth/preferences', payload)
 }
 
-export function fetchWorkspaces() {
-  return http.get<Result<WorkspaceVO[]>>('/workspaces')
+export function selectCurrentWorkspace(workspaceId: number) {
+  return http.put<Result<AuthVO>>('/auth/current-workspace', { workspaceId })
 }
 
 export function fetchHealth() {

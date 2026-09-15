@@ -47,6 +47,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
 import { useResourceManageBack } from '@/composables/useResourceManageBack'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { PermissionCodes } from '@/constants/permissions'
@@ -130,4 +131,5 @@ function remove(item: ToolVO) {
 }
 
 load()
+useReloadOnWorkspaceChange(load)
 </script>

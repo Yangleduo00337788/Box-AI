@@ -89,6 +89,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import TraceSpanTree from '@/components/TraceSpanTree.vue'
 import { extractApiError } from '@/api/apiError'
 import {
@@ -185,6 +186,7 @@ async function selectExecution(ctx: { row: ExecutionVO }) {
 }
 
 onMounted(loadExecutions)
+useReloadOnWorkspaceChange(loadExecutions)
 </script>
 
 <style scoped>

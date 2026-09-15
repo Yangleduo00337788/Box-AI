@@ -179,6 +179,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import {
   createCredential,
   createModel,
@@ -406,6 +407,7 @@ async function runTest() {
 }
 
 onMounted(loadAll)
+useReloadOnWorkspaceChange(loadAll)
 </script>
 
 <style scoped>

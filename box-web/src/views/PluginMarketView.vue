@@ -86,6 +86,7 @@ import {
   type PluginCategoryVO,
 } from '@/api/plugin'
 import { extractApiError } from '@/api/apiError'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { managePathForCategory } from '@/constants/resourceRoutes'
 
 const route = useRoute()
@@ -190,6 +191,10 @@ async function handleInstall(item: PluginCatalogVO) {
 }
 
 onMounted(async () => {
+  await loadCategories()
+  await loadPlugins()
+})
+useReloadOnWorkspaceChange(async () => {
   await loadCategories()
   await loadPlugins()
 })

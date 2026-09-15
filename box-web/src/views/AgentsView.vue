@@ -126,6 +126,7 @@ import {
 import { extractApiError } from '@/api/apiError'
 import { PermissionCodes } from '@/constants/permissions'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
@@ -282,6 +283,9 @@ function removeAgent(item: AgentVO) {
 }
 
 onMounted(async () => {
+  await Promise.all([loadPlatformModels(), loadAgents()])
+})
+useReloadOnWorkspaceChange(async () => {
   await Promise.all([loadPlatformModels(), loadAgents()])
 })
 </script>

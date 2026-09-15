@@ -1,8 +1,23 @@
 import http, { type Result } from './http'
 import type { WorkspaceVO } from './auth'
 
-export function createWorkspace(payload: { name: string; description?: string }) {
+export function fetchWorkspaces() {
+  return http.get<Result<WorkspaceVO[]>>('/workspaces')
+}
+
+export function createWorkspace(payload: { name: string; description?: string; avatarUrl?: string }) {
   return http.post<Result<WorkspaceVO>>('/workspaces', payload)
+}
+
+export function updateWorkspace(
+  id: number,
+  payload: { name: string; description?: string; avatarUrl?: string; status?: number },
+) {
+  return http.put<Result<WorkspaceVO>>(`/workspaces/${id}`, payload)
+}
+
+export function deleteWorkspace(id: number) {
+  return http.delete<Result<void>>(`/workspaces/${id}`)
 }
 
 export function fetchCurrentPermissions() {

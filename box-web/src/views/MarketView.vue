@@ -39,6 +39,7 @@ import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import { enableMarketTemplate, listMarketTemplates, type AgentTemplateVO } from '@/api/market'
+import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 
 const router = useRouter()
 const loading = ref(false)
@@ -69,6 +70,7 @@ async function enable(item: AgentTemplateVO) {
 }
 
 onMounted(loadTemplates)
+useReloadOnWorkspaceChange(loadTemplates)
 </script>
 
 <style scoped>
