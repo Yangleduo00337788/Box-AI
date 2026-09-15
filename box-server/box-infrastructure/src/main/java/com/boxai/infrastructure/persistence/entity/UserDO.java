@@ -26,6 +26,8 @@ public class UserDO {
     private Integer status;
     @Column("user_type")
     private String userType;
+    @Column("platform_admin_role")
+    private String platformAdminRole;
     @Column("last_login_at")
     private LocalDateTime lastLoginAt;
     @Column("created_at")

@@ -45,8 +45,13 @@ public class VerificationCodeService {
         String code = String.format("%06d", random.nextInt(1_000_000));
         String codeKey = CODE_KEY_PREFIX + purpose.name() + ":" + normalized;
         redisService.set(codeKey, code, CODE_TTL);
+        try {
+            verificationEmailSender.send(normalized, purpose, code);
+        } catch (RuntimeException ex) {
+            redisService.delete(codeKey);
+            throw ex;
+        }
         redisService.set(rateKey, "1", RATE_LIMIT);
-        verificationEmailSender.send(normalized, purpose, code);
         log.info("Verification code sent for {} ({})", normalized, purpose);
         return exposeCode ? code : null;
     }

@@ -20,15 +20,21 @@ public class JwtService {
     }
 
     public String generate(Long userId, String username, String userType) {
+        return generate(userId, username, userType, null);
+    }
+
+    public String generate(Long userId, String username, String userType, String sessionId) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
                 .claim("userType", userType)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(properties.getExpireSeconds())))
-                .signWith(key())
-                .compact();
+                .expiration(Date.from(now.plusSeconds(properties.getExpireSeconds())));
+        if (sessionId != null && !sessionId.isBlank()) {
+            builder.claim("sid", sessionId);
+        }
+        return builder.signWith(key()).compact();
     }
 
     public Claims parse(String token) {

@@ -49,6 +49,7 @@ public class AuthApplicationService {
     private final AuditLogService auditLogService;
     private final RateLimitService rateLimitService;
     private final UserPreferenceApplicationService userPreferenceApplicationService;
+    private final UserSessionApplicationService userSessionApplicationService;
 
     public AuthApplicationService(UserRepository userRepository,
                                   WorkspaceApplicationService workspaceApplicationService,
@@ -58,7 +59,8 @@ public class AuthApplicationService {
                                   VerificationCodeService verificationCodeService,
                                   AuditLogService auditLogService,
                                   RateLimitService rateLimitService,
-                                  UserPreferenceApplicationService userPreferenceApplicationService) {
+                                  UserPreferenceApplicationService userPreferenceApplicationService,
+                                  UserSessionApplicationService userSessionApplicationService) {
         this.userRepository = userRepository;
         this.workspaceApplicationService = workspaceApplicationService;
         this.tenantApplicationService = tenantApplicationService;
@@ -68,6 +70,7 @@ public class AuthApplicationService {
         this.auditLogService = auditLogService;
         this.rateLimitService = rateLimitService;
         this.userPreferenceApplicationService = userPreferenceApplicationService;
+        this.userSessionApplicationService = userSessionApplicationService;
     }
 
     @Transactional
@@ -235,7 +238,8 @@ public class AuthApplicationService {
     private AuthVO issue(User user) {
         tenantApplicationService.ensurePrimaryTenantActive(user.getId());
         String userType = user.getUserType() == null ? UserTypes.TENANT_USER : user.getUserType();
-        String token = jwtService.generate(user.getId(), user.getUsername(), userType);
+        String sessionId = userSessionApplicationService.createSession(user.getId());
+        String token = jwtService.generate(user.getId(), user.getUsername(), userType, sessionId);
         List<WorkspaceVO> workspaces = workspaceApplicationService.listMineByUserId(user.getId()).stream()
                 .map(item -> new WorkspaceVO(
                         item.id(),

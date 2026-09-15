@@ -28,6 +28,14 @@ public final class HttpRequestContext {
         return request.getRemoteAddr();
     }
 
+    public static String userAgent() {
+        org.springframework.web.context.request.RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
+            return null;
+        }
+        return servletAttributes.getRequest().getHeader("User-Agent");
+    }
+
     public static String requestId() {
         org.springframework.web.context.request.RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
         if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {

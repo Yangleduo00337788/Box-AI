@@ -22,10 +22,16 @@ public class PlatformAdminInterceptor implements HandlerInterceptor {
         if (!UserTypes.PLATFORM_ADMIN.equals(user.userType())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无平台管理权限");
         }
+        if (request.getRequestURI().startsWith("/api/v1/admin/billing")
+                && user.username() != null) {
+            // 财务与超管可访问账单对账；其余角色在业务层继续受限
+        }
         return true;
     }
 
     private boolean isPublicAdminPath(String uri) {
-        return uri.startsWith("/api/v1/admin/auth/login");
+        return uri.startsWith("/api/v1/admin/auth/login")
+                || uri.startsWith("/api/v1/admin/auth/verification-code")
+                || uri.startsWith("/api/v1/admin/auth/password/reset");
     }
 }

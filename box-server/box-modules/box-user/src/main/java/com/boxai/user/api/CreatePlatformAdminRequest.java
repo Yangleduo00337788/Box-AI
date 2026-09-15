@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 public record CreatePlatformAdminRequest(
         @NotBlank @Email String email,
         @NotBlank @Size(min = 8, max = 64) String password,
-        @Size(max = 64) String nickname
+        @Size(max = 64) String nickname,
+        @Size(max = 32) String platformAdminRole
 ) {
 }

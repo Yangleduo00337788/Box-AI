@@ -88,6 +88,7 @@ public class UserRepositoryImpl implements UserRepository {
         row.setBio(user.getBio());
         row.setStatus(user.getStatus() == null ? 1 : user.getStatus());
         row.setUserType(user.getUserType() == null ? UserTypes.TENANT_USER : user.getUserType());
+        row.setPlatformAdminRole(user.getPlatformAdminRole());
         row.setCreatedAt(LocalDateTime.now());
         row.setUpdatedAt(LocalDateTime.now());
         row.setDeleted(0);
@@ -153,6 +154,7 @@ public class UserRepositoryImpl implements UserRepository {
         user.setBio(row.getBio());
         user.setStatus(row.getStatus());
         user.setUserType(row.getUserType());
+        user.setPlatformAdminRole(row.getPlatformAdminRole());
         user.setLastLoginAt(row.getLastLoginAt());
         user.setCreatedAt(row.getCreatedAt());
         return user;

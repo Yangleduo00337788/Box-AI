@@ -4,6 +4,7 @@ import com.boxai.common.result.PageResult;
 import com.boxai.common.result.Result;
 import com.boxai.security.context.SecurityContexts;
 import com.boxai.user.api.CreatePlatformAdminRequest;
+import com.boxai.user.api.PlatformUserContextVO;
 import com.boxai.user.api.PlatformUserVO;
 import com.boxai.user.api.UpdateUserStatusRequest;
 import com.boxai.user.application.AdminPlatformUserApplicationService;
@@ -46,5 +47,10 @@ public class AdminPlatformUserController {
                                                @Valid @RequestBody UpdateUserStatusRequest request) {
         return Result.success(adminPlatformUserApplicationService.updateStatus(
                 SecurityContexts.currentUser(), id, request.status()));
+    }
+
+    @GetMapping("/{id}/context")
+    public Result<PlatformUserContextVO> context(@PathVariable Long id) {
+        return Result.success(adminPlatformUserApplicationService.context(id));
     }
 }

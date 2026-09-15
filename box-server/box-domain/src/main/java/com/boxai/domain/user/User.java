@@ -19,6 +19,7 @@ public class User {
     private String bio;
     private Integer status;
     private String userType;
+    private String platformAdminRole;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
 }
