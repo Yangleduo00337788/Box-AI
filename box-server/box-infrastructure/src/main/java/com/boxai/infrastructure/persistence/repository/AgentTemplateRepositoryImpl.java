@@ -62,7 +62,11 @@ public class AgentTemplateRepositoryImpl implements AgentTemplateRepository {
     @Override
     public List<AgentTemplate> listListed() {
         return mapper.selectListByQuery(
-                        QueryWrapper.create().eq("status", "LISTED").orderBy("sort_order", false).orderBy("id", true))
+                        QueryWrapper.create()
+                                .eq("status", "LISTED")
+                                .eq("review_status", "APPROVED")
+                                .orderBy("sort_order", false)
+                                .orderBy("id", true))
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -97,6 +101,10 @@ public class AgentTemplateRepositoryImpl implements AgentTemplateRepository {
         template.setMaxTokens(row.getMaxTokens());
         template.setStreamEnabled(row.getStreamEnabled() != null && row.getStreamEnabled() == 1);
         template.setStatus(row.getStatus());
+        template.setReviewStatus(row.getReviewStatus());
+        template.setVisibility(row.getVisibility());
+        template.setTenantIdsJson(row.getTenantIdsJson());
+        template.setRolloutPercent(row.getRolloutPercent());
         template.setSortOrder(row.getSortOrder());
         template.setInstallCount(row.getInstallCount());
         template.setCreatedBy(row.getCreatedBy());
@@ -120,6 +128,10 @@ public class AgentTemplateRepositoryImpl implements AgentTemplateRepository {
         row.setMaxTokens(template.getMaxTokens());
         row.setStreamEnabled(template.getStreamEnabled() == null || template.getStreamEnabled() ? 1 : 0);
         row.setStatus(template.getStatus() == null ? "DRAFT" : template.getStatus());
+        row.setReviewStatus(template.getReviewStatus() == null ? "PENDING_REVIEW" : template.getReviewStatus());
+        row.setVisibility(template.getVisibility() == null ? "GLOBAL" : template.getVisibility());
+        row.setTenantIdsJson(template.getTenantIdsJson());
+        row.setRolloutPercent(template.getRolloutPercent() == null ? 100 : template.getRolloutPercent());
         row.setSortOrder(template.getSortOrder() == null ? 0 : template.getSortOrder());
         row.setInstallCount(template.getInstallCount());
         row.setCreatedBy(template.getCreatedBy());

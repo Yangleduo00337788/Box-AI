@@ -23,6 +23,10 @@ public class AgentTemplate {
     private Integer maxTokens;
     private Boolean streamEnabled;
     private String status;
+    private String reviewStatus;
+    private String visibility;
+    private String tenantIdsJson;
+    private Integer rolloutPercent;
     private Integer sortOrder;
     private Integer installCount;
     private Long createdBy;

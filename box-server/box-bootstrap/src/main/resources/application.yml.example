@@ -61,6 +61,7 @@ box:
     crypto:
       aes-key: box-dev-aes-256-key-change-me!!
   embed:
+    # 本地开发可跳过 TXT / well-known 校验；生产必须为 false
     skip-domain-verify: true
   minio:
     endpoint: http://127.0.0.1:9000

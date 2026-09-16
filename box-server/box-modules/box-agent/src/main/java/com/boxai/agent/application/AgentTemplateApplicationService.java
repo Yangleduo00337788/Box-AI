@@ -4,7 +4,9 @@ import com.boxai.agent.api.AgentVO;
 import com.boxai.agent.api.template.AgentTemplateVO;
 import com.boxai.agent.api.template.CreateAgentTemplateRequest;
 import com.boxai.agent.api.template.UpdateAgentTemplateRequest;
+import com.boxai.agent.api.template.UpdateAgentTemplateReviewRequest;
 import com.boxai.agent.api.template.UpdateAgentTemplateStatusRequest;
+import com.boxai.common.constant.MarketReviewStatuses;
 import com.boxai.common.constant.ModelSources;
 import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
@@ -66,7 +68,10 @@ public class AgentTemplateApplicationService {
 
     public List<AgentTemplateVO> listMarket() {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
-        return agentTemplateRepository.listListed().stream().map(this::toConsumerVO).toList();
+        return agentTemplateRepository.listListed().stream()
+                .filter(template -> platformModelApplicationService.isRunnable(template.getPlatformModelId()))
+                .map(this::toConsumerVO)
+                .toList();
     }
 
     @Transactional
@@ -87,6 +92,9 @@ public class AgentTemplateApplicationService {
         template.setStreamEnabled(request.streamEnabled() == null || request.streamEnabled());
         template.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         template.setStatus("DRAFT");
+        template.setReviewStatus(MarketReviewStatuses.PENDING_REVIEW);
+        template.setVisibility("GLOBAL");
+        template.setRolloutPercent(100);
         template.setInstallCount(0);
         template.setCreatedBy(adminId);
         template.setUpdatedBy(adminId);
@@ -124,6 +132,9 @@ public class AgentTemplateApplicationService {
         if ("LISTED".equals(status) && template.getPlatformModelId() == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "上架前需配置平台模型");
         }
+        if ("LISTED".equals(status) && !MarketReviewStatuses.isApproved(template.getReviewStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请先通过审核再上架");
+        }
         if ("LISTED".equals(status)) {
             platformModelApplicationService.resolveForChat(template.getPlatformModelId());
         }
@@ -134,10 +145,30 @@ public class AgentTemplateApplicationService {
     }
 
     @Transactional
+    public AgentTemplateVO updateReview(Long id, UpdateAgentTemplateReviewRequest request) {
+        AgentTemplate template = requireTemplate(id);
+        String reviewStatus = request.reviewStatus().trim().toUpperCase();
+        if (!MarketReviewStatuses.ALL.contains(reviewStatus)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "审核状态无效");
+        }
+        template.setReviewStatus(reviewStatus);
+        if (!MarketReviewStatuses.isApproved(reviewStatus) && "LISTED".equals(template.getStatus())) {
+            template.setStatus("DRAFT");
+        }
+        template.setUpdatedBy(SecurityContexts.currentUser().userId());
+        agentTemplateRepository.update(template);
+        return toVO(template);
+    }
+
+    @Transactional
     public AgentVO enable(Long templateId) {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_CREATE);
         AgentTemplate template = requireListedTemplate(templateId);
-        platformModelApplicationService.resolveForChat(template.getPlatformModelId());
+        try {
+            platformModelApplicationService.resolveForChat(template.getPlatformModelId());
+        } catch (BusinessException ex) {
+            throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "模板绑定的平台模型不可用，请联系平台运营");
+        }
         Long userId = WorkspaceContext.require().userId();
         Long workspaceId = WorkspaceContext.require().workspaceId();
 
@@ -190,8 +221,8 @@ public class AgentTemplateApplicationService {
 
     private AgentTemplate requireListedTemplate(Long id) {
         AgentTemplate template = requireTemplate(id);
-        if (!"LISTED".equals(template.getStatus())) {
-            throw new BusinessException(ErrorCode.AGENT_TEMPLATE_NOT_FOUND, "模板未上架或已下架");
+        if (!MarketReviewStatuses.visibleToConsumers(template.getStatus(), template.getReviewStatus())) {
+            throw new BusinessException(ErrorCode.AGENT_TEMPLATE_NOT_FOUND, "模板未上架、未通过审核或已下架");
         }
         return template;
     }
@@ -218,6 +249,7 @@ public class AgentTemplateApplicationService {
                 template.getMaxTokens(),
                 template.getStreamEnabled(),
                 template.getStatus(),
+                template.getReviewStatus(),
                 template.getSortOrder(),
                 template.getInstallCount(),
                 template.getCreatedAt(),
@@ -241,6 +273,7 @@ public class AgentTemplateApplicationService {
                 vo.maxTokens(),
                 vo.streamEnabled(),
                 vo.status(),
+                vo.reviewStatus(),
                 vo.sortOrder(),
                 vo.installCount(),
                 vo.createdAt(),

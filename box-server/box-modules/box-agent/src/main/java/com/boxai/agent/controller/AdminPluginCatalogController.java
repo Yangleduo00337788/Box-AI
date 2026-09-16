@@ -3,6 +3,7 @@ package com.boxai.agent.controller;
 import com.boxai.agent.api.plugin.AdminPluginCatalogVO;
 import com.boxai.agent.api.plugin.CreatePluginCatalogRequest;
 import com.boxai.agent.api.plugin.UpdatePluginCatalogRequest;
+import com.boxai.agent.api.plugin.UpdatePluginReviewRequest;
 import com.boxai.agent.application.AdminPluginCatalogApplicationService;
 import com.boxai.common.result.Result;
 import jakarta.validation.Valid;
@@ -42,6 +43,12 @@ public class AdminPluginCatalogController {
     public Result<AdminPluginCatalogVO> update(@PathVariable Long id,
                                                @Valid @RequestBody UpdatePluginCatalogRequest request) {
         return Result.success(adminPluginCatalogApplicationService.update(id, request));
+    }
+
+    @PutMapping("/{id}/review")
+    public Result<AdminPluginCatalogVO> updateReview(@PathVariable Long id,
+                                                     @Valid @RequestBody UpdatePluginReviewRequest request) {
+        return Result.success(adminPluginCatalogApplicationService.updateReview(id, request));
     }
 
     @DeleteMapping("/{id}")

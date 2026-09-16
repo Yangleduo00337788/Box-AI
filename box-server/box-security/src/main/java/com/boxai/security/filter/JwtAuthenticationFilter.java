@@ -38,11 +38,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = Long.valueOf(claims.getSubject());
                 String username = claims.get("username", String.class);
                 String userType = claims.get("userType", String.class);
+                String platformAdminRole = claims.get("platformAdminRole", String.class);
                 if (userType == null || userType.isBlank()) {
                     userType = UserTypes.TENANT_USER;
                 }
                 var authentication = new UsernamePasswordAuthenticationToken(
-                        new LoginUser(userId, username, userType), null, List.of());
+                        new LoginUser(userId, username, userType, platformAdminRole), null, List.of());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 LoggingContext.setUserId(userId);
             } catch (JwtException | IllegalArgumentException ignored) {

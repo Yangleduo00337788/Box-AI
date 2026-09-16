@@ -62,7 +62,7 @@ public class UserRepositoryImpl implements UserRepository {
                 .orderBy("created_at", false);
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String like = "%" + query.getKeyword().trim() + "%";
-            wrapper.and("(email like {0} or nickname like {0} or username like {0})", like);
+            wrapper.and("(email like {0} or nickname like {1} or username like {2})", like, like, like);
         }
         Page<UserDO> result = userMapper.paginate(page, pageSize, wrapper);
         List<User> records = result.getRecords().stream().map(this::toDomain).toList();

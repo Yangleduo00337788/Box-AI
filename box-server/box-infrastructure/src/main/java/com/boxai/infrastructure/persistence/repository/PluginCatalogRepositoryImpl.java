@@ -39,6 +39,7 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
     public List<PluginCatalog> listByCategory(String category) {
         QueryWrapper query = QueryWrapper.create()
                 .eq("status", "LISTED")
+                .eq("review_status", "APPROVED")
                 .orderBy("sort_order", false)
                 .orderBy("id", true);
         if (category != null && !category.isBlank()) {
@@ -64,6 +65,7 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         }
         return mapper.selectListByQuery(QueryWrapper.create()
                         .eq("status", "LISTED")
+                        .eq("review_status", "APPROVED")
                         .and("(title LIKE ? OR description LIKE ?)", "%" + keyword.trim() + "%", "%" + keyword.trim() + "%")
                         .orderBy("sort_order", false)
                         .orderBy("id", true)
@@ -136,6 +138,10 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         row.setDescription(plugin.getDescription());
         row.setManifestJson(plugin.getManifestJson());
         row.setStatus(plugin.getStatus());
+        row.setReviewStatus(plugin.getReviewStatus() == null ? "PENDING_REVIEW" : plugin.getReviewStatus());
+        row.setVisibility(plugin.getVisibility() == null ? "GLOBAL" : plugin.getVisibility());
+        row.setTenantIdsJson(plugin.getTenantIdsJson());
+        row.setRolloutPercent(plugin.getRolloutPercent() == null ? 100 : plugin.getRolloutPercent());
         row.setSortOrder(plugin.getSortOrder());
         row.setInstallCount(plugin.getInstallCount());
         return row;
@@ -150,6 +156,10 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         plugin.setDescription(row.getDescription());
         plugin.setManifestJson(row.getManifestJson());
         plugin.setStatus(row.getStatus());
+        plugin.setReviewStatus(row.getReviewStatus());
+        plugin.setVisibility(row.getVisibility());
+        plugin.setTenantIdsJson(row.getTenantIdsJson());
+        plugin.setRolloutPercent(row.getRolloutPercent());
         plugin.setSortOrder(row.getSortOrder());
         plugin.setInstallCount(row.getInstallCount());
         plugin.setCreatedAt(row.getCreatedAt());

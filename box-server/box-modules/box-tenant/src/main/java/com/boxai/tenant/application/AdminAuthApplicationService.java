@@ -58,11 +58,19 @@ public class AdminAuthApplicationService {
     }
 
     private AdminAuthVO issue(User user) {
-        String token = jwtService.generate(user.getId(), user.getUsername(), user.getUserType());
+        String token = jwtService.generate(
+                user.getId(), user.getUsername(), user.getUserType(), null, user.getPlatformAdminRole());
         return new AdminAuthVO(token, toUserVo(user));
     }
 
     private AdminUserVO toUserVo(User user) {
-        return new AdminUserVO(user.getId(), user.getUsername(), user.getEmail(), user.getNickname(), user.getAvatarUrl(), user.getUserType());
+        return new AdminUserVO(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getAvatarUrl(),
+                user.getUserType(),
+                user.getPlatformAdminRole());
     }
 }

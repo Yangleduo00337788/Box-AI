@@ -6,5 +6,6 @@ public record AdminUserVO(
         String email,
         String nickname,
         String avatarUrl,
-        String userType
+        String userType,
+        String platformAdminRole
 ) {}

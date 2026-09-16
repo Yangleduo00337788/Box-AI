@@ -24,6 +24,10 @@ public class JwtService {
     }
 
     public String generate(Long userId, String username, String userType, String sessionId) {
+        return generate(userId, username, userType, sessionId, null);
+    }
+
+    public String generate(Long userId, String username, String userType, String sessionId, String platformAdminRole) {
         Instant now = Instant.now();
         var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
@@ -33,6 +37,9 @@ public class JwtService {
                 .expiration(Date.from(now.plusSeconds(properties.getExpireSeconds())));
         if (sessionId != null && !sessionId.isBlank()) {
             builder.claim("sid", sessionId);
+        }
+        if (platformAdminRole != null && !platformAdminRole.isBlank()) {
+            builder.claim("platformAdminRole", platformAdminRole);
         }
         return builder.signWith(key()).compact();
     }

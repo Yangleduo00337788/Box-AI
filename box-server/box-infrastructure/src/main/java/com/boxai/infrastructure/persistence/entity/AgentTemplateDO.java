@@ -34,6 +34,13 @@ public class AgentTemplateDO {
     @Column("stream_enabled")
     private Integer streamEnabled;
     private String status;
+    @Column("review_status")
+    private String reviewStatus;
+    private String visibility;
+    @Column("tenant_ids_json")
+    private String tenantIdsJson;
+    @Column("rollout_percent")
+    private Integer rolloutPercent;
     @Column("sort_order")
     private Integer sortOrder;
     @Column("install_count")

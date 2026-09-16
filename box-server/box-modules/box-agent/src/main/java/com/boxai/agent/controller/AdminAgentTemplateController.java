@@ -3,6 +3,7 @@ package com.boxai.agent.controller;
 import com.boxai.agent.api.template.AgentTemplateVO;
 import com.boxai.agent.api.template.CreateAgentTemplateRequest;
 import com.boxai.agent.api.template.UpdateAgentTemplateRequest;
+import com.boxai.agent.api.template.UpdateAgentTemplateReviewRequest;
 import com.boxai.agent.api.template.UpdateAgentTemplateStatusRequest;
 import com.boxai.agent.application.AgentTemplateApplicationService;
 import com.boxai.common.result.Result;
@@ -48,6 +49,12 @@ public class AdminAgentTemplateController {
     public Result<AgentTemplateVO> updateStatus(@PathVariable Long id,
                                                   @Valid @RequestBody UpdateAgentTemplateStatusRequest request) {
         return Result.success(agentTemplateApplicationService.updateStatus(id, request));
+    }
+
+    @PutMapping("/{id}/review")
+    public Result<AgentTemplateVO> updateReview(@PathVariable Long id,
+                                                @Valid @RequestBody UpdateAgentTemplateReviewRequest request) {
+        return Result.success(agentTemplateApplicationService.updateReview(id, request));
     }
 
     @DeleteMapping("/{id}")

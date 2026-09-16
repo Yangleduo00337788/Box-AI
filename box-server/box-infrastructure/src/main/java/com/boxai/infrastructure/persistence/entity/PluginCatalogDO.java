@@ -22,6 +22,13 @@ public class PluginCatalogDO {
     @Column("manifest_json")
     private String manifestJson;
     private String status;
+    @Column("review_status")
+    private String reviewStatus;
+    private String visibility;
+    @Column("tenant_ids_json")
+    private String tenantIdsJson;
+    @Column("rollout_percent")
+    private Integer rolloutPercent;
     @Column("sort_order")
     private Integer sortOrder;
     @Column("install_count")

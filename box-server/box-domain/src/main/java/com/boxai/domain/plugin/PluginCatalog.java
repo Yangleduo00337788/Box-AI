@@ -16,6 +16,10 @@ public class PluginCatalog {
     private String description;
     private String manifestJson;
     private String status;
+    private String reviewStatus;
+    private String visibility;
+    private String tenantIdsJson;
+    private Integer rolloutPercent;
     private Integer sortOrder;
     private Integer installCount;
     private LocalDateTime createdAt;

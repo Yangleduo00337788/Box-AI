@@ -3,6 +3,8 @@ package com.boxai.agent.application;
 import com.boxai.agent.api.plugin.AdminPluginCatalogVO;
 import com.boxai.agent.api.plugin.CreatePluginCatalogRequest;
 import com.boxai.agent.api.plugin.UpdatePluginCatalogRequest;
+import com.boxai.agent.api.plugin.UpdatePluginReviewRequest;
+import com.boxai.common.constant.MarketReviewStatuses;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.plugin.PluginCatalog;
@@ -58,6 +60,9 @@ public class AdminPluginCatalogApplicationService {
         plugin.setDescription(request.description());
         plugin.setManifestJson(manifestJson);
         plugin.setStatus("LISTED");
+        plugin.setReviewStatus(MarketReviewStatuses.PENDING_REVIEW);
+        plugin.setVisibility("GLOBAL");
+        plugin.setRolloutPercent(100);
         plugin.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         plugin.setInstallCount(0);
         pluginCatalogRepository.save(plugin);
@@ -85,7 +90,27 @@ public class AdminPluginCatalogApplicationService {
             plugin.setSortOrder(request.sortOrder());
         }
         if (request.status() != null) {
-            plugin.setStatus(request.status());
+            String status = request.status().trim().toUpperCase();
+            if ("LISTED".equals(status) && !MarketReviewStatuses.isApproved(plugin.getReviewStatus())) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "请先通过审核再上架");
+            }
+            plugin.setStatus(status);
+        }
+        pluginCatalogRepository.update(plugin);
+        return toVO(plugin);
+    }
+
+    @Transactional
+    public AdminPluginCatalogVO updateReview(Long id, UpdatePluginReviewRequest request) {
+        PluginCatalog plugin = pluginCatalogRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在"));
+        String reviewStatus = request.reviewStatus().trim().toUpperCase();
+        if (!MarketReviewStatuses.ALL.contains(reviewStatus)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "审核状态无效");
+        }
+        plugin.setReviewStatus(reviewStatus);
+        if (!MarketReviewStatuses.isApproved(reviewStatus) && "LISTED".equals(plugin.getStatus())) {
+            plugin.setStatus("UNLISTED");
         }
         pluginCatalogRepository.update(plugin);
         return toVO(plugin);
@@ -130,6 +155,7 @@ public class AdminPluginCatalogApplicationService {
                 plugin.getDescription(),
                 plugin.getManifestJson(),
                 plugin.getStatus(),
+                plugin.getReviewStatus(),
                 plugin.getSortOrder(),
                 plugin.getInstallCount());
     }

@@ -24,7 +24,7 @@ public final class AgentEmbedConfigSupport {
         ObjectNode root = readRoot(configJson);
         JsonNode embed = root.get("embed");
         if (embed == null || embed.isNull()) {
-            return new AgentEmbedConfigVO(DEFAULT_THEME, "", "", List.of(), agentName, "", false, null);
+            return new AgentEmbedConfigVO(DEFAULT_THEME, "", "", List.of(), agentName, "", false, null, false);
         }
         return new AgentEmbedConfigVO(
                 textOrDefault(embed.get("themeColor"), DEFAULT_THEME),
@@ -34,15 +34,18 @@ public final class AgentEmbedConfigSupport {
                 agentName,
                 textOrDefault(embed.get("customDomain"), ""),
                 embed.path("domainVerified").asBoolean(false),
-                null);
+                null,
+                false);
     }
 
     public static AgentEmbedConfigVO withDomain(AgentEmbedConfigVO vo,
                                                 String customDomain,
                                                 boolean verified,
-                                                String verifyToken) {
+                                                String verifyToken,
+                                                boolean verifySkipped) {
         if (vo == null) {
-            return new AgentEmbedConfigVO(DEFAULT_THEME, "", "", List.of(), null, customDomain, verified, verifyToken);
+            return new AgentEmbedConfigVO(
+                    DEFAULT_THEME, "", "", List.of(), null, customDomain, verified, verifyToken, verifySkipped);
         }
         return new AgentEmbedConfigVO(
                 vo.themeColor(),
@@ -52,7 +55,8 @@ public final class AgentEmbedConfigSupport {
                 vo.agentName(),
                 customDomain,
                 verified,
-                verifyToken);
+                verifyToken,
+                verifySkipped);
     }
 
     public static String merge(String configJson, UpdateAgentEmbedConfigRequest request) {

@@ -10,6 +10,7 @@ public record AgentEmbedConfigVO(
         String agentName,
         String customDomain,
         Boolean domainVerified,
-        String domainVerifyToken
+        String domainVerifyToken,
+        Boolean domainVerifySkipped
 ) {
 }

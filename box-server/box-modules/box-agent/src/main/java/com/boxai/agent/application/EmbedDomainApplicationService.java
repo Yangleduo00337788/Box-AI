@@ -5,6 +5,7 @@ import com.boxai.agent.support.AgentEmbedConfigSupport;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.common.security.EmbedDomainNormalizer;
+import com.boxai.common.security.EmbedDomainTxtLookup;
 import com.boxai.common.security.SsrfGuard;
 import com.boxai.common.security.SsrfSafeHttpClient;
 import com.boxai.domain.agent.Agent;
@@ -51,6 +52,14 @@ public class EmbedDomainApplicationService {
                 .filter(item -> item.getVerified() != null && item.getVerified() == 1);
     }
 
+    public Optional<String> findVerifyTokenByHost(String host) {
+        String domain = EmbedDomainNormalizer.normalize(host);
+        if (domain.isEmpty()) {
+            return Optional.empty();
+        }
+        return embedCustomDomainRepository.findByDomain(domain).map(EmbedCustomDomain::getVerifyToken);
+    }
+
     @Transactional
     public EmbedCustomDomain syncDomain(Agent agent, String rawDomain) {
         String domain = EmbedDomainNormalizer.normalize(rawDomain);
@@ -93,10 +102,13 @@ public class EmbedDomainApplicationService {
             embedCustomDomainRepository.update(domain);
             return domain;
         }
-        String token = fetchWellKnownToken(domain.getDomain());
-        if (!domain.getVerifyToken().equals(token)) {
+        String expected = domain.getVerifyToken();
+        boolean txtOk = EmbedDomainTxtLookup.containsToken(domain.getDomain(), expected);
+        boolean fileOk = expected.equals(fetchWellKnownToken(domain.getDomain()).orElse(null));
+        if (!txtOk && !fileOk) {
             throw new BusinessException(ErrorCode.BAD_REQUEST,
-                    "域名验证失败：请在 https://" + domain.getDomain() + "/.well-known/box-domain-verify.txt 放置校验令牌");
+                    "域名验证失败：请将 CNAME 指向当前站点，并添加 TXT 记录 box-verify=" + expected
+                            + "，或在 https://" + domain.getDomain() + "/.well-known/box-domain-verify.txt 放置该令牌");
         }
         domain.setVerified(1);
         embedCustomDomainRepository.update(domain);
@@ -106,13 +118,19 @@ public class EmbedDomainApplicationService {
     public AgentEmbedConfigVO attach(AgentEmbedConfigVO vo, Long agentId, boolean includeToken) {
         EmbedCustomDomain domain = embedCustomDomainRepository.findByAgentId(agentId).orElse(null);
         if (domain == null) {
-            return vo;
+            return AgentEmbedConfigSupport.withDomain(
+                    vo,
+                    vo == null ? "" : vo.customDomain(),
+                    false,
+                    null,
+                    skipDomainVerify);
         }
         return AgentEmbedConfigSupport.withDomain(
                 vo,
                 domain.getDomain(),
                 domain.getVerified() != null && domain.getVerified() == 1,
-                includeToken ? domain.getVerifyToken() : null);
+                includeToken ? domain.getVerifyToken() : null,
+                skipDomainVerify);
     }
 
     public Agent requirePublished(Long agentId) {
@@ -124,20 +142,18 @@ public class EmbedDomainApplicationService {
         return agent;
     }
 
-    private String fetchWellKnownToken(String domain) {
+    private Optional<String> fetchWellKnownToken(String domain) {
         try {
             URI uri = SsrfGuard.validateHttpUrl("https://" + domain + "/.well-known/box-domain-verify.txt");
             HttpClient client = SsrfSafeHttpClient.create(Duration.ofSeconds(8), false);
             HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(8)).GET().build();
             HttpResponse<String> response = SsrfSafeHttpClient.send(client, request, false, Duration.ofSeconds(8));
             if (response.statusCode() >= 400 || response.body() == null) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "无法读取域名校验文件");
+                return Optional.empty();
             }
-            return response.body().trim();
-        } catch (BusinessException e) {
-            throw e;
+            return Optional.of(response.body().trim());
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "域名验证请求失败: " + e.getMessage());
+            return Optional.empty();
         }
     }
 

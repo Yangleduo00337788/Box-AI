@@ -4,6 +4,7 @@ package com.boxai.agent.application;
 
 import com.boxai.agent.api.plugin.PluginCatalogVO;
 
+import com.boxai.common.constant.MarketReviewStatuses;
 import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 
@@ -181,9 +182,9 @@ public class PluginMarketApplicationService {
 
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在"));
 
-        if (!"LISTED".equals(plugin.getStatus())) {
+        if (!MarketReviewStatuses.visibleToConsumers(plugin.getStatus(), plugin.getReviewStatus())) {
 
-            throw new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件未上架或已下架");
+            throw new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件未上架、未通过审核或已下架");
 
         }
 

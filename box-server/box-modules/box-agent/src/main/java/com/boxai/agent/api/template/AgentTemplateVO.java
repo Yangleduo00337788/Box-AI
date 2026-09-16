@@ -18,6 +18,7 @@ public record AgentTemplateVO(
         Integer maxTokens,
         Boolean streamEnabled,
         String status,
+        String reviewStatus,
         Integer sortOrder,
         Integer installCount,
         LocalDateTime createdAt,
