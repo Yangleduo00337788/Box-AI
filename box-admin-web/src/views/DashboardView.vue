@@ -41,7 +41,7 @@
         </t-card>
       </div>
 
-      <t-card :bordered="false" title="最近租户" class="table-card">
+      <t-card v-if="canOpen('/tenants')" :bordered="false" title="最近租户" class="table-card">
         <t-table row-key="id" :data="recentTenants" :columns="tenantColumns" hover size="medium">
           <template #empty>
             <t-empty description="暂无租户" />
@@ -67,8 +67,11 @@ import { fetchPlatformModels, fetchPlatformProviders } from '@/api/platform'
 import { useAppearanceStore } from '@/stores/appearance'
 import { fetchTenants, type TenantVO } from '@/api/tenant'
 import { formatDateTime } from '@/utils/datetime'
+import { canAccessAdminRoute } from '@/constants/rbac'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
 const appearance = useAppearanceStore()
 const loading = ref(false)
 const tenants = ref<TenantVO[]>([])
@@ -83,25 +86,33 @@ const pieRef = ref<HTMLDivElement | null>(null)
 let barChart: ECharts | null = null
 let pieChart: ECharts | null = null
 
-const stats = computed(() => [
-  { label: '租户', value: tenants.value.length, to: '/tenants' },
-  { label: '启用租户', value: tenants.value.filter((item) => item.status === 1).length, to: '/tenants' },
-  { label: '套餐', value: planCount.value, to: '/plans' },
-  { label: '模型服务商', value: providerCount.value, to: '/platform-models' },
-  { label: '平台模型', value: modelCount.value, to: '/platform-models' },
-  { label: '上架插件', value: plugins.value.length, to: '/plugin-catalog' },
-  { label: '智能体模板', value: templates.value.length, to: '/agent-templates' },
-])
+function canOpen(path: string) {
+  return canAccessAdminRoute(auth.platformRole, path)
+}
 
-const entries = [
-  { to: '/analytics', label: '分析', icon: 'chart' },
-  { to: '/tenants', label: '租户', icon: 'usergroup' },
-  { to: '/users', label: '用户', icon: 'user' },
-  { to: '/platform-tools', label: '工具', icon: 'tools' },
-  { to: '/platform-mcp', label: 'MCP', icon: 'server' },
-  { to: '/plugin-catalog', label: '插件', icon: 'layers' },
-  { to: '/audit-logs', label: '审计', icon: 'history' },
-]
+const stats = computed(() =>
+  [
+    { label: '租户', value: tenants.value.length, to: '/tenants' },
+    { label: '启用租户', value: tenants.value.filter((item) => item.status === 1).length, to: '/tenants' },
+    { label: '套餐', value: planCount.value, to: '/plans' },
+    { label: '模型服务商', value: providerCount.value, to: '/platform-models' },
+    { label: '平台模型', value: modelCount.value, to: '/platform-models' },
+    { label: '上架插件', value: plugins.value.length, to: '/plugin-catalog' },
+    { label: '智能体模板', value: templates.value.length, to: '/agent-templates' },
+  ].filter((item) => canOpen(item.to)),
+)
+
+const entries = computed(() =>
+  [
+    { to: '/analytics', label: '分析', icon: 'chart' },
+    { to: '/tenants', label: '租户', icon: 'usergroup' },
+    { to: '/users', label: '用户', icon: 'user' },
+    { to: '/platform-tools', label: '工具', icon: 'tools' },
+    { to: '/platform-mcp', label: 'MCP', icon: 'server' },
+    { to: '/plugin-catalog', label: '插件', icon: 'layers' },
+    { to: '/audit-logs', label: '审计', icon: 'history' },
+  ].filter((item) => canOpen(item.to)),
+)
 
 const recentTenants = computed(() => tenants.value.slice(0, 8))
 
@@ -210,19 +221,19 @@ async function load() {
   loading.value = true
   try {
     const [tenantRes, planRes, providerRes, modelRes, pluginRes, templateRes] = await Promise.all([
-      fetchTenants(),
-      fetchPlans(),
-      fetchPlatformProviders(),
-      fetchPlatformModels(),
-      fetchPlugins(),
-      fetchAgentTemplates(),
+      canOpen('/tenants') ? fetchTenants() : Promise.resolve(null),
+      canOpen('/plans') ? fetchPlans() : Promise.resolve(null),
+      canOpen('/platform-models') ? fetchPlatformProviders() : Promise.resolve(null),
+      canOpen('/platform-models') ? fetchPlatformModels() : Promise.resolve(null),
+      canOpen('/plugin-catalog') ? fetchPlugins() : Promise.resolve(null),
+      canOpen('/agent-templates') ? fetchAgentTemplates() : Promise.resolve(null),
     ])
-    tenants.value = tenantRes.data.data || []
-    planCount.value = (planRes.data.data || []).length
-    providerCount.value = (providerRes.data.data || []).length
-    modelCount.value = (modelRes.data.data || []).length
-    plugins.value = pluginRes.data.data || []
-    templates.value = templateRes.data.data || []
+    tenants.value = tenantRes?.data.data || []
+    planCount.value = (planRes?.data.data || []).length
+    providerCount.value = (providerRes?.data.data || []).length
+    modelCount.value = (modelRes?.data.data || []).length
+    plugins.value = pluginRes?.data.data || []
+    templates.value = templateRes?.data.data || []
     await nextTick()
     renderCharts()
   } finally {

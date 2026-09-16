@@ -2,7 +2,7 @@
   <div class="users-page admin-page">
     <page-header title="用户管理" desc="查看平台用户，新建平台管理员，启停账号。停用后无法登录。">
       <template #actions>
-        <t-button theme="primary" @click="openCreate">新建管理员</t-button>
+        <t-button v-if="canManageAdmins" theme="primary" @click="openCreate">新建管理员</t-button>
       </template>
     </page-header>
 
@@ -90,6 +90,7 @@ import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/datetime'
 
 const auth = useAuthStore()
+const canManageAdmins = computed(() => auth.isSuperAdmin)
 const loading = ref(false)
 const users = ref<PlatformUserVO[]>([])
 const keyword = ref('')
@@ -163,7 +164,7 @@ function tenantTypeLabel(value?: string) {
   return value || '-'
 }
 
-const columns: PrimaryTableCol<PlatformUserVO>[] = [
+const columns = computed<PrimaryTableCol<PlatformUserVO>[]>(() => [
   { colKey: 'id', title: 'ID', width: 80 },
   { colKey: 'email', title: '邮箱', minWidth: 200, cell: (_, { row }) => row.email || '-' },
   { colKey: 'nickname', title: '昵称', width: 140, cell: (_, { row }) => row.nickname || '-' },
@@ -212,24 +213,28 @@ const columns: PrimaryTableCol<PlatformUserVO>[] = [
   {
     colKey: 'actions',
     title: '操作',
-    width: 140,
+    width: canManageAdmins.value ? 140 : 80,
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openContext(row) }, () => '上下文'),
-        h(
-          Link,
-          {
-            theme: row.status === 1 ? 'warning' : 'success',
-            hover: 'color',
-            disabled: auth.user?.id === row.id,
-            onClick: () => toggleStatus(row),
-          },
-          () => (row.status === 1 ? '停用' : '启用'),
-        ),
+        ...(canManageAdmins.value
+          ? [
+              h(
+                Link,
+                {
+                  theme: row.status === 1 ? 'warning' : 'success',
+                  hover: 'color',
+                  disabled: auth.user?.id === row.id,
+                  onClick: () => toggleStatus(row),
+                },
+                () => (row.status === 1 ? '停用' : '启用'),
+              ),
+            ]
+          : []),
       ]),
   },
-]
+])
 
 async function loadUsers() {
   loading.value = true

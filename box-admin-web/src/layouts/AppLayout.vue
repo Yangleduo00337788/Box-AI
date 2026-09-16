@@ -25,7 +25,7 @@
             />
           </div>
         </template>
-        <t-menu-group v-for="group in ADMIN_MENU_GROUPS" :key="group.title" :title="group.title">
+        <t-menu-group v-for="group in visibleMenuGroups" :key="group.title" :title="group.title">
           <t-menu-item
             v-for="item in group.items"
             :key="item.value"
@@ -87,6 +87,7 @@ import logoWordmark from '@/assets/logo.png'
 import logoCollapsed from '@/assets/logo-collapsed.png'
 import ThemeSettingDrawer from '@/components/ThemeSettingDrawer.vue'
 import { ADMIN_MENU_GROUPS } from '@/constants/menu'
+import { canAccessAdminRoute } from '@/constants/rbac'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useAuthStore } from '@/stores/auth'
 
@@ -101,8 +102,15 @@ const active = computed(() => route.path)
 const userName = computed(() => auth.user?.nickname || auth.user?.email || '管理员')
 const avatarText = computed(() => userName.value.slice(0, 1).toUpperCase())
 
+const visibleMenuGroups = computed(() =>
+  ADMIN_MENU_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccessAdminRoute(auth.platformRole, item.value)),
+  })).filter((group) => group.items.length),
+)
+
 const currentTitle = computed(() => {
-  for (const group of ADMIN_MENU_GROUPS) {
+  for (const group of visibleMenuGroups.value) {
     const hit = group.items.find((item) => item.value === route.path)
     if (hit) return hit.label
   }

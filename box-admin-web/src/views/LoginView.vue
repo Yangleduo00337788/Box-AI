@@ -69,7 +69,7 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   try {
     await auth.login(formData.account, formData.password)
     MessagePlugin.success('登录成功')
-    await router.push('/dashboard')
+    await router.push(auth.homePath)
   } catch (error) {
     const message = error instanceof Error ? error.message : '登录失败'
     if (message) {

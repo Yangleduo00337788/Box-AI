@@ -1,6 +1,6 @@
 <template>
   <div class="templates-page admin-page">
-    <page-header title="智能体市场" desc="上架模板智能体，供 C 端用户一键启用。">
+    <page-header title="智能体市场" desc="审核通过后再上架，C 端市场只展示已通过且已上架的模板。">
       <template #actions>
         <t-button theme="primary" @click="openCreate">新建模板</t-button>
       </template>
@@ -58,6 +58,7 @@ import {
   deleteAgentTemplate,
   fetchAgentTemplates,
   updateAgentTemplate,
+  updateAgentTemplateReview,
   updateAgentTemplateStatus,
   type AgentTemplateVO,
 } from '@/api/agentTemplate'
@@ -103,6 +104,12 @@ const statusLabel: Record<string, string> = {
   ARCHIVED: '已下架',
 }
 
+const reviewLabel: Record<string, string> = {
+  PENDING_REVIEW: '待审核',
+  APPROVED: '已通过',
+  REJECTED: '已拒绝',
+}
+
 const columns: PrimaryTableCol<AgentTemplateVO>[] = [
   { colKey: 'name', title: '名称', minWidth: 140 },
   { colKey: 'templateCode', title: '编码', width: 160 },
@@ -111,7 +118,7 @@ const columns: PrimaryTableCol<AgentTemplateVO>[] = [
   { colKey: 'installCount', title: '启用次数', width: 100 },
   {
     colKey: 'status',
-    title: '状态',
+    title: '上架',
     width: 90,
     cell: (_, { row }) => {
       const theme = row.status === 'LISTED' ? 'success' : row.status === 'DRAFT' ? 'default' : 'warning'
@@ -119,16 +126,35 @@ const columns: PrimaryTableCol<AgentTemplateVO>[] = [
     },
   },
   {
+    colKey: 'reviewStatus',
+    title: '审核',
+    width: 100,
+    cell: (_, { row }) => {
+      const status = row.reviewStatus || 'PENDING_REVIEW'
+      const theme = status === 'APPROVED' ? 'success' : status === 'REJECTED' ? 'danger' : 'warning'
+      return h(Tag, { theme, variant: 'light' }, () => reviewLabel[status] || status)
+    },
+  },
+  {
     colKey: 'actions',
     title: '操作',
-    width: 220,
+    width: 280,
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openEdit(row) }, () => '编辑'),
-        row.status !== 'LISTED'
+        row.reviewStatus !== 'APPROVED'
+          ? h(Link, { theme: 'success', hover: 'color', onClick: () => reviewTemplate(row, 'APPROVED') }, () => '通过')
+          : null,
+        row.reviewStatus !== 'REJECTED'
+          ? h(Link, { theme: 'danger', hover: 'color', onClick: () => reviewTemplate(row, 'REJECTED') }, () => '拒绝')
+          : null,
+        row.reviewStatus === 'APPROVED' && row.status !== 'LISTED'
           ? h(Link, { theme: 'primary', hover: 'color', onClick: () => listTemplate(row) }, () => '上架')
-          : h(Link, { theme: 'warning', hover: 'color', onClick: () => archiveTemplate(row) }, () => '下架'),
+          : null,
+        row.status === 'LISTED'
+          ? h(Link, { theme: 'warning', hover: 'color', onClick: () => archiveTemplate(row) }, () => '下架')
+          : null,
         h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDelete(row) }, () => '删除'),
       ]),
   },
@@ -195,7 +221,7 @@ async function onSave() {
         templateCode: form.templateCode.trim(),
         ...payload,
       })
-      MessagePlugin.success('模板已创建')
+      MessagePlugin.success('模板已创建，通过审核后才能上架')
     }
     dialogVisible.value = false
     await loadData()
@@ -203,6 +229,12 @@ async function onSave() {
     saving.value = false
   }
   return true
+}
+
+async function reviewTemplate(row: AgentTemplateVO, reviewStatus: 'APPROVED' | 'REJECTED') {
+  await updateAgentTemplateReview(row.id, reviewStatus)
+  MessagePlugin.success(reviewStatus === 'APPROVED' ? '已通过审核' : '已拒绝')
+  await loadData()
 }
 
 async function listTemplate(row: AgentTemplateVO) {

@@ -1,12 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { fetchMe, login as loginApi, type AdminAuthVO, type AdminUserVO } from '@/api/auth'
+import { firstAccessibleAdminRoute, normalizePlatformRole, PLATFORM_ADMIN_ROLES } from '@/constants/rbac'
 
 const TOKEN_KEY = 'box.admin.token'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem(TOKEN_KEY) || '')
   const user = ref<AdminUserVO | null>(null)
+  const platformRole = computed(() => normalizePlatformRole(user.value?.platformAdminRole))
+  const isSuperAdmin = computed(() => platformRole.value === PLATFORM_ADMIN_ROLES.SUPER_ADMIN)
+  const homePath = computed(() => firstAccessibleAdminRoute(platformRole.value))
 
   function persist(payload: AdminAuthVO) {
     if (payload.user.userType !== 'PLATFORM_ADMIN') {
@@ -27,11 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     const { data } = await fetchMe()
-    if (data.data.user.userType !== 'PLATFORM_ADMIN') {
-      logout()
-      throw new Error('无平台管理权限')
-    }
-    user.value = data.data.user
+    persist(data.data)
   }
 
   function logout() {
@@ -40,5 +40,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(TOKEN_KEY)
   }
 
-  return { token, user, login, hydrate, logout }
+  return { token, user, platformRole, isSuperAdmin, homePath, login, hydrate, logout }
 })

@@ -3,6 +3,7 @@ export interface MenuItem {
   label: string
   icon: string
   desc?: string
+  roles?: string[]
 }
 
 export interface MenuGroup {

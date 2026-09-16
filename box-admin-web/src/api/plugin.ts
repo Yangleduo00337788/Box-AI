@@ -14,6 +14,7 @@ export interface AdminPluginCatalogVO {
   description?: string
   manifestJson?: string
   status: string
+  reviewStatus?: string
   sortOrder: number
   installCount: number
 }
@@ -69,6 +70,10 @@ export function updatePlugin(
   },
 ) {
   return http.put<Result<AdminPluginCatalogVO>>(`/plugins/${id}`, payload)
+}
+
+export function updatePluginReview(id: number, reviewStatus: string) {
+  return http.put<Result<AdminPluginCatalogVO>>(`/plugins/${id}/review`, { reviewStatus })
 }
 
 export function deletePlugin(id: number) {

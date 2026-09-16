@@ -15,6 +15,7 @@ export interface AgentTemplateVO {
   maxTokens?: number
   streamEnabled?: boolean
   status: string
+  reviewStatus?: string
   sortOrder?: number
   installCount?: number
   createdAt?: string
@@ -61,6 +62,10 @@ export function updateAgentTemplate(
 
 export function updateAgentTemplateStatus(id: number, status: string) {
   return http.put<Result<AgentTemplateVO>>(`/agent-templates/${id}/status`, { status })
+}
+
+export function updateAgentTemplateReview(id: number, reviewStatus: string) {
+  return http.put<Result<AgentTemplateVO>>(`/agent-templates/${id}/review`, { reviewStatus })
 }
 
 export function deleteAgentTemplate(id: number) {

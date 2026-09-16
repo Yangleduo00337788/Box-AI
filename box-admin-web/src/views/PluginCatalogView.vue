@@ -1,6 +1,6 @@
 <template>
   <div class="plugin-catalog-page admin-page">
-    <page-header title="插件市场" desc="管理插件分类与上架插件，安装时按配置在工作空间创建对应资源。" />
+    <page-header title="插件市场" desc="先审核再上架。C 端只展示已通过且上架的插件。" />
 
     <t-card :bordered="false" class="admin-tab-card">
       <t-tabs v-model="tab">
@@ -76,7 +76,7 @@
           <t-input-number v-model="pluginForm.sortOrder" :min="0" theme="column" />
         </t-form-item>
         <t-form-item v-if="pluginEditing" label="状态" name="status">
-          <t-radio-group v-model="pluginForm.status">
+          <t-radio-group v-model="pluginForm.status" :disabled="pluginForm.reviewStatus !== 'APPROVED'">
             <t-radio value="LISTED">上架</t-radio>
             <t-radio value="UNLISTED">下架</t-radio>
           </t-radio-group>
@@ -169,6 +169,7 @@ import {
   fetchPlugins,
   updatePlugin,
   updatePluginCategory,
+  updatePluginReview,
   type AdminPluginCatalogVO,
   type PluginCategoryVO,
 } from '@/api/plugin'
@@ -230,6 +231,7 @@ const pluginForm = reactive({
   description: '',
   sortOrder: 0,
   status: 'LISTED',
+  reviewStatus: 'PENDING_REVIEW',
   ...emptyManifest,
 })
 
@@ -267,7 +269,7 @@ const pluginColumns: PrimaryTableCol<AdminPluginCatalogVO>[] = [
   { colKey: 'installCount', title: '安装数', width: 90 },
   {
     colKey: 'status',
-    title: '状态',
+    title: '上架',
     width: 90,
     cell: (_, { row }) =>
       h(Tag, { theme: row.status === 'LISTED' ? 'success' : 'default', variant: 'light' }, () =>
@@ -275,13 +277,36 @@ const pluginColumns: PrimaryTableCol<AdminPluginCatalogVO>[] = [
       ),
   },
   {
+    colKey: 'reviewStatus',
+    title: '审核',
+    width: 100,
+    cell: (_, { row }) => {
+      const status = row.reviewStatus || 'PENDING_REVIEW'
+      const theme = status === 'APPROVED' ? 'success' : status === 'REJECTED' ? 'danger' : 'warning'
+      const label = status === 'APPROVED' ? '已通过' : status === 'REJECTED' ? '已拒绝' : '待审核'
+      return h(Tag, { theme, variant: 'light' }, () => label)
+    },
+  },
+  {
     colKey: 'actions',
     title: '操作',
-    width: 140,
+    width: 280,
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openPluginEdit(row) }, () => '编辑'),
+        row.reviewStatus !== 'APPROVED'
+          ? h(Link, { theme: 'success', hover: 'color', onClick: () => reviewPlugin(row, 'APPROVED') }, () => '通过')
+          : null,
+        row.reviewStatus !== 'REJECTED'
+          ? h(Link, { theme: 'danger', hover: 'color', onClick: () => reviewPlugin(row, 'REJECTED') }, () => '拒绝')
+          : null,
+        row.reviewStatus === 'APPROVED' && row.status !== 'LISTED'
+          ? h(Link, { theme: 'primary', hover: 'color', onClick: () => listPlugin(row) }, () => '上架')
+          : null,
+        row.reviewStatus === 'APPROVED' && row.status === 'LISTED'
+          ? h(Link, { theme: 'warning', hover: 'color', onClick: () => unlistPlugin(row) }, () => '下架')
+          : null,
         h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDeletePlugin(row) }, () => '删除'),
       ]),
   },
@@ -385,6 +410,7 @@ function openPluginCreate() {
     description: '',
     sortOrder: 0,
     status: 'LISTED',
+    reviewStatus: 'PENDING_REVIEW',
     ...emptyManifest,
   })
   pluginDialogVisible.value = true
@@ -400,6 +426,7 @@ function openPluginEdit(row: AdminPluginCatalogVO) {
     description: row.description || '',
     sortOrder: row.sortOrder,
     status: row.status,
+    reviewStatus: row.reviewStatus || 'PENDING_REVIEW',
     ...emptyManifest,
   })
   applyManifest(row.manifestJson)
@@ -443,13 +470,31 @@ async function onSavePlugin() {
         manifestJson,
         sortOrder: pluginForm.sortOrder,
       })
-      MessagePlugin.success('已创建')
+      MessagePlugin.success('已创建，通过审核后才会出现在 C 端市场')
     }
     pluginDialogVisible.value = false
     await loadPlugins()
   } finally {
     pluginSaving.value = false
   }
+}
+
+async function reviewPlugin(row: AdminPluginCatalogVO, reviewStatus: 'APPROVED' | 'REJECTED') {
+  await updatePluginReview(row.id, reviewStatus)
+  MessagePlugin.success(reviewStatus === 'APPROVED' ? '已通过审核' : '已拒绝')
+  await loadPlugins()
+}
+
+async function listPlugin(row: AdminPluginCatalogVO) {
+  await updatePlugin(row.id, { status: 'LISTED' })
+  MessagePlugin.success('插件已上架')
+  await loadPlugins()
+}
+
+async function unlistPlugin(row: AdminPluginCatalogVO) {
+  await updatePlugin(row.id, { status: 'UNLISTED' })
+  MessagePlugin.success('插件已下架')
+  await loadPlugins()
 }
 
 function confirmDeletePlugin(row: AdminPluginCatalogVO) {

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { canAccessAdminRoute } from '@/constants/rbac'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -89,6 +90,16 @@ const router = createRouter({
           component: () => import('@/views/SystemConfigView.vue'),
           meta: { title: '系统配置' },
         },
+        {
+          path: 'forbidden',
+          component: () => import('@/views/ForbiddenView.vue'),
+          meta: { title: '无权限' },
+        },
+        {
+          path: ':pathMatch(.*)*',
+          component: () => import('@/views/NotFoundView.vue'),
+          meta: { title: '页面不存在' },
+        },
       ],
     },
   ],
@@ -109,6 +120,9 @@ router.beforeEach(async (to) => {
       auth.logout()
       return '/login'
     }
+  }
+  if (to.path !== '/forbidden' && !canAccessAdminRoute(auth.platformRole, to.path)) {
+    return '/forbidden'
   }
   return true
 })

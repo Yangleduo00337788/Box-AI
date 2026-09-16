@@ -1,5 +1,8 @@
 import type { MenuGroup } from '@box/ui/types/menu'
 
+/**
+ * 管理端侧栏。谁能看见哪一项由 `ADMIN_ROUTE_ROLES`（rbac.ts）决定，此处不重复写角色。
+ */
 export const ADMIN_MENU_GROUPS: MenuGroup[] = [
   {
     title: '工作台',

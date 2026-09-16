@@ -7,6 +7,7 @@ export interface AdminUserVO {
   nickname?: string
   avatarUrl?: string
   userType?: string
+  platformAdminRole?: string
 }
 
 export interface AdminAuthVO {
