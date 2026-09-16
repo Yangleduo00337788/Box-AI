@@ -59,3 +59,49 @@ export function userMessageImages(item: MessageVO) {
   if (item.role !== 'USER') return []
   return parseUserContent(item.content || '').images
 }
+
+/** Builder / Embed 本地会话（非 MessageVO） */
+export interface LocalChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export function isLocalLoadingBubble(
+  item: LocalChatMessage,
+  index: number,
+  messages: LocalChatMessage[],
+  chatting: boolean,
+) {
+  return chatting && index === messages.length - 1 && item.role === 'assistant' && !item.content
+}
+
+export function toLocalChatUiRole(role: LocalChatMessage['role']): ChatUiRole {
+  return role
+}
+
+export function toLocalChatUiStatus(
+  item: LocalChatMessage,
+  index: number,
+  messages: LocalChatMessage[],
+  chatting: boolean,
+): ChatUiStatus {
+  if (isLocalLoadingBubble(item, index, messages, chatting)) return 'pending'
+  if (chatting && index === messages.length - 1 && item.role === 'assistant') return 'streaming'
+  if (item.content?.includes('（已停止生成）')) return 'stop'
+  return 'complete'
+}
+
+export function toLocalChatUiContent(
+  item: LocalChatMessage,
+  index: number,
+  messages: LocalChatMessage[],
+  chatting: boolean,
+): ChatUiContentBlock[] {
+  if (item.role === 'user') {
+    return [{ type: 'text', data: item.content || '' }]
+  }
+  if (isLocalLoadingBubble(item, index, messages, chatting)) {
+    return [{ type: 'markdown', data: '' }]
+  }
+  return [{ type: 'markdown', data: item.content || '（无回复）' }]
+}

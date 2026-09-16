@@ -92,7 +92,7 @@
                 <t-icon name="setting" />
                 <span>设置</span>
               </button>
-              <button v-if="isEnterprise" type="button" class="user-menu__item" @click="openDialog('team')">
+              <button v-if="canOpenTeam" type="button" class="user-menu__item" @click="openDialog('team')">
                 <t-icon name="usergroup" />
                 <span>团队</span>
               </button>
@@ -194,7 +194,7 @@
       width="960px"
       placement="center"
     >
-      <team-view v-if="teamVisible" compact />
+      <team-view v-if="teamVisible && canOpenTeam" compact />
     </t-dialog>
   </div>
 </template>
@@ -218,6 +218,7 @@ import NotificationCenter from '@/components/NotificationCenter.vue'
 import TeamView from '@/views/TeamView.vue'
 import { getUnreadNotificationCount } from '@/api/notification'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionStore } from '@/stores/permission'
 
 defineProps<{
   collapsed?: boolean
@@ -233,8 +234,12 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const auth = useAuthStore()
+const permissionStore = usePermissionStore()
 const { isWorkspacePinned, toggleWorkspacePin } = useWorkspacePins()
 const isEnterprise = computed(() => auth.tenant?.tenantType === 'ENTERPRISE')
+const canOpenTeam = computed(
+  () => isEnterprise.value && permissionStore.can('member:manage'),
+)
 const currentWorkspaceName = computed(() => auth.currentWorkspace?.name || '未选择工作空间')
 const displayWorkspaces = computed(() => {
   const pinned = auth.workspaces.filter((item) => isWorkspacePinned(item.id))
@@ -259,6 +264,9 @@ function go(path: string) {
 }
 
 function openDialog(name: 'overview' | 'analytics' | 'team') {
+  if (name === 'team' && !canOpenTeam.value) {
+    return
+  }
   menuVisible.value = false
   overviewVisible.value = name === 'overview'
   analyticsVisible.value = name === 'analytics'

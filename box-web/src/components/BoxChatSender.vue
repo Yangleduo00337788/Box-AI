@@ -13,9 +13,9 @@
       @stop="emit('stop')"
       @remove="onRemoveAttachment"
     >
-      <template #footer-prefix>
+      <template v-if="showAttach || showCloud" #footer-prefix>
         <div class="box-chat-sender__prefix">
-          <t-tooltip content="添加文件" placement="top" theme="light" :show-arrow="false">
+          <t-tooltip v-if="showAttach" content="添加文件" placement="top" theme="light" :show-arrow="false">
             <button type="button" class="box-chat-sender__tool" aria-label="添加文件" @click="fileInputRef?.click()">
               <t-icon name="add" />
             </button>
@@ -62,6 +62,7 @@
       </template>
     </ChatSender>
     <input
+      v-if="showAttach"
       ref="fileInputRef"
       type="file"
       class="box-chat-sender__file-input"
@@ -88,6 +89,7 @@ const props = withDefaults(
     placeholder?: string
     maxRows?: number
     showCloud?: boolean
+    showAttach?: boolean
     showVoice?: boolean
     showModelPicker?: boolean
     listening?: boolean
@@ -104,6 +106,7 @@ const props = withDefaults(
     placeholder: '说说你想聊什么...',
     maxRows: 8,
     showCloud: true,
+    showAttach: true,
     showVoice: false,
     showModelPicker: false,
     listening: false,

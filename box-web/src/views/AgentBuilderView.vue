@@ -6,7 +6,7 @@
           <template #icon><t-icon name="chevron-left" /></template>
         </t-button>
         <div class="builder-header__meta">
-          <h1 class="builder-header__title">{{ agent?.name || '加载中…' }}</h1>
+          <h1 class="builder-header__title">{{ headerTitle }}</h1>
           <p class="builder-header__desc">Agent Builder · 配置与调试</p>
         </div>
         <t-tag v-if="agent" :theme="agent.status === 'PUBLISHED' ? 'success' : 'default'" variant="light" size="small">
@@ -21,7 +21,18 @@
     </header>
 
     <t-loading :loading="loading" size="small" class="builder-body">
-      <div v-if="agent" class="builder-layout">
+      <div v-if="loadError" class="builder-error">
+        <t-empty :description="loadError">
+          <template #title>
+            <span>无法加载智能体</span>
+          </template>
+          <p class="builder-error__hint">请确认当前工作空间是否正确，或从侧栏打开该智能体。</p>
+          <template #action>
+            <t-button theme="primary" @click="router.push('/chat')">返回对话</t-button>
+          </template>
+        </t-empty>
+      </div>
+      <div v-else-if="agent" class="builder-layout">
         <nav class="builder-nav">
           <button
             v-for="item in navItems"
@@ -334,14 +345,23 @@
                       <t-form-item label="自定义域名">
                         <t-input v-model="embedForm.customDomain" placeholder="chat.example.com" />
                       </t-form-item>
+                      <t-alert
+                        v-if="embedForm.customDomain && embedForm.domainVerifySkipped"
+                        theme="warning"
+                        message="当前为开发环境，已跳过 DNS / 校验文件检查。生产请将 box.embed.skip-domain-verify 设为 false。"
+                        style="margin-bottom: 12px"
+                      />
                       <p v-if="embedForm.customDomain" class="embed-domain-hint">
-                        将域名 CNAME 到当前站点后访问根路径即可打开嵌入对话。
-                        <span v-if="embedForm.domainVerified">已验证。</span>
+                        将域名 CNAME 到当前站点后，访问根路径会打开嵌入对话。
+                        <span v-if="embedForm.domainVerifySkipped && embedForm.domainVerified">本地已跳过校验。</span>
+                        <span v-else-if="embedForm.domainVerified">已验证。</span>
                         <span v-else>尚未验证。</span>
                       </p>
                       <p v-if="embedForm.domainVerifyToken" class="embed-domain-hint">
-                        校验文件：<code>/.well-known/box-domain-verify.txt</code> 内容为
-                        <code>{{ embedForm.domainVerifyToken }}</code>
+                        任选其一完成校验：TXT 记录
+                        <code>box-verify={{ embedForm.domainVerifyToken }}</code>
+                        （可写在域名或 <code>_box-verify.{{ embedForm.customDomain }}</code>），或将
+                        <code>/.well-known/box-domain-verify.txt</code> 内容设为同一令牌。CNAME 到本站时可由平台自动提供该文件。
                       </p>
                       <t-space>
                         <t-button theme="primary" :loading="savingEmbed" @click="saveEmbedConfig">保存 Embed 配置</t-button>
@@ -386,51 +406,67 @@
             <h3>调试预览</h3>
             <t-button variant="text" size="small" @click="clearChat">清空</t-button>
           </div>
-          <div ref="chatListRef" class="preview-messages">
+          <div ref="chatListRef" class="preview-messages preview-messages--td">
             <div v-if="!messages.length" class="preview-empty">
               发送消息测试当前 Prompt 与模型配置
             </div>
-            <div
-              v-for="(item, index) in messages"
-              :key="index"
-              class="preview-message"
-              :class="`preview-message--${item.role}`"
-            >
-              <span class="preview-message__role">{{ item.role === 'user' ? '你' : '智能体' }}</span>
-              <div
-                class="preview-message__content"
-                :class="{
-                  'preview-message__content--loading':
-                    chatting && index === messages.length - 1 && item.role === 'assistant' && !item.content,
-                }"
+            <div v-for="(item, index) in messages" :key="index" class="preview-message-wrap">
+              <ChatMessage
+                :role="toLocalChatUiRole(item.role)"
+                :content="toLocalChatUiContent(item, index, messages, chatting)"
+                :status="toLocalChatUiStatus(item, index, messages, chatting)"
+                :placement="item.role === 'user' ? 'right' : 'left'"
+                variant="text"
+                :animation="isLocalLoadingBubble(item, index, messages, chatting) ? 'gradient' : undefined"
+                class="chat-message-td"
               >
-                {{ item.content || (chatting && item.role === 'assistant' ? '思考中…' : '') }}
-              </div>
-              <div v-if="item.citations?.length" class="preview-citations">
-                <span class="preview-citations__label">引用</span>
-                <div v-for="cite in item.citations" :key="cite.index" class="preview-citation">
-                  [{{ cite.index }}] {{ cite.documentName }}
+                <template v-if="canShowPreviewActions(item, index)" #actionbar>
+                  <div class="t-chat__actions chat-message-td__actions">
+                    <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
+                      <t-button theme="default" size="small" :disabled="chatting" @click="copyPreviewMessage(item)">
+                        <template #icon><t-icon name="file-copy" /></template>
+                      </t-button>
+                    </t-tooltip>
+                  </div>
+                </template>
+              </ChatMessage>
+              <div v-if="item.citations?.length" class="chat-citations">
+                <span class="chat-citations__label">引用来源</span>
+                <div class="chat-citations__list">
+                  <t-popup
+                    v-for="cite in item.citations"
+                    :key="cite.index"
+                    placement="top"
+                    trigger="hover"
+                    show-arrow
+                    destroy-on-close
+                  >
+                    <template #content>
+                      <div class="chat-citation-popup">
+                        <div class="chat-citation-popup__title">{{ cite.documentName }}</div>
+                        <div class="chat-citation-popup__body">{{ cite.content }}</div>
+                      </div>
+                    </template>
+                    <button type="button" class="chat-citation-chip">
+                      [{{ cite.index }}] {{ cite.documentName }}
+                    </button>
+                  </t-popup>
                 </div>
               </div>
             </div>
           </div>
           <div class="preview-input">
-            <t-textarea
+            <box-chat-sender
               v-model="chatInput"
-              placeholder="输入测试消息，Enter 发送"
-              :autosize="{ minRows: 2, maxRows: 4 }"
-              :disabled="chatting"
-              @keydown="onChatKeydown"
+              :loading="chatting"
+              :can-send="Boolean(chatInput.trim())"
+              placeholder="输入测试消息…"
+              :max-rows="4"
+              :show-cloud="false"
+              :show-attach="false"
+              @send="sendChat"
+              @stop="stopChat"
             />
-            <t-button v-if="chatting" variant="outline" @click="stopChat">停止</t-button>
-            <t-button
-              v-else
-              theme="primary"
-              :disabled="!chatInput.trim()"
-              @click="sendChat"
-            >
-              发送
-            </t-button>
           </div>
         </aside>
       </div>
@@ -577,10 +613,17 @@ import {
   type PlatformModelVO,
 } from '@/api/platform'
 import type { ModelSource } from '@/api/agent'
+import { ChatMessage } from '@tdesign-vue-next/chat'
+import BoxChatSender from '@/components/BoxChatSender.vue'
+import {
+  isLocalLoadingBubble,
+  toLocalChatUiContent,
+  toLocalChatUiRole,
+  toLocalChatUiStatus,
+  type LocalChatMessage,
+} from '@/utils/chatMessageAdapter'
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
+interface BuilderPreviewMessage extends LocalChatMessage {
   citations?: Array<{ index: number; documentName: string; content: string }>
 }
 
@@ -589,7 +632,21 @@ const router = useRouter()
 const agentId = computed(() => Number(route.params.id))
 
 const loading = ref(true)
+const loadError = ref('')
 const agent = ref<AgentVO | null>(null)
+
+const headerTitle = computed(() => {
+  if (agent.value?.name) {
+    return agent.value.name
+  }
+  if (loadError.value) {
+    return '无法加载智能体'
+  }
+  if (loading.value) {
+    return '加载中…'
+  }
+  return '智能体不存在'
+})
 const models = ref<ModelVO[]>([])
 const platformModels = ref<PlatformModelVO[]>([])
 const byokEnabled = ref(false)
@@ -600,7 +657,7 @@ const savingPrompt = ref(false)
 const savingModel = ref(false)
 const chatting = ref(false)
 const chatInput = ref('')
-const messages = ref<ChatMessage[]>([])
+const messages = ref<BuilderPreviewMessage[]>([])
 const chatListRef = ref<HTMLElement | null>(null)
 
 const navItems = [
@@ -792,6 +849,7 @@ const embedForm = reactive({
   customDomain: '',
   domainVerified: false,
   domainVerifyToken: '',
+  domainVerifySkipped: false,
 })
 
 interface AgentConfigPayload {
@@ -958,6 +1016,7 @@ function applyConfigJson(raw?: string) {
     embedForm.customDomain = ''
     embedForm.domainVerified = false
     embedForm.domainVerifyToken = ''
+    embedForm.domainVerifySkipped = false
     return
   }
   try {
@@ -1026,6 +1085,7 @@ function applyEmbedVo(data: {
   customDomain?: string
   domainVerified?: boolean
   domainVerifyToken?: string | null
+  domainVerifySkipped?: boolean
 }) {
   embedForm.themeColor = data.themeColor || '#0052d9'
   embedForm.logoUrl = data.logoUrl || ''
@@ -1034,6 +1094,7 @@ function applyEmbedVo(data: {
   embedForm.customDomain = data.customDomain || ''
   embedForm.domainVerified = Boolean(data.domainVerified)
   embedForm.domainVerifyToken = data.domainVerifyToken || ''
+  embedForm.domainVerifySkipped = Boolean(data.domainVerifySkipped)
 }
 
 async function loadEmbedConfig() {
@@ -1075,7 +1136,9 @@ async function verifyEmbedDomain() {
     if (data.data) {
       applyEmbedVo(data.data)
     }
-    MessagePlugin.success(embedForm.domainVerified ? '域名已验证' : '验证已提交')
+    MessagePlugin.success(
+      embedForm.domainVerifySkipped ? '开发环境已跳过校验' : embedForm.domainVerified ? '域名已验证' : '验证已提交',
+    )
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '域名验证失败'))
   } finally {
@@ -1125,51 +1188,61 @@ function parseMcpToolCount(catalog?: string) {
 
 async function loadAgent() {
   loading.value = true
+  loadError.value = ''
+  agent.value = null
   try {
-    const [
-      { data: agentRes },
-      { data: modelRes },
-      { data: platformRes },
-      { data: capRes },
-      { data: kbRes },
-      { data: toolRes },
-      { data: mcpRes },
-      { data: agentsRes },
-      { data: bindKbRes },
-      { data: bindToolRes },
-      { data: bindMcpRes },
-      { data: bindSubAgentRes },
-      { data: publishRes },
-    ] = await Promise.all([
-      getAgent(agentId.value),
-      listModels(),
-      listPlatformModels(),
-      fetchPlatformCapabilities(),
-      listKnowledgeBases(),
-      listTools(),
-      listMcpServers(),
-      listAgents(),
-      listAgentKnowledge(agentId.value),
-      listAgentTools(agentId.value),
-      listAgentMcp(agentId.value),
-      listAgentSubAgents(agentId.value),
-      getAgentPublishStatus(agentId.value),
-    ])
-    models.value = modelRes.data || []
-    platformModels.value = platformRes.data || []
-    byokEnabled.value = capRes.data?.byokEnabled === true
-    knowledgeBases.value = kbRes.data || []
-    tools.value = toolRes.data || []
-    mcpServers.value = mcpRes.data || []
-    allAgents.value = agentsRes.data || []
-    knowledgeBindings.value = bindKbRes.data || []
-    toolBindings.value = bindToolRes.data || []
-    mcpBindings.value = bindMcpRes.data || []
-    subAgentBindings.value = bindSubAgentRes.data || []
-    publishInfo.value = publishRes.data || null
-    if (agentRes.data) {
-      applyAgent(agentRes.data)
+    const { data: agentRes } = await getAgent(agentId.value)
+    if (!agentRes.data) {
+      loadError.value = '智能体不存在'
+      return
     }
+    applyAgent(agentRes.data)
+
+    try {
+      const [
+        { data: modelRes },
+        { data: platformRes },
+        { data: capRes },
+        { data: kbRes },
+        { data: toolRes },
+        { data: mcpRes },
+        { data: agentsRes },
+        { data: bindKbRes },
+        { data: bindToolRes },
+        { data: bindMcpRes },
+        { data: bindSubAgentRes },
+        { data: publishRes },
+      ] = await Promise.all([
+        listModels(),
+        listPlatformModels(),
+        fetchPlatformCapabilities(),
+        listKnowledgeBases(),
+        listTools(),
+        listMcpServers(),
+        listAgents(),
+        listAgentKnowledge(agentId.value),
+        listAgentTools(agentId.value),
+        listAgentMcp(agentId.value),
+        listAgentSubAgents(agentId.value),
+        getAgentPublishStatus(agentId.value),
+      ])
+      models.value = modelRes.data || []
+      platformModels.value = platformRes.data || []
+      byokEnabled.value = capRes.data?.byokEnabled === true
+      knowledgeBases.value = kbRes.data || []
+      tools.value = toolRes.data || []
+      mcpServers.value = mcpRes.data || []
+      allAgents.value = agentsRes.data || []
+      knowledgeBindings.value = bindKbRes.data || []
+      toolBindings.value = bindToolRes.data || []
+      mcpBindings.value = bindMcpRes.data || []
+      subAgentBindings.value = bindSubAgentRes.data || []
+      publishInfo.value = publishRes.data || null
+    } catch (error) {
+      MessagePlugin.warning(extractApiError(error, '部分配置加载失败'))
+    }
+  } catch (error) {
+    loadError.value = extractApiError(error, '加载智能体失败')
   } finally {
     loading.value = false
   }
@@ -1414,8 +1487,8 @@ function buildServerHistory() {
     }))
 }
 
-async function sendChat() {
-  const text = chatInput.value.trim()
+async function sendChat(raw?: string) {
+  const text = (raw ?? chatInput.value).trim()
   if (!text || chatting.value) return
   const history = buildServerHistory()
   messages.value.push({ role: 'user', content: text })
@@ -1486,10 +1559,19 @@ async function sendChat() {
   }
 }
 
-function onChatKeydown(_value: string, context: { e: KeyboardEvent }) {
-  if (context.e.key === 'Enter' && !context.e.shiftKey && !chatting.value) {
-    context.e.preventDefault()
-    sendChat()
+function canShowPreviewActions(item: BuilderPreviewMessage, index: number) {
+  if (isLocalLoadingBubble(item, index, messages.value, chatting.value)) return false
+  return Boolean(item.content?.trim())
+}
+
+async function copyPreviewMessage(item: BuilderPreviewMessage) {
+  const text = item.content?.trim()
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    MessagePlugin.success('已复制')
+  } catch {
+    MessagePlugin.error('复制失败')
   }
 }
 
@@ -1554,6 +1636,23 @@ onMounted(loadAgent)
   margin: 2px 0 0;
   font: var(--td-font-body-small);
   color: var(--box-muted);
+}
+
+.builder-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 320px;
+  padding: 24px;
+}
+
+.builder-error__hint {
+  margin: 0 0 16px;
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 360px;
 }
 
 .builder-body {
@@ -1699,6 +1798,22 @@ onMounted(loadAgent)
   gap: 12px;
 }
 
+.preview-messages--td {
+  gap: 16px;
+}
+
+.preview-message-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.chat-message-td__actions {
+  display: inline-flex;
+  align-items: center;
+}
+
 .preview-empty {
   margin: auto;
   max-width: 220px;
@@ -1707,72 +1822,64 @@ onMounted(loadAgent)
   color: var(--box-muted);
 }
 
-.preview-message {
+.chat-citations {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 92%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
 }
 
-.preview-message--user {
-  align-self: flex-end;
-  align-items: flex-end;
-}
-
-.preview-message--assistant {
-  align-self: flex-start;
-}
-
-.preview-message__role {
-  font: var(--td-font-body-small);
-  color: var(--box-muted);
-}
-
-.preview-message__content {
-  padding: 10px 12px;
-  border-radius: 12px;
-  font: var(--td-font-body-medium);
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.preview-message--user .preview-message__content {
-  background: var(--td-gray-color-2);
-  color: var(--box-ink);
-}
-
-.preview-message--assistant .preview-message__content {
-  background: var(--td-gray-color-1);
-  color: var(--box-ink);
-}
-
-.preview-message__content--loading {
-  color: var(--box-muted);
-}
-
-.preview-citations {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--box-border);
+.chat-citations__label {
   font-size: 12px;
-  color: var(--box-muted);
+  color: var(--td-text-color-secondary);
 }
 
-.preview-citations__label {
-  display: block;
-  margin-bottom: 4px;
+.chat-citations__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-citation-chip {
+  border: 1px solid var(--td-component-border);
+  background: var(--td-bg-color-container);
+  color: var(--td-text-color-primary);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-citation-chip:hover {
+  border-color: var(--td-brand-color);
+  color: var(--td-brand-color);
+}
+
+.chat-citation-popup {
+  max-width: 360px;
+}
+
+.chat-citation-popup__title {
+  font-size: 13px;
   font-weight: 600;
+  margin-bottom: 6px;
 }
 
-.preview-citation {
+.chat-citation-popup__body {
+  font-size: 12px;
   line-height: 1.5;
+  color: var(--td-text-color-secondary);
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
 }
 
 .preview-input {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   padding: 12px 16px 16px;
   border-top: 1px solid var(--box-border);
   flex-shrink: 0;

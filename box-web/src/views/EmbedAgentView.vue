@@ -8,7 +8,7 @@
       <p v-if="!apiKey" class="embed-hint">请在 URL 中提供 <code>apiKey</code> 参数</p>
     </header>
 
-    <div ref="messageListRef" class="embed-messages">
+    <div ref="messageListRef" class="embed-messages embed-messages--td">
       <div v-if="!messages.length" class="embed-empty">
         <p v-if="embedConfig.welcomeMessage" class="embed-welcome">{{ embedConfig.welcomeMessage }}</p>
         <p v-else>开始与智能体对话</p>
@@ -25,25 +25,43 @@
           </button>
         </div>
       </div>
-      <div
-        v-for="(item, index) in messages"
-        :key="index"
-        class="embed-message"
-        :class="`embed-message--${item.role}`"
-      >
-        {{ item.content }}
+      <div v-for="(item, index) in messages" :key="index" class="embed-message-wrap">
+        <ChatMessage
+          :role="toLocalChatUiRole(item.role)"
+          :content="toLocalChatUiContent(item, index, messages, loading)"
+          :status="toLocalChatUiStatus(item, index, messages, loading)"
+          :placement="item.role === 'user' ? 'right' : 'left'"
+          variant="text"
+          :animation="isLocalLoadingBubble(item, index, messages, loading) ? 'gradient' : undefined"
+          class="chat-message-td"
+        >
+          <template v-if="canShowEmbedActions(item, index)" #actionbar>
+            <div class="t-chat__actions chat-message-td__actions">
+              <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
+                <t-button theme="default" size="small" :disabled="loading" @click="copyMessage(item)">
+                  <template #icon><t-icon name="file-copy" /></template>
+                </t-button>
+              </t-tooltip>
+            </div>
+          </template>
+        </ChatMessage>
       </div>
     </div>
 
-    <form class="embed-input" @submit.prevent="send">
-      <t-input
+    <div class="embed-input">
+      <box-chat-sender
         v-model="input"
+        :loading="loading"
+        :disabled="!apiKey || !agentId"
+        :can-send="canSend"
         placeholder="输入消息…"
-        :disabled="loading || !apiKey || !agentId"
-        size="large"
+        :max-rows="4"
+        :show-cloud="false"
+        :show-attach="false"
+        @send="onSend"
+        @stop="stopGeneration"
       />
-      <t-button theme="primary" type="submit" :loading="loading" :disabled="!apiKey || !agentId">发送</t-button>
-    </form>
+    </div>
   </div>
 </template>
 
@@ -51,16 +69,20 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
+import { ChatMessage } from '@tdesign-vue-next/chat'
 import {
   chatPublishedAgentStream,
   getPublishedAgentEmbedConfig,
   type AgentEmbedConfigVO,
 } from '@/api/agent'
-
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
+import BoxChatSender from '@/components/BoxChatSender.vue'
+import {
+  isLocalLoadingBubble,
+  toLocalChatUiContent,
+  toLocalChatUiRole,
+  toLocalChatUiStatus,
+  type LocalChatMessage,
+} from '@/utils/chatMessageAdapter'
 
 const route = useRoute()
 const agentId = ref<number>(Number(route.params.id) || 0)
@@ -70,10 +92,11 @@ const embedConfig = ref<AgentEmbedConfigVO>({
   themeColor: '#0052d9',
   suggestedQuestions: [],
 })
-const messages = ref<ChatMessage[]>([])
+const messages = ref<LocalChatMessage[]>([])
 const input = ref('')
 const loading = ref(false)
 const messageListRef = ref<HTMLElement | null>(null)
+const streamAbortController = ref<AbortController | null>(null)
 
 const displayTitle = computed(
   () => queryTitle.value || embedConfig.value.agentName || 'Box Agent',
@@ -81,6 +104,7 @@ const displayTitle = computed(
 const pageStyle = computed(() => ({
   '--embed-theme-color': embedConfig.value.themeColor || '#0052d9',
 }))
+const canSend = computed(() => Boolean(input.value.trim()) && Boolean(apiKey.value) && Boolean(agentId.value))
 
 async function scrollToBottom() {
   await nextTick()
@@ -103,33 +127,65 @@ function applyEmbed(data?: AgentEmbedConfigVO | null) {
   }
 }
 
+function canShowEmbedActions(item: LocalChatMessage, index: number) {
+  if (isLocalLoadingBubble(item, index, messages.value, loading.value)) return false
+  return Boolean(item.content?.trim())
+}
+
+async function copyMessage(item: LocalChatMessage) {
+  const text = item.content?.trim()
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    MessagePlugin.success('已复制')
+  } catch {
+    MessagePlugin.error('复制失败')
+  }
+}
+
+function stopGeneration() {
+  streamAbortController.value?.abort()
+}
+
 async function sendMessage(text: string) {
   if (!text || !apiKey.value || !agentId.value || loading.value) {
     return
   }
   messages.value.push({ role: 'user', content: text })
-  const assistant: ChatMessage = { role: 'assistant', content: '' }
+  const assistant: LocalChatMessage = { role: 'assistant', content: '' }
   messages.value.push(assistant)
   loading.value = true
   await scrollToBottom()
+  const controller = new AbortController()
+  streamAbortController.value = controller
   try {
     await chatPublishedAgentStream(agentId.value, apiKey.value, text, async (chunk) => {
       assistant.content += chunk
       await scrollToBottom()
-    })
-  } catch (error) {
+    }, { signal: controller.signal })
     if (!assistant.content) {
-      messages.value.pop()
+      assistant.content = '（无回复）'
     }
-    MessagePlugin.error(error instanceof Error ? error.message : '发送失败')
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      if (!assistant.content) {
+        assistant.content = '（已停止生成）'
+      }
+    } else {
+      if (!assistant.content) {
+        messages.value.pop()
+      }
+      MessagePlugin.error(error instanceof Error ? error.message : '发送失败')
+    }
   } finally {
     loading.value = false
+    streamAbortController.value = null
     await scrollToBottom()
   }
 }
 
-async function send() {
-  const text = input.value.trim()
+async function onSend(value: string) {
+  const text = value.trim()
   if (!text) {
     return
   }
@@ -217,6 +273,23 @@ onMounted(async () => {
   padding: 16px 20px;
 }
 
+.embed-messages--td {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.embed-message-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.chat-message-td__actions {
+  display: inline-flex;
+  align-items: center;
+}
+
 .embed-empty {
   color: var(--box-muted, #666);
   text-align: center;
@@ -253,34 +326,11 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
-.embed-message {
-  max-width: 80%;
-  margin-bottom: 12px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.embed-message--user {
-  margin-left: auto;
-  background: var(--embed-theme-color, var(--td-brand-color, #0052d9));
-  color: #fff;
-}
-
-.embed-message--assistant {
-  background: #f3f4f6;
-  color: var(--box-ink, #222);
-}
-
 .embed-input {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--box-border, #e7e7e7);
+  padding: 12px 20px 20px;
 }
 
+.embed-input :deep(.t-chat-sender__send-btn),
 .embed-input :deep(.t-button--theme-primary) {
   background-color: var(--embed-theme-color, var(--td-brand-color, #0052d9));
   border-color: var(--embed-theme-color, var(--td-brand-color, #0052d9));

@@ -116,6 +116,7 @@ export interface AgentEmbedConfigVO {
   customDomain?: string
   domainVerified?: boolean
   domainVerifyToken?: string | null
+  domainVerifySkipped?: boolean
 }
 
 export interface PublishedEmbedResolveVO {

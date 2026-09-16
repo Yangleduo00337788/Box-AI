@@ -32,12 +32,18 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@box/ui': path.resolve(__dirname, '../box-ui/src'),
+      'tdesign-icons-vue-next': path.resolve(__dirname, 'node_modules/tdesign-icons-vue-next'),
     },
+    dedupe: ['vue', 'tdesign-icons-vue-next'],
   },
   server: {
     port: 5173,
     proxy: {
       '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+      '/.well-known': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },

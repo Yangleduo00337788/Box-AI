@@ -49,6 +49,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   function applyWorkspaceSelection(preferredId: number | null | undefined, persistRemote: boolean) {
     const ids = new Set(workspaces.value.map((item) => String(item.id)))
+    // 受邀加入的其他租户工作空间可能暂未出现在 workspaces 列表，保留本地选择。
+    if (currentWorkspaceId.value && !ids.has(currentWorkspaceId.value)) {
+      if (persistRemote) {
+        void persistCurrentWorkspace(Number(currentWorkspaceId.value))
+      }
+      reloadPermissions()
+      return
+    }
     const preferred = preferredId != null ? String(preferredId) : ''
     if (preferred && ids.has(preferred)) {
       applyLocalWorkspace(Number(preferred))

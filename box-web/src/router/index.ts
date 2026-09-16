@@ -120,7 +120,17 @@ const router = createRouter({
             { path: 'billing', redirect: { path: '/settings/plan', query: { tab: 'billing' } } },
             { path: 'about', component: () => import('@/views/settings/SettingsAboutView.vue'), meta: { title: '关于盒子' } },
             { path: 'legal', component: () => import('@/views/settings/SettingsLegalView.vue'), meta: { title: '隐私与协议' } },
+            {
+              path: ':pathMatch(.*)*',
+              component: () => import('@/views/NotFoundView.vue'),
+              meta: { title: '页面不存在' },
+            },
           ],
+        },
+        {
+          path: ':pathMatch(.*)*',
+          component: () => import('@/views/NotFoundView.vue'),
+          meta: { title: '页面不存在' },
         },
       ],
     },
