@@ -1802,41 +1802,111 @@ permissions
 
 公开页：
 
-/login · /register · /forgot-password · /embed/agents/:id
+`/login` · `/register` · `/forgot-password` · `/embed` · `/embed/agents/:id` · `/invite/:token` · `/legal/:doc`
 
 登录后默认：`/` → `/chat`
+
+**C 端侧栏（真实结构）**：新任务 `/chat`、插件市场 `/plugin-market`、模型 `/models`，以及智能体 / 项目 / 任务列表。  
+知识库 · 工具 · MCP · 工作流 · 市场 **不在侧栏**，从插件市场或全局搜索进入。
+
+**头像菜单 Dialog（不以侧栏整页为主）**：概览、分析（可切到执行记录）、团队。对应路由 `/dashboard`、`/analytics`、`/team` 仍存在。团队弹窗需企业租户 + `member:manage`。
 
 | 路由 | 说明 |
 |------|------|
 | `/chat`、`/chat/:id` | 对话工作台（默认首页） |
-| `/dashboard` | 概览 |
-| `/agents` | ↪️ 重定向 `/chat` |
+| `/dashboard` | 概览（主入口为弹窗） |
+| `/agents` | ↪️ `/chat` |
 | `/agents/:id/builder` | Agent Builder |
-| `/workflows`、`/workflows/:id/editor` | 工作流 |
-| `/knowledge` · `/tools` · `/mcp` · `/models` | 资源管理 |
-| `/plugin-market` · `/market` | 插件 / Agent 市场 |
-| `/executions` · `/debug` · `/analytics` | 可观测 |
-| `/team` | 团队成员（`member:manage`） |
-| `/settings/profile` · `appearance` · `general` · `security` | 个人与通用 |
+| `/workflows`、`/workflows/:id/editor` | 工作流（非侧栏） |
+| `/knowledge` · `/tools` · `/mcp` | 资源（非侧栏） |
+| `/models` | 模型（侧栏） |
+| `/plugin-market` · `/market` | 插件市场（侧栏） / Agent 市场（非侧栏） |
+| `/executions` | ↪️ `/debug` |
+| `/debug` | Debug Console（无侧栏入口） |
+| `/analytics` | 分析（主入口为弹窗） |
+| `/team` | 团队（主入口为弹窗；`member:manage`） |
+| `/settings/profile` · `security` · `preferences` | 账号与偏好 |
 | `/settings/api-keys` · `roles` · `audit-logs` | 需对应权限 |
-| `/settings/quota` · `billing` · `capacity` | 额度与账单 |
+| `/settings/plan` | 套餐与额度（含账单 Tab） |
 | `/settings/about` · `legal` | 关于与协议 |
 | `/forbidden` | 无权限 |
 
+设置重定向：`appearance` · `general` → `preferences`；`quota` · `capacity` · `billing` → `plan`。
+
 已废弃重定向：`/conversations`、`/chat/logs` → `/chat`
 
-**box-admin-web**（独立应用）：`/tenants` · `/plans` · `/platform-models` · `/agent-templates` · `/plugin-catalog` · `/system-config`
+**box-admin-web**（独立应用，默认 `/dashboard`）：
+
+侧栏显隐与路由守卫共用 `box-admin-web/src/constants/rbac.ts` 的 `ADMIN_ROUTE_ROLES`（与后端 `PlatformAdminAccess` 对齐）。`menu.ts` 只描述文案与路径，不重复写角色。
+
+| 路由 | 说明 | 角色 |
+|------|------|------|
+| `/dashboard` | 工作台 | SUPER / OPS / FINANCE / CONTENT |
+| `/analytics` | 平台分析 | SUPER / OPS / FINANCE |
+| `/tenants` | 租户管理 | SUPER / OPS / FINANCE |
+| `/users` | 平台用户 | SUPER / OPS（新建/启停仅 SUPER） |
+| `/plans` | 套餐 | SUPER / OPS / FINANCE |
+| `/billing-invoices` | 账单对账 | SUPER / FINANCE |
+| `/ops-placements` | 运营位 | SUPER / OPS / CONTENT |
+| `/audit-logs` | 全平台审计 | SUPER / OPS / FINANCE |
+| `/platform-models` | 平台模型池 | SUPER / OPS |
+| `/agent-templates` | 智能体市场 | SUPER / OPS / CONTENT |
+| `/plugin-catalog` · `/platform-tools` · `/platform-mcp` | 插件 / 官方工具 / MCP | SUPER / OPS / CONTENT |
+| `/system-config` | SMTP / OAuth / 协议 | SUPER |
+| `/forbidden` | 无权限 | 已登录 |
 
 ---
 
 五十五点一、平台 Admin API
 
 ```
+POST       /api/v1/admin/auth/login
+GET        /api/v1/admin/auth/me
+POST       /api/v1/admin/auth/verification-code
+POST       /api/v1/admin/auth/password/reset
+
+GET        /api/v1/admin/analytics/overview
+GET        /api/v1/admin/analytics/trends
+GET        /api/v1/admin/analytics/tenants/{tenantId}
+
+GET/POST   /api/v1/admin/tenants
+PUT        /api/v1/admin/tenants/{id}/status
+PUT        /api/v1/admin/tenants/{id}/plan
+GET        /api/v1/admin/tenants/{id}/quota
+GET        /api/v1/admin/tenants/{id}/workspaces
+GET/POST   /api/v1/admin/tenants/{tenantId}/members
+PUT        /api/v1/admin/tenants/{tenantId}/members/{userId}/status
+
+GET        /api/v1/admin/users
+POST       /api/v1/admin/users                 （仅 SUPER_ADMIN）
+PUT        /api/v1/admin/users/{id}/status     （仅 SUPER_ADMIN）
+GET        /api/v1/admin/users/{id}/context
+
 GET/POST   /api/v1/admin/plans
-GET/PUT    /api/v1/admin/platform/models
-GET/POST   /api/v1/admin/plugins
+GET/PUT/DELETE /api/v1/admin/plans/{id}
+
+GET        /api/v1/admin/billing/invoices
+
+GET        /api/v1/admin/audit-logs
+
+GET/POST/PUT/DELETE /api/v1/admin/ops/placements
+
+GET/POST/PUT/DELETE /api/v1/admin/platform/providers
+GET/POST/PUT/DELETE /api/v1/admin/platform/models
+GET/POST/DELETE     /api/v1/admin/platform/credentials
+
+GET/POST/PUT/DELETE /api/v1/admin/agent-templates
+PUT        /api/v1/admin/agent-templates/{id}/review
+GET/POST/PUT/DELETE /api/v1/admin/plugins
+PUT        /api/v1/admin/plugins/{id}/review
+GET/POST/PUT/DELETE /api/v1/admin/plugin-categories
+
 GET/PUT    /api/v1/admin/system/config
+POST       /api/v1/admin/assets/images
 ```
+
+平台角色 `platformAdminRole`：`SUPER_ADMIN` · `OPS` · `FINANCE` · `CONTENT`。  
+`PlatformAdminInterceptor` 对 `/api/v1/admin/**` 校验 userType + 角色路径矩阵（见 `PlatformAdminAccess`）。无 claim 的旧 Token 暂按 SUPER_ADMIN，重新登录后写入真实角色。
 
 租户成员等见 `box-tenant` / `box-user` 下 Admin Controller。
 
@@ -1884,6 +1954,8 @@ Permission
 «前端权限只是 UX 控制，不能作为安全边界。»
 
 真正权限必须由后端执行。
+
+平台管理端另有 `platformAdminRole`（SUPER_ADMIN / OPS / FINANCE / CONTENT）：侧栏与路由守卫只做显隐，接口由 `PlatformAdminInterceptor` 拒绝 403。
 
 ---
 

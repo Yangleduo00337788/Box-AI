@@ -1,6 +1,6 @@
 # Box V1 进度追踪
 
-文档版本：V1.7 · 整体完成度：**~96%**
+文档版本：V1.10 · 整体完成度：**~96%**
 
 > 未完成项与执行顺序见 [`10-Gaps.md`](./10-Gaps.md)。本文档反映代码库真实状态，不再使用「100%」表述。
 
@@ -10,10 +10,48 @@
 
 | 维度 | 完成度 | 说明 |
 |------|--------|------|
-| 文档规划 | ~96% | 2026-09-14 已补 Flyway V25–V29、B 端路由；PRD Super Admin 部分能力仍在 backlog |
-| 后端实现 | ~96% | V1 主清单完成；OAuth 仍为 stub；B 端用户/审计/套餐知识库配额已接 |
-| 前端实现 | ~95% | C 端 V1 完成；B 端工作台/用户/审计/主题已落地 |
+| 文档规划 | ~97% | 2026-09-16 对齐 C 端侧栏/弹窗 IA 与 B 端 RBAC 单源 |
+| 后端实现 | ~97% | V1 主清单完成；平台角色拦截已细化；OAuth 仍为 stub |
+| 前端实现 | ~96% | C 端 `/chat`、Builder 调试预览、Embed 页统一 TDesign Chat |
 | V1 可演示 | ~98% | **`10-Gaps.md` P0/P1/P2 主清单已全部完成** |
+
+---
+
+## Sprint 10 已完成（C/B 端 IA 文档对齐，2026-09-16）
+
+| ID | 任务 | 状态 |
+|----|------|------|
+| D-13 | `09-Progress` / `05-Backend` §55 按真实侧栏、设置合并、弹窗入口改写 | ✅ |
+| F-24 | C 端去掉未渲染的「资源」菜单配置；资源仅插件市场 + 搜索 | ✅ |
+| F-25 | 团队头像弹窗与 `/team` 同样校验 `member:manage` | ✅ |
+| A-09 | 管理端菜单角色只维护 `rbac.ts` | ✅ |
+
+---
+
+## Sprint 9 已完成（平台 RBAC + B 端文档，2026-09-16）
+
+| ID | 任务 | 状态 |
+|----|------|------|
+| BL-20 | 平台角色细粒度拦截 + 管理端菜单/路由显隐 | ✅ |
+| BL-07 | 抽检并更新 `05-Backend.md` B 端路由与 Admin API | ✅ |
+
+**角色矩阵**：`SUPER_ADMIN` 全量；`OPS` 运营/租户/资源（不含账单与系统配置，不能新建管理员）；`FINANCE` 分析/租户/套餐/账单/审计；`CONTENT` 运营位与市场目录。
+
+---
+
+## Sprint 8 已完成（对话 UI 统一，2026-09-16）
+
+| ID | 任务 | 状态 |
+|----|------|------|
+| F-21 | C 端 `/chat` 接入 TDesign Chat（`ChatMessage` + `BoxChatSender`） | ✅ |
+| F-22 | Builder 调试预览改用同一套 Chat 消息与输入区 | ✅ |
+| F-23 | Embed `/embed/agents/:id` 改用同一套 Chat 消息与输入区 | ✅ |
+
+**实现要点**：
+
+- 共享适配：`box-web/src/utils/chatMessageAdapter.ts`（`MessageVO` + 本地 `LocalChatMessage`）
+- 共享输入：`BoxChatSender`；Builder / Embed 关闭附件与「云端」标记
+- Embed 保留欢迎语、推荐问题与主题色；生成中可停止 SSE
 
 ---
 
@@ -45,8 +83,10 @@
 **关键 API**：
 
 - `GET /api/v1/auth/oauth/providers`
-- `GET /api/v1/agents/{id}/embed-config` · `PUT ...`
+- `GET /api/v1/agents/{id}/embed-config` · `PUT ...` · `POST /api/v1/agents/{id}/embed-domain/verify`
 - `GET /api/v1/published/agents/{id}/embed-config`（公开，无需 API Key）
+- `GET /api/v1/published/embed/resolve` · `GET /.well-known/box-domain-verify.txt`
+- `PUT /api/v1/admin/agent-templates/{id}/review` · `PUT /api/v1/admin/plugins/{id}/review`
 
 **Docker 全栈**：`cd deploy && docker compose --profile app up -d --build`
 
@@ -72,7 +112,7 @@
 | B-14 | 危险 Tool 执行确认（`tool.confirm` + Redis 令牌） | ✅ |
 | B-16 | 通知中心后端事件 | ✅ |
 | F-02 | Agent 列表策略（方案 B：`/chat` 合并） | ✅ |
-| F-06 | 默认入口 `/chat`，侧栏保留概览 | ✅ |
+| F-06 | 默认入口 `/chat`；概览在头像菜单弹窗 | ✅ |
 | F-07 | Settings IA（`/team` + `/settings/*`） | ✅ |
 | F-11 | Chat Trace 侧栏 | ✅ |
 | F-13 | 危险 Tool 二次确认 Dialog | ✅ |
@@ -87,8 +127,11 @@
 ### 产品决策（F-02 / F-06 / F-07）
 
 - **Agent 列表**：不恢复独立 `/agents` 列表页；`/agents` → `/chat`，在对话工作台选择/创建 Agent
-- **默认入口**：登录后进入 `/chat`；`/dashboard` 作为可选「概览」
-- **设置 IA**：成员与角色在 `/team`；API Key、审计、安全等在 `/settings/*`，按权限显隐
+- **默认入口**：登录后进入 `/chat`
+- **概览 / 分析 / 团队**：不以侧栏整页为主；头像菜单打开 Dialog。`/dashboard`、`/analytics`、`/team` 直链仍可用。团队弹窗与 `/team` 一样需要企业租户 + `member:manage`
+- **侧栏固定入口**：新任务 `/chat`、插件市场 `/plugin-market`、模型 `/models`；其下为智能体、项目、任务列表
+- **资源页**：知识库 / 工具 / MCP / 工作流 / 市场不在侧栏；从插件市场或全局搜索进入
+- **设置 IA**：`profile` · `security` · `preferences` · `api-keys` · `roles` · `audit-logs` · `plan` · `about` · `legal`。外观/通用 → `preferences`；额度/容量/账单 → `plan`
 
 ### 限流策略（B-06）
 
@@ -224,58 +267,63 @@
 
 默认入口：`/` → `/chat`（新任务 / 对话工作台）
 
+**C 端侧栏**：新任务、插件市场、模型 + 智能体/项目/任务。资源页不在侧栏。概览/分析/团队在头像菜单 Dialog，不是侧栏主入口。
+
 | 页面 | 路由 | 状态 | 备注 |
 |------|------|------|------|
-| 对话工作台 | `/chat`、`/chat/:id` | ✅ | 登录后默认页 |
-| 概览 | `/dashboard` | ✅ | |
-| 智能体列表 | `/agents` | ↪️ | **重定向至 `/chat`**；列表与对话合并 |
-| Agent Builder | `/agents/:id/builder` | ✅ | Prompt / 模型 / 知识库 / 工具 / 发布 / 调试 |
-| 工作流列表 | `/workflows` | ✅ | 经插件市场或侧栏进入 |
+| 对话工作台 | `/chat`、`/chat/:id` | ✅ | 登录后默认页；侧栏「新任务」 |
+| 概览 | `/dashboard` | ✅ | **头像菜单弹窗**为主；直链仍打开整页 |
+| 智能体列表 | `/agents` | ↪️ | **重定向至 `/chat`** |
+| Agent Builder | `/agents/:id/builder` | ✅ | 右侧调试预览用 TDesign Chat |
+| 工作流列表 | `/workflows` | ✅ | 插件市场 / 搜索；不在侧栏 |
 | 工作流编辑器 | `/workflows/:id/editor` | ✅ | |
-| 知识库 | `/knowledge` | ✅ | |
-| 工具 | `/tools` | ✅ | |
-| MCP | `/mcp` | ✅ | |
-| 模型 | `/models` | ✅ | |
-| 插件市场 | `/plugin-market` | ✅ | 工作流 / 知识库 / 工具 / MCP 入口聚合 |
-| 执行记录 | `/executions` | ✅ | |
-| Debug Console | `/debug` | ✅ | 三栏：Input / Trace / Output |
-| 分析 | `/analytics` | ✅ | ECharts 趋势图 + Top Agents 柱状图 |
-| 市场 | `/market` | ✅ | |
-| 团队 | `/team` | ✅ | 需 `member:manage` |
+| 知识库 | `/knowledge` | ✅ | 插件市场 / 搜索；不在侧栏 |
+| 工具 | `/tools` | ✅ | 插件市场 / 搜索；不在侧栏 |
+| MCP | `/mcp` | ✅ | 插件市场 / 搜索；不在侧栏 |
+| 模型 | `/models` | ✅ | 侧栏入口 |
+| 插件市场 | `/plugin-market` | ✅ | 侧栏入口；资源分类与「管理我的…」 |
+| 市场 | `/market` | ✅ | 插件市场跳转 / 搜索；不在侧栏 |
+| 执行记录 | `/executions` | ↪️ | **重定向 `/debug`**；分析弹窗内也可看列表 |
+| Debug Console | `/debug` | ✅ | 无侧栏入口；Builder 等可跳转 |
+| 分析 | `/analytics` | ✅ | **头像菜单弹窗**为主；直链仍打开整页 |
+| 团队 | `/team` | ✅ | **头像菜单弹窗**为主（企业 + `member:manage`）；邀请接受会整页打开 |
 | 设置 · 个人信息 | `/settings/profile` | ✅ | |
-| 设置 · 外观 | `/settings/appearance` | ✅ | |
-| 设置 · 通用 | `/settings/general` | ✅ | |
 | 设置 · 账号与安全 | `/settings/security` | ✅ | |
+| 设置 · 偏好设置 | `/settings/preferences` | ✅ | 外观/通用已重定向至此 |
 | 设置 · API 密钥 | `/settings/api-keys` | ✅ | 需 `api_key:manage` |
 | 设置 · 角色与权限 | `/settings/roles` | ✅ | 需 `role:manage` |
 | 设置 · 审计日志 | `/settings/audit-logs` | ✅ | 需 `audit:read` |
-| 设置 · 额度管理 | `/settings/quota` | ✅ | `box-tenant` |
-| 设置 · 账单概览 | `/settings/billing` | ✅ | `box-tenant` |
-| 设置 · 容量管理 | `/settings/capacity` | ✅ | |
+| 设置 · 套餐与额度 | `/settings/plan` | ✅ | 额度/容量/账单已重定向至此 |
 | 设置 · 关于 / 协议 | `/settings/about`、`/settings/legal` | ✅ | |
 | 无权限 | `/forbidden` | ✅ | |
-| 嵌入对话 | `/embed/agents/:id` | ✅ | 公开页 |
+| 嵌入对话 | `/embed/agents/:id`、`/embed` | ✅ | 公开页；后者用于自定义域名解析 |
+| 邀请链接 | `/invite/:token` | ✅ | 公开页 |
+| 法律文档 | `/legal/:doc` | ✅ | 公开页 |
 | 忘记密码 | `/forgot-password` | ✅ | 公开页 |
 
 **管理后台 `box-admin-web`**（独立 Vite 应用，默认 `/dashboard`）：
 
 | 页面 | 路由 | 备注 |
 |------|------|------|
-| 工作台 | `/dashboard` | 租户/资源统计与图表 |
+| 工作台 | `/dashboard` | 租户/资源统计与图表；快捷入口按角色过滤 |
 | 平台分析 | `/analytics` | 执行量、成功率、Token、租户用量 TOP |
 | 租户管理 | `/tenants` | 创建（含个人/企业）、启停、成员、套餐、额度 |
-| 用户管理 | `/users` | 新建平台管理员、分页、类型/状态、启停 |
+| 用户管理 | `/users` | 列表与上下文；新建/启停仅 SUPER_ADMIN |
 | 套餐管理 | `/plans` | 套餐与配额（含知识库上限） |
+| 账单对账 | `/billing-invoices` | 订阅账单 |
+| 运营位 | `/ops-placements` | C 端公告、推荐与市场精选 |
 | 审计日志 | `/audit-logs` | 全平台操作记录 |
 | 平台模型池 | `/platform-models` | 平台级模型与密钥 |
 | 智能体市场 | `/agent-templates` | C 端模板上架 |
 | 插件市场 | `/plugin-catalog` | 插件分类与上架 |
 | 官方工具 | `/platform-tools` | 上架 HTTP 工具供租户安装 |
 | 官方 MCP | `/platform-mcp` | 上架 MCP 服务供租户安装 |
-| 运营位 | `/ops-placements` | C 端公告、推荐与市场精选 |
-| 系统配置 | `/system-config` | 关于、协议、客服 |
+| 系统配置 | `/system-config` | 关于、协议、客服、SMTP/OAuth |
+| 无权限 | `/forbidden` | 平台角色无页面权限 |
 
-已废弃或重定向：`/conversations`、`/chat/logs`、`/agents` → `/chat`
+已废弃或重定向：`/conversations`、`/chat/logs`、`/agents` → `/chat`；`/executions` → `/debug`；`/settings/appearance` · `general` → `/settings/preferences`；`/settings/quota` · `capacity` · `billing` → `/settings/plan`
+
+管理端菜单显隐只读 `rbac.ts` 的 `ADMIN_ROUTE_ROLES`，与 `menu.ts` 文案分源。
 
 ---
 
@@ -289,7 +337,7 @@
   → Builder 内 SSE 调试对话
   → 发布 Agent
   → Web Chat / Published API + API Key（/settings/api-keys）
-  → 查看 /executions、/debug 或 /analytics
+  → 头像菜单打开概览 / 分析（弹窗）；执行记录在分析弹窗内或 `/debug`
 ```
 
 ---
@@ -349,7 +397,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 | Tool | P0 | ✅ | HTTP/DB/MCP/Function/Code 已通 |
 | Workflow + Runtime | P0 | ✅ | `box-workflow` · Switch + 图校验 |
 | Agent Runtime | P0 | ✅ | `box-agent` |
-| Debug / Trace | P0 | ✅ | `/debug` · `/executions` |
+| Debug / Trace | P0 | ✅ | `/debug`（`/executions` 重定向）；分析弹窗可看执行列表 |
 | Publish + API Key | P0 | ✅ | Builder 发布 · `/settings/api-keys` |
 | RBAC | P0 | ✅ | `box-security` · `/settings/roles` |
 | 基础 Analytics | P0 | ✅ | `box-analytics` · `/analytics` |
@@ -382,7 +430,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 | 通知 | `/api/v1/notifications/*` | ✅ | 未读角标、已读；顶栏 `NotificationCenter` |
 | 账单/额度 | `/api/v1/billing/*` | ✅ | `box-tenant` |
 | 侧栏 | `/api/v1/sidebar` | ✅ | C 端菜单与工作区上下文 |
-| 平台管理 | `/api/v1/admin/*` | ✅ | 租户、用户、套餐、审计、分析、运营位、平台模型、插件/工具/MCP、系统配置 |
+| 平台管理 | `/api/v1/admin/*` | ✅ | 见 `05-Backend.md` §55.1；`PlatformAdminAccess` 按角色拦截 |
 
 ---
 
@@ -406,7 +454,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 
 ## V1.5 商业化与运营（2026-09）
 
-Flyway **V35–V37**；Phase A–E 按计划落地（支付网关、市场审核 UI、Model Router 接入 chat 仍 🟡）。
+Flyway **V35–V37**；市场审核（通过/拒绝）与 Embed 域名真校验已落地（灰度放量、支付网关、Model Router 接入 chat 仍 🟡）。
 
 | 域 | 交付 | 状态 |
 |----|------|------|
@@ -416,8 +464,8 @@ Flyway **V35–V37**；Phase A–E 按计划落地（支付网关、市场审核
 | 企业升级 | 个人→企业 `upgradeToEnterprise` | ✅ |
 | 运营排障 | 用户上下文 Drawer；Analytics 租户下钻（不含代登录进 C 端） | ✅ |
 | C 端体验 | 侧栏 IA；Debug/Executions 合并；对话导出；API 文档 Tab；Session 管理 | ✅ |
-| B 端治理 | 平台角色创建；SMTP/OAuth 系统配置；管理端找回密码 | 🟡 RBAC 拦截待细化 |
-| Phase E | 运营位埋点；知识库 URL 导入；市场审核字段；Model Router stub | 部分 🟡 |
+| B 端治理 | 平台角色创建；SMTP/OAuth 系统配置；管理端找回密码；RBAC 拦截 | ✅ |
+| Phase E | 运营位埋点；知识库 URL 导入；市场审核；Embed 域名校验；Model Router stub | 部分 🟡 |
 
 **主要路由**：C 端 `/settings/plan`、`/team`、`/invite/:token`；B 端 `/billing-invoices`、`/forgot-password`。
 
