@@ -16,7 +16,18 @@ export class BoxClient {
     this.apiKey = apiKey
   }
 
-  async chat(agentId, message, { stream = false, onDelta } = {}) {
+  async chat(agentId, message, options = {}) {
+    const {
+      stream = false,
+      onDelta,
+      onCitations,
+      onToolStart,
+      onToolDelta,
+      onToolEnd,
+      onToolConfirm,
+      history = [],
+      toolConfirmationToken,
+    } = options
     const response = await fetch(`${this.baseUrl}/api/v1/published/agents/${agentId}/chat`, {
       method: 'POST',
       headers: {
@@ -24,14 +35,23 @@ export class BoxClient {
         'Content-Type': 'application/json',
         Accept: stream ? 'text/event-stream, application/json' : 'application/json',
       },
-      body: JSON.stringify({ message, stream }),
+      body: JSON.stringify({
+        message,
+        stream,
+        history: this.#normalizeHistory(history),
+        toolConfirmationToken,
+      }),
     })
     if (!stream) {
       const payload = await response.json()
       if (!response.ok || payload.code !== 0) {
         throw new Error(payload.message || `HTTP ${response.status}`)
       }
-      return payload.data?.content || ''
+      return {
+        content: payload.data?.content || '',
+        citations: payload.data?.citations || [],
+        executionId: payload.data?.executionId,
+      }
     }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
@@ -54,10 +74,36 @@ export class BoxClient {
         buffer = buffer.slice(boundary + 2)
         for (const line of rawEvent.split('\n')) {
           if (!line.startsWith('data:')) continue
-          const event = JSON.parse(line.slice(5).trim())
+          const payload = line.slice(5).trim()
+          if (!payload) continue
+          let event
+          try {
+            event = JSON.parse(payload)
+          } catch {
+            continue
+          }
           if (event.type === 'delta' && event.content) {
             content += event.content
             onDelta?.(event.content)
+          }
+          if (event.type === 'citations' && event.content) {
+            try {
+              onCitations?.(JSON.parse(event.content))
+            } catch {
+              // ignore malformed citations
+            }
+          }
+          if (event.type === 'tool.start') {
+            onToolStart?.(this.#parseToolPayload(event.content))
+          }
+          if (event.type === 'tool.delta') {
+            onToolDelta?.(this.#parseToolPayload(event.content))
+          }
+          if (event.type === 'tool.end') {
+            onToolEnd?.(this.#parseToolPayload(event.content))
+          }
+          if (event.type === 'tool.confirm') {
+            onToolConfirm?.(this.#parseToolConfirmPayload(event.content))
           }
           if (event.type === 'error') {
             throw new Error(event.message || 'stream error')
@@ -81,5 +127,35 @@ export class BoxClient {
       throw new Error(payload.message || `HTTP ${response.status}`)
     }
     return payload.data
+  }
+
+  #normalizeHistory(history) {
+    if (!Array.isArray(history)) return []
+    return history
+      .filter((item) => item?.content?.trim())
+      .map((item) => ({
+        role: item.role,
+        content: String(item.content).trim(),
+      }))
+  }
+
+  #parseToolPayload(raw) {
+    if (!raw) return null
+    try {
+      const parsed = JSON.parse(raw)
+      return parsed?.toolKey ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  #parseToolConfirmPayload(raw) {
+    if (!raw) return null
+    try {
+      const parsed = JSON.parse(raw)
+      return parsed?.confirmationToken && parsed?.toolKey ? parsed : null
+    } catch {
+      return null
+    }
   }
 }
