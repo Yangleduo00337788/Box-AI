@@ -1,11 +1,14 @@
 package com.boxai.publish.application;
 
+import com.boxai.agent.api.AgentChatHistoryItem;
 import com.boxai.agent.api.AgentChatRequest;
 import com.boxai.agent.api.AgentChatVO;
 import com.boxai.agent.application.AgentLongTermMemoryApplicationService;
 import com.boxai.agent.chat.AgentChatExecutor;
 import com.boxai.agent.chat.AgentChatPreparer;
+import com.boxai.agent.chat.ChatCitationSupport;
 import com.boxai.agent.chat.PreparedAgentChat;
+import com.boxai.ai.ChatTurn;
 import com.boxai.common.constant.PublishResourceTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
@@ -23,12 +26,14 @@ import com.boxai.domain.publish.EmbedCustomDomain;
 import com.boxai.knowledge.application.KnowledgeRetrievalResult;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.trace.application.ExecutionRecorder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +48,7 @@ public class PublishedAgentApplicationService {
     private final ExecutionRecorder executionRecorder;
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
     private final EmbedDomainApplicationService embedDomainApplicationService;
+    private final ObjectMapper objectMapper;
 
     public PublishedAgentApplicationService(AgentRepository agentRepository,
                                             AgentVersionRepository agentVersionRepository,
@@ -51,7 +57,8 @@ public class PublishedAgentApplicationService {
                                             AgentChatExecutor agentChatExecutor,
                                             ExecutionRecorder executionRecorder,
                                             AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
-                                            EmbedDomainApplicationService embedDomainApplicationService) {
+                                            EmbedDomainApplicationService embedDomainApplicationService,
+                                            ObjectMapper objectMapper) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.publishRepository = publishRepository;
@@ -60,6 +67,7 @@ public class PublishedAgentApplicationService {
         this.executionRecorder = executionRecorder;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
         this.embedDomainApplicationService = embedDomainApplicationService;
+        this.objectMapper = objectMapper;
     }
 
     public AgentEmbedConfigVO getEmbedConfig(Long agentId) {
@@ -89,8 +97,11 @@ public class PublishedAgentApplicationService {
         Agent agent = requirePublishedAgent(agentId);
         String message = request.message().trim();
         AgentVersion version = requirePublishedVersion(agent);
+        List<ChatTurn> history = resolveHistory(version, request.history());
         KnowledgeRetrievalResult retrieval = agentChatPreparer.retrieveKnowledge(version, message);
-        PreparedAgentChat prepared = agentChatPreparer.preparePublished(agentId, List.of(), message);
+        PreparedAgentChat prepared = applyToolConfirmation(
+                agentChatPreparer.preparePublished(agentId, history, message, retrieval),
+                request.toolConfirmationToken());
         Execution execution = executionRecorder.startAgentExecution(
                 agentId,
                 prepared.agentVersionId(),
@@ -108,7 +119,7 @@ public class PublishedAgentApplicationService {
                     WorkspaceContext.require().userId(),
                     message,
                     content);
-            return new AgentChatVO(content);
+            return new AgentChatVO(content, retrieval.citations(), execution.getId());
         } catch (RuntimeException e) {
             executionRecorder.fail(execution, e.getMessage());
             throw e;
@@ -119,8 +130,11 @@ public class PublishedAgentApplicationService {
         Agent agent = requirePublishedAgent(agentId);
         String message = request.message().trim();
         AgentVersion version = requirePublishedVersion(agent);
+        List<ChatTurn> history = resolveHistory(version, request.history());
         KnowledgeRetrievalResult retrieval = agentChatPreparer.retrieveKnowledge(version, message);
-        PreparedAgentChat prepared = agentChatPreparer.preparePublished(agentId, List.of(), message);
+        PreparedAgentChat prepared = applyToolConfirmation(
+                agentChatPreparer.preparePublished(agentId, history, message, retrieval),
+                request.toolConfirmationToken());
         Execution execution = executionRecorder.startAgentExecution(
                 agentId,
                 prepared.agentVersionId(),
@@ -132,12 +146,43 @@ public class PublishedAgentApplicationService {
         configureSseResponse(response);
         Long workspaceId = workspaceId();
         Long userId = WorkspaceContext.require().userId();
+        String citationsJson = ChatCitationSupport.toCitationsJson(objectMapper, retrieval.citations());
         return agentChatExecutor.stream(prepared, content -> {
             executionRecorder.recordLlmSpan(execution, message, Map.of("content", content));
             executionRecorder.succeed(execution, toOutputJson(content), estimateTokens(content));
             longTermMemoryApplicationService.captureFromTurn(
                     version, agentId, workspaceId, userId, message, content);
-        }, execution.getId(), null, execution);
+        }, execution.getId(), citationsJson, execution);
+    }
+
+    private PreparedAgentChat applyToolConfirmation(PreparedAgentChat prepared, String token) {
+        if (token == null || token.isBlank()) {
+            return prepared;
+        }
+        return prepared.withToolConfirmationToken(token.trim());
+    }
+
+    private List<ChatTurn> resolveHistory(AgentVersion version, List<AgentChatHistoryItem> history) {
+        if (Boolean.FALSE.equals(version.getMemoryEnabled()) || history == null || history.isEmpty()) {
+            return List.of();
+        }
+        int windowSize = version.getMemoryWindowSize() == null ? 20 : Math.max(0, version.getMemoryWindowSize());
+        if (windowSize == 0) {
+            return List.of();
+        }
+        int start = Math.max(0, history.size() - windowSize);
+        List<ChatTurn> turns = new ArrayList<>();
+        for (int index = start; index < history.size(); index++) {
+            AgentChatHistoryItem item = history.get(index);
+            if (item == null || item.content() == null || item.content().isBlank()) {
+                continue;
+            }
+            String role = item.role() == null ? "" : item.role().toUpperCase();
+            if ("USER".equals(role) || "ASSISTANT".equals(role)) {
+                turns.add(new ChatTurn(role, item.content()));
+            }
+        }
+        return turns;
     }
 
     private Agent requirePublishedAgent(Long agentId) {
@@ -164,15 +209,19 @@ public class PublishedAgentApplicationService {
     }
 
     private String toInputJson(String message) {
-        return "{\"message\":\"" + escapeJson(message) + "\"}";
+        try {
+            return objectMapper.writeValueAsString(Map.of("message", message));
+        } catch (Exception e) {
+            return "{\"message\":\"\"}";
+        }
     }
 
     private String toOutputJson(String content) {
-        return "{\"content\":\"" + escapeJson(content) + "\"}";
-    }
-
-    private String escapeJson(String value) {
-        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
+        try {
+            return objectMapper.writeValueAsString(Map.of("content", content == null ? "" : content));
+        } catch (Exception e) {
+            return "{\"content\":\"\"}";
+        }
     }
 
     private Integer estimateTokens(String content) {
