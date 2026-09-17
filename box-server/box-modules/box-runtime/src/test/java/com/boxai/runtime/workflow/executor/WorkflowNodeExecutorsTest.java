@@ -38,7 +38,8 @@ class WorkflowNodeExecutorsTest {
 
     @Test
     void loopNodeForeachCollectsResults() throws Exception {
-        LoopNodeExecutor executor = new LoopNodeExecutor(inlineScriptExecutor);
+        LoopNodeExecutor executor = new LoopNodeExecutor(inlineScriptExecutor, null);
+
         WorkflowExecutionContext context = new WorkflowExecutionContext(1L, 1L, 1L, "exec-2",
                 Map.of("items", List.of("a", "b")));
         WorkflowNode node = new WorkflowNode("loop-1", "Loop",
@@ -67,7 +68,7 @@ class WorkflowNodeExecutorsTest {
 
     @Test
     void parallelNodeRunsTasks() throws Exception {
-        ParallelNodeExecutor executor = new ParallelNodeExecutor(inlineScriptExecutor, templateRenderer, objectMapper);
+        ParallelNodeExecutor executor = new ParallelNodeExecutor(inlineScriptExecutor, templateRenderer, objectMapper, null);
         WorkflowExecutionContext context = new WorkflowExecutionContext(1L, 1L, 1L, "exec-3", Map.of("name", "Box"));
         WorkflowNode node = new WorkflowNode("parallel-1", "Parallel",
                 objectMapper.readTree("""

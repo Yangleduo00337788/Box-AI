@@ -1,11 +1,13 @@
 package com.boxai.runtime.workflow.executor;
 
 import com.boxai.ai.ChatModelGateway;
+import com.boxai.ai.ChatStreamHandler;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.model.platform.ResolvedPlatformModel;
 import com.boxai.runtime.workflow.core.NodeExecutionContext;
 import com.boxai.runtime.workflow.core.NodeExecutionResult;
+import com.boxai.runtime.workflow.core.WorkflowStreamCallback;
 import com.boxai.runtime.workflow.engine.WorkflowTemplateRenderer;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.tenant.application.QuotaApplicationService;
@@ -13,6 +15,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Component
 public class LlmNodeExecutor implements NodeExecutor {
@@ -61,13 +66,58 @@ public class LlmNodeExecutor implements NodeExecutor {
             Long workspaceId = WorkspaceContext.require().workspaceId();
             quotaApplicationService.assertAiQuotaAvailable(workspaceId);
             ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(platformModelId);
-            String content = chatModelGateway.chat(
-                    resolved.runtimeConfig(),
-                    systemPrompt.isBlank() ? null : systemPrompt,
-                    userPrompt,
-                    temperature,
-                    topP,
-                    maxTokens);
+            String content;
+            boolean stream = shouldStream(context, config);
+            if (stream) {
+                StringBuilder builder = new StringBuilder();
+                WorkflowStreamCallback callback = context.executionContext().streamCallback();
+                String nodeId = context.node().id();
+                String nodeType = context.node().type();
+                CountDownLatch latch = new CountDownLatch(1);
+                AtomicReference<Throwable> streamError = new AtomicReference<>();
+                chatModelGateway.streamChat(
+                        resolved.runtimeConfig(),
+                        systemPrompt.isBlank() ? null : systemPrompt,
+                        userPrompt,
+                        temperature,
+                        topP,
+                        maxTokens,
+                        new ChatStreamHandler() {
+                            @Override
+                            public void onPartial(String partial) {
+                                builder.append(partial);
+                                if (callback != null) {
+                                    callback.onDelta(nodeId, nodeType, partial);
+                                }
+                            }
+
+                            @Override
+                            public void onComplete() {
+                                latch.countDown();
+                            }
+
+                            @Override
+                            public void onError(Throwable error) {
+                                streamError.set(error);
+                                latch.countDown();
+                            }
+                        });
+                if (!latch.await(120, TimeUnit.SECONDS)) {
+                    return NodeExecutionResult.failed("LLM 节点流式生成超时");
+                }
+                if (streamError.get() != null) {
+                    return NodeExecutionResult.failed("LLM 节点流式生成失败: " + streamError.get().getMessage());
+                }
+                content = builder.toString();
+            } else {
+                content = chatModelGateway.chat(
+                        resolved.runtimeConfig(),
+                        systemPrompt.isBlank() ? null : systemPrompt,
+                        userPrompt,
+                        temperature,
+                        topP,
+                        maxTokens);
+            }
             quotaApplicationService.consumeAiUsage(workspaceId, estimateTokens(systemPrompt, userPrompt, content));
             context.executionContext().setVariable(outputVariable, content);
             return NodeExecutionResult.ok(Map.of(outputVariable, content));
@@ -76,6 +126,13 @@ public class LlmNodeExecutor implements NodeExecutor {
         } catch (Exception ex) {
             return NodeExecutionResult.failed("LLM 节点执行失败: " + ex.getMessage());
         }
+    }
+
+    private boolean shouldStream(NodeExecutionContext context, JsonNode config) {
+        if (context.executionContext().streamCallback() != null) {
+            return true;
+        }
+        return context.executionContext().debugMode() && config.path("streamEnabled").asBoolean(true);
     }
 
     private long estimateTokens(String systemPrompt, String userPrompt, String response) {

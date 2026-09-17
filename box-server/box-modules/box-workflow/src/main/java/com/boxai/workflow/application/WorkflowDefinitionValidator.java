@@ -168,7 +168,13 @@ public class WorkflowDefinitionValidator {
             }
             connected.add(source);
             connected.add(target);
-            adjacency.computeIfAbsent(source, key -> new ArrayList<>()).add(target);
+            JsonNode targetDefinition = nodeMap.get(target);
+            boolean loopBackEdge = targetDefinition != null
+                    && "Loop".equalsIgnoreCase(targetDefinition.path("type").asText(""))
+                    && targetDefinition.path("config").path("graphBody").asBoolean(false);
+            if (!loopBackEdge) {
+                adjacency.computeIfAbsent(source, key -> new ArrayList<>()).add(target);
+            }
             JsonNode handleNode = edge.get("sourceHandle");
             if (handleNode != null && !handleNode.asText().isBlank()) {
                 branchHandles.computeIfAbsent(source, key -> new HashSet<>()).add(handleNode.asText());
@@ -445,6 +451,15 @@ public class WorkflowDefinitionValidator {
             }
             if (!handles.contains("false")) {
                 errors.add("Condition 节点 " + nodeId + " 缺少 false 分支连线");
+            }
+            return;
+        }
+        if ("Loop".equalsIgnoreCase(type) && config != null && config.path("graphBody").asBoolean(false)) {
+            if (!handles.contains("body")) {
+                errors.add("Loop 节点 " + nodeId + " 缺少 body 分支连线");
+            }
+            if (!handles.contains("next")) {
+                errors.add("Loop 节点 " + nodeId + " 缺少 next 分支连线");
             }
             return;
         }

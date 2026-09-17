@@ -9,9 +9,12 @@ import com.boxai.domain.workflow.WorkflowVersionRepository;
 import com.boxai.runtime.api.WorkflowExecuteRequest;
 import com.boxai.runtime.api.WorkflowExecutionResultVO;
 import com.boxai.runtime.api.WorkflowNodeTraceVO;
+import com.boxai.runtime.api.WorkflowStreamEvent;
 import com.boxai.runtime.workflow.core.WorkflowExecutionContext;
+import com.boxai.runtime.workflow.core.WorkflowExecutionListener;
 import com.boxai.runtime.workflow.core.WorkflowExecutionResult;
 import com.boxai.runtime.workflow.core.WorkflowNodeTrace;
+import com.boxai.runtime.workflow.core.WorkflowStreamCallback;
 import com.boxai.runtime.workflow.engine.DefaultWorkflowExecutor;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.security.notification.NotificationPublisher;
@@ -23,14 +26,33 @@ import com.boxai.workflow.application.WorkflowApplicationService;
 import com.boxai.workflow.application.WorkflowDefinitionValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
 public class WorkflowExecutionApplicationService {
+
+    private static final long STREAM_TIMEOUT_MS = 120_000L;
+    private static final ExecutorService STREAM_EXECUTOR = Executors.newFixedThreadPool(
+            Math.max(2, Runtime.getRuntime().availableProcessors()),
+            runnable -> {
+                Thread thread = new Thread(runnable, "box-workflow-stream");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     private final WorkflowVersionRepository workflowVersionRepository;
     private final WorkflowApplicationService workflowApplicationService;
@@ -66,7 +88,64 @@ public class WorkflowExecutionApplicationService {
         workspacePermissionService.requirePermission(com.boxai.common.constant.PermissionCodes.WORKFLOW_EXECUTE);
         Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
         WorkflowVersion version = workflowApplicationService.requireDraft(workflow);
-        return run(workflow, version, request, true);
+        return run(workflow, version, request, true, null, null);
+    }
+
+    public SseEmitter debugStream(Long workflowId, WorkflowExecuteRequest request, HttpServletResponse response) {
+        workspacePermissionService.requirePermission(com.boxai.common.constant.PermissionCodes.WORKFLOW_EXECUTE);
+        Workflow workflow = workflowApplicationService.requireWorkflow(workflowId);
+        WorkflowVersion version = workflowApplicationService.requireDraft(workflow);
+        configureSseResponse(response);
+        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
+        emitter.onTimeout(emitter::complete);
+        WorkspaceContext workspaceContext = WorkspaceContext.get();
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        CompletableFuture.runAsync(() -> {
+            if (workspaceContext != null) {
+                WorkspaceContext.set(workspaceContext);
+            }
+            SecurityContextHolder.setContext(securityContext);
+            try {
+                WorkflowExecutionListener listener = new WorkflowExecutionListener() {
+                    @Override
+                    public void onNodeStart(String nodeId, String nodeType) {
+                        sendStreamEvent(emitter, WorkflowStreamEvent.nodeStart(nodeId, nodeType));
+                    }
+
+                    @Override
+                    public void onNodeComplete(WorkflowNodeTrace trace) {
+                        sendStreamEvent(emitter, WorkflowStreamEvent.nodeEnd(
+                                trace.nodeId(),
+                                trace.nodeType(),
+                                trace.status(),
+                                trace.durationMs(),
+                                trace.output(),
+                                trace.errorMessage()));
+                    }
+                };
+                WorkflowStreamCallback streamCallback = (nodeId, nodeType, chunk) -> {
+                    if (listener != null) {
+                        listener.onNodeDelta(nodeId, nodeType, chunk);
+                    }
+                    sendStreamEvent(emitter, WorkflowStreamEvent.nodeDelta(nodeId, nodeType, chunk));
+                };
+                WorkflowExecutionResultVO result = run(
+                        workflow,
+                        version,
+                        request == null ? new WorkflowExecuteRequest(Map.of()) : request,
+                        true,
+                        listener,
+                        streamCallback);
+                sendStreamEvent(emitter, WorkflowStreamEvent.done(result));
+                emitter.complete();
+            } catch (Exception ex) {
+                completeStreamWithError(emitter, ex);
+            } finally {
+                WorkspaceContext.clear();
+                SecurityContextHolder.clearContext();
+            }
+        }, STREAM_EXECUTOR);
+        return emitter;
     }
 
     public WorkflowExecutionResultVO execute(Long workflowId, WorkflowExecuteRequest request) {
@@ -77,7 +156,7 @@ public class WorkflowExecutionApplicationService {
         }
         WorkflowVersion version = workflowVersionRepository.findById(workflow.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.WORKFLOW_VERSION_NOT_FOUND, "发布版本不存在"));
-        return run(workflow, version, request, false);
+        return run(workflow, version, request, false, null, null);
     }
 
     public WorkflowExecutionResultVO executeWebhook(Long workflowId, WorkflowExecuteRequest request) {
@@ -87,13 +166,15 @@ public class WorkflowExecutionApplicationService {
         }
         WorkflowVersion version = workflowVersionRepository.findById(workflow.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.WORKFLOW_VERSION_NOT_FOUND, "发布版本不存在"));
-        return run(workflow, version, request, false);
+        return run(workflow, version, request, false, null, null);
     }
 
     private WorkflowExecutionResultVO run(Workflow workflow,
                                           WorkflowVersion version,
                                           WorkflowExecuteRequest request,
-                                          boolean debugMode) {
+                                          boolean debugMode,
+                                          WorkflowExecutionListener listener,
+                                          WorkflowStreamCallback streamCallback) {
         WorkflowValidateVO validation = workflowDefinitionValidator.validate(
                 version.getDefinitionJson(), WorkspaceContext.require().workspaceId());
         if (!validation.valid()) {
@@ -115,8 +196,14 @@ public class WorkflowExecutionApplicationService {
                 execution.getExecutionNo(),
                 new LinkedHashMap<>(inputs),
                 debugMode);
+        if (listener != null) {
+            context.setListener(listener);
+        }
+        if (streamCallback != null) {
+            context.setStreamCallback(streamCallback);
+        }
 
-        WorkflowExecutionResult result = workflowExecutor.execute(version.getDefinitionJson(), context);
+        WorkflowExecutionResult result = workflowExecutor.execute(version.getDefinitionJson(), context, listener);
         result.nodeTraces().forEach(trace -> executionRecorder.recordWorkflowNodeSpan(
                 execution,
                 trace.nodeId(),
@@ -177,5 +264,32 @@ public class WorkflowExecutionApplicationService {
         } catch (JsonProcessingException ex) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "执行结果序列化失败");
         }
+    }
+
+    private void configureSseResponse(HttpServletResponse response) {
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
+    }
+
+    private void sendStreamEvent(SseEmitter emitter, WorkflowStreamEvent event) {
+        try {
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event().data(event));
+            }
+        } catch (IOException ex) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "工作流调试流推送失败");
+        }
+    }
+
+    private void completeStreamWithError(SseEmitter emitter, Exception error) {
+        String message = error instanceof BusinessException businessException
+                ? businessException.getMessage()
+                : "工作流调试失败";
+        try {
+            sendStreamEvent(emitter, WorkflowStreamEvent.error(message));
+        } catch (Exception ignored) {
+            // ignore secondary send failure
+        }
+        emitter.completeWithError(error);
     }
 }

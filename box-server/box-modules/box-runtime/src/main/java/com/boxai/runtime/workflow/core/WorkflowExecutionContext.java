@@ -16,6 +16,8 @@ public class WorkflowExecutionContext {
     private final Set<Long> callStack;
     private final Map<String, Object> variables = new LinkedHashMap<>();
     private final Map<String, Object> outputs = new LinkedHashMap<>();
+    private WorkflowExecutionListener listener;
+    private WorkflowStreamCallback streamCallback;
 
     public WorkflowExecutionContext(Long workflowId,
                                     Long workflowVersionId,
@@ -125,5 +127,45 @@ public class WorkflowExecutionContext {
 
     public void setOutput(String name, Object value) {
         outputs.put(name, value);
+    }
+
+    public WorkflowExecutionListener listener() {
+        return listener;
+    }
+
+    public void setListener(WorkflowExecutionListener listener) {
+        this.listener = listener;
+    }
+
+    public WorkflowStreamCallback streamCallback() {
+        return streamCallback;
+    }
+
+    public void setStreamCallback(WorkflowStreamCallback streamCallback) {
+        this.streamCallback = streamCallback;
+    }
+
+    public WorkflowExecutionContext snapshot() {
+        WorkflowExecutionContext copy = new WorkflowExecutionContext(
+                workflowId,
+                workflowVersionId,
+                executionId,
+                executionNo,
+                new LinkedHashMap<>(variables),
+                debugMode,
+                depth,
+                new LinkedHashSet<>(callStack));
+        copy.listener = listener;
+        copy.streamCallback = streamCallback;
+        copy.outputs.putAll(outputs);
+        return copy;
+    }
+
+    public void mergeFrom(WorkflowExecutionContext branch) {
+        if (branch == null) {
+            return;
+        }
+        variables.putAll(branch.variables);
+        outputs.putAll(branch.outputs);
     }
 }
