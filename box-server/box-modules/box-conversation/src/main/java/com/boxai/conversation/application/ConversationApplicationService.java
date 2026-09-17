@@ -194,7 +194,8 @@ public class ConversationApplicationService {
                 conversation,
                 content,
                 request.platformModelId(),
-                request.toolConfirmationToken());
+                request.toolConfirmationToken(),
+                retrieval);
         executionRecorder.recordRagSpan(execution, Map.of("query", content), retrieval.citations());
         agentChatExecutor.assertQuotaAvailable();
         Message userMessage = appendMessage(conversation, "USER", content, null);
@@ -231,7 +232,8 @@ public class ConversationApplicationService {
                 conversation,
                 content,
                 request.platformModelId(),
-                request.toolConfirmationToken());
+                request.toolConfirmationToken(),
+                retrieval);
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
         appendMessage(conversation, "USER", content, null);
@@ -260,12 +262,14 @@ public class ConversationApplicationService {
     private PreparedAgentChat buildPreparedChat(Conversation conversation,
                                                 String userMessage,
                                                 Long platformModelId,
-                                                String toolConfirmationToken) {
+                                                String toolConfirmationToken,
+                                                KnowledgeRetrievalResult retrieval) {
         PreparedAgentChat prepared = agentChatPreparer.prepare(
                 conversation.getAgentId(),
                 historyTurns(conversation, userMessage),
                 userMessage,
-                platformModelId);
+                platformModelId,
+                retrieval);
         if (toolConfirmationToken == null || toolConfirmationToken.isBlank()) {
             return prepared;
         }
@@ -349,7 +353,7 @@ public class ConversationApplicationService {
         KnowledgeRetrievalResult retrieval = draft == null
                 ? KnowledgeRetrievalResult.empty()
                 : agentChatPreparer.retrieveKnowledge(draft, content);
-        PreparedAgentChat prepared = buildPreparedChat(conversation, content, platformModelId, null);
+        PreparedAgentChat prepared = buildPreparedChat(conversation, content, platformModelId, null, retrieval);
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
         Long modelId = prepared.modelId();

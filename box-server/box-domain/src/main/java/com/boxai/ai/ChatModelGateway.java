@@ -42,4 +42,17 @@ public interface ChatModelGateway {
                     Double topP,
                     Integer maxTokens,
                     ChatStreamHandler handler);
+
+    /**
+     * Tool rounds run synchronously (no answer tokens streamed); the final answer uses real streaming.
+     */
+    void streamChatWithTools(ModelRuntimeConfig config,
+                             List<ChatTurn> turns,
+                             List<ToolDefinition> tools,
+                             java.util.function.Function<ToolCall, String> toolExecutor,
+                             Double temperature,
+                             Double topP,
+                             Integer maxTokens,
+                             ChatStreamHandler handler,
+                             ToolStreamObserver toolObserver);
 }

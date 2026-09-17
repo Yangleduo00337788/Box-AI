@@ -25,12 +25,21 @@ import java.util.List;
 import java.util.Map;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 @Service
 public class AgentChatExecutor {
 
     private static final long STREAM_TIMEOUT_MS = 120_000L;
+    private static final ExecutorService STREAM_EXECUTOR = Executors.newFixedThreadPool(
+            Math.max(4, Runtime.getRuntime().availableProcessors()),
+            runnable -> {
+                Thread thread = new Thread(runnable, "box-chat-stream");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     private final ChatModelGateway chatModelGateway;
     private final ModelCredentialRepository credentialRepository;
@@ -207,7 +216,7 @@ public class AgentChatExecutor {
             } catch (Exception e) {
                 completeStreamWithError(emitter, new BusinessException(ErrorCode.EXECUTION_FAILED, "模型调用失败"));
             }
-        });
+        }, STREAM_EXECUTOR);
         return emitter;
     }
 
@@ -220,71 +229,86 @@ public class AgentChatExecutor {
                                  StringBuilder contentBuilder) throws IOException {
         List<ResolvedAgentTool> resolvedTools = agentToolRuntimeService.resolveTools(prepared.agentVersionId());
         try {
-        String answer = chatModelGateway.chatWithTools(
-                prepared.runtimeConfig(),
-                prepared.turns(),
-                prepared.tools(),
-                toolCall -> {
-                    try {
-                        sendStreamEvent(emitter, ChatStreamEvent.toolStart(toolPayload(
-                                toolCall.toolKey(),
-                                toolCall.arguments(),
-                                null,
-                                null)));
-                        String result = executeToolWithTrace(execution, prepared, resolvedTools, toolCall);
-                        sendStreamEvent(emitter, ChatStreamEvent.toolDelta(toolPayload(
-                                toolCall.toolKey(),
-                                toolCall.arguments(),
-                                result,
-                                null)));
-                        sendStreamEvent(emitter, ChatStreamEvent.toolEnd(toolPayload(
-                                toolCall.toolKey(),
-                                toolCall.arguments(),
-                                result,
-                                "SUCCEEDED")));
-                        return result;
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    } catch (RuntimeException e) {
+            chatModelGateway.streamChatWithTools(
+                    prepared.runtimeConfig(),
+                    prepared.turns(),
+                    prepared.tools(),
+                    toolCall -> {
                         try {
-                            sendStreamEvent(emitter, ChatStreamEvent.toolEnd(toolPayload(
+                            sendStreamEvent(emitter, ChatStreamEvent.toolStart(toolPayload(
                                     toolCall.toolKey(),
                                     toolCall.arguments(),
                                     null,
-                                    e.getMessage())));
-                        } catch (IOException ioException) {
-                            throw new RuntimeException(ioException);
+                                    null)));
+                            String result = executeToolWithTrace(execution, prepared, resolvedTools, toolCall);
+                            sendStreamEvent(emitter, ChatStreamEvent.toolDelta(toolPayload(
+                                    toolCall.toolKey(),
+                                    toolCall.arguments(),
+                                    result,
+                                    null)));
+                            sendStreamEvent(emitter, ChatStreamEvent.toolEnd(toolPayload(
+                                    toolCall.toolKey(),
+                                    toolCall.arguments(),
+                                    result,
+                                    "SUCCEEDED")));
+                            return result;
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        } catch (RuntimeException e) {
+                            try {
+                                sendStreamEvent(emitter, ChatStreamEvent.toolEnd(toolPayload(
+                                        toolCall.toolKey(),
+                                        toolCall.arguments(),
+                                        null,
+                                        e.getMessage())));
+                            } catch (IOException ioException) {
+                                throw new RuntimeException(ioException);
+                            }
+                            throw e;
                         }
-                        throw e;
-                    }
-                },
-                prepared.temperature(),
-                prepared.topP(),
-                prepared.maxTokens());
-        pseudoStreamAnswer(emitter, contentBuilder, answer);
-        touchCredential(prepared);
-        quotaApplicationService.consumeAiUsage(workspaceId, estimateTokens(prepared, answer));
-        if (onCompleted != null) {
-            onCompleted.accept(answer);
-        }
-        sendStreamEvent(emitter, executionId == null ? ChatStreamEvent.done() : ChatStreamEvent.done(executionId));
-        emitter.complete();
+                    },
+                    prepared.temperature(),
+                    prepared.topP(),
+                    prepared.maxTokens(),
+                    new ChatStreamHandler() {
+                        @Override
+                        public void onPartial(String partial) {
+                            contentBuilder.append(partial);
+                            try {
+                                sendStreamEvent(emitter, ChatStreamEvent.delta(partial));
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+
+                        @Override
+                        public void onComplete() {
+                            try {
+                                touchCredential(prepared);
+                                String content = contentBuilder.toString();
+                                quotaApplicationService.consumeAiUsage(workspaceId, estimateTokens(prepared, content));
+                                if (onCompleted != null) {
+                                    onCompleted.accept(content);
+                                }
+                                sendStreamEvent(emitter, executionId == null
+                                        ? ChatStreamEvent.done()
+                                        : ChatStreamEvent.done(executionId));
+                                emitter.complete();
+                            } catch (Exception e) {
+                                emitter.completeWithError(e);
+                            }
+                        }
+
+                        @Override
+                        public void onError(Throwable error) {
+                            completeStreamWithError(emitter, error);
+                        }
+                    },
+                    null);
         } catch (ToolConfirmationRequiredException confirmation) {
             sendStreamEvent(emitter, ChatStreamEvent.toolConfirmRequired(confirmPayload(confirmation)));
             sendStreamEvent(emitter, executionId == null ? ChatStreamEvent.done() : ChatStreamEvent.done(executionId));
             emitter.complete();
-        }
-    }
-
-    private void pseudoStreamAnswer(SseEmitter emitter, StringBuilder contentBuilder, String answer) throws IOException {
-        if (answer == null || answer.isEmpty()) {
-            return;
-        }
-        int chunkSize = 32;
-        for (int index = 0; index < answer.length(); index += chunkSize) {
-            String chunk = answer.substring(index, Math.min(index + chunkSize, answer.length()));
-            contentBuilder.append(chunk);
-            sendStreamEvent(emitter, ChatStreamEvent.delta(chunk));
         }
     }
 

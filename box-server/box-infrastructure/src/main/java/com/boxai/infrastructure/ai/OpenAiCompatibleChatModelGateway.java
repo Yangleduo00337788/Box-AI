@@ -6,6 +6,7 @@ import com.boxai.ai.ChatTurn;
 import com.boxai.ai.ModelRuntimeConfig;
 import com.boxai.ai.ToolCall;
 import com.boxai.ai.ToolDefinition;
+import com.boxai.ai.ToolStreamObserver;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -193,6 +194,58 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
                 handler.onError(error);
             }
         });
+    }
+
+    @Override
+    public void streamChatWithTools(ModelRuntimeConfig config,
+                                    List<ChatTurn> turns,
+                                    List<ToolDefinition> tools,
+                                    Function<ToolCall, String> toolExecutor,
+                                    Double temperature,
+                                    Double topP,
+                                    Integer maxTokens,
+                                    ChatStreamHandler handler,
+                                    ToolStreamObserver toolObserver) {
+        if (tools == null || tools.isEmpty()) {
+            streamChat(config, turns, temperature, topP, maxTokens, handler);
+            return;
+        }
+        List<ChatTurn> workingTurns = new ArrayList<>(turns == null ? List.of() : turns);
+        prependToolInstruction(workingTurns, tools);
+        boolean toolsUsed = false;
+        for (int round = 0; round < 5; round++) {
+            String response = chat(config, workingTurns, temperature, topP, maxTokens);
+            ToolCall toolCall = parseToolCall(response);
+            if (toolCall == null) {
+                if (!toolsUsed) {
+                    emitKnownAnswerAsStream(response, handler);
+                } else {
+                    streamChat(config, workingTurns, temperature, topP, maxTokens, handler);
+                }
+                return;
+            }
+            toolsUsed = true;
+            String toolResult = toolExecutor.apply(toolCall);
+            if (toolObserver != null) {
+                toolObserver.onToolRound(toolCall, toolResult);
+            }
+            workingTurns.add(new ChatTurn("ASSISTANT", response));
+            workingTurns.add(new ChatTurn("USER", "工具 " + toolCall.toolKey() + " 的执行结果：\n" + toolResult
+                    + "\n请基于结果继续回答用户。"));
+        }
+        handler.onError(new BusinessException(ErrorCode.EXECUTION_FAILED, "工具调用超过最大轮次"));
+    }
+
+    private void emitKnownAnswerAsStream(String answer, ChatStreamHandler handler) {
+        if (answer == null || answer.isEmpty()) {
+            handler.onComplete();
+            return;
+        }
+        int chunkSize = 16;
+        for (int index = 0; index < answer.length(); index += chunkSize) {
+            handler.onPartial(answer.substring(index, Math.min(index + chunkSize, answer.length())));
+        }
+        handler.onComplete();
     }
 
     private List<ChatMessage> toMessages(List<ChatTurn> turns) {

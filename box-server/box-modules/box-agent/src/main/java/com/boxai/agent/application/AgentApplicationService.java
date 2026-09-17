@@ -17,6 +17,7 @@ import com.boxai.agent.api.UpdateAgentRequest;
 import com.boxai.ai.ChatTurn;
 import com.boxai.agent.chat.AgentChatExecutor;
 import com.boxai.agent.chat.AgentChatPreparer;
+import com.boxai.agent.chat.ChatCitationSupport;
 import com.boxai.agent.chat.AgentToolRuntimeService;
 import com.boxai.agent.chat.PreparedAgentChat;
 import com.boxai.agent.chat.ResolvedAgentTool;
@@ -329,7 +330,7 @@ public class AgentApplicationService {
         List<ChatTurn> history = resolveHistory(draft, request.history());
         KnowledgeRetrievalResult retrieval = agentChatPreparer.retrieveKnowledge(draft, message);
         PreparedAgentChat prepared = applyToolConfirmation(
-                agentChatPreparer.prepare(id, history, message),
+                agentChatPreparer.prepare(id, history, message, null, retrieval),
                 request.toolConfirmationToken());
         Execution execution = executionRecorder.startAgentExecution(
                 id,
@@ -363,7 +364,7 @@ public class AgentApplicationService {
         List<ChatTurn> history = resolveHistory(draft, request.history());
         KnowledgeRetrievalResult retrieval = agentChatPreparer.retrieveKnowledge(draft, message);
         PreparedAgentChat prepared = applyToolConfirmation(
-                agentChatPreparer.prepare(id, history, message),
+                agentChatPreparer.prepare(id, history, message, null, retrieval),
                 request.toolConfirmationToken());
         Execution execution = executionRecorder.startAgentExecution(
                 id,
@@ -380,7 +381,7 @@ public class AgentApplicationService {
             executionRecorder.succeed(execution, toOutputJson(content), estimateTokens(content));
             longTermMemoryApplicationService.captureFromTurn(
                     draft, id, workspaceId, userId, message, content);
-        }, execution.getId(), null, execution);
+        }, execution.getId(), ChatCitationSupport.toCitationsJson(retrieval.citations()), execution);
     }
 
     public AgentToolConfirmVO confirmTool(Long id, ConfirmAgentToolRequest request) {

@@ -66,14 +66,22 @@ public class AgentChatPreparer {
     }
 
     public PreparedAgentChat prepare(Long agentId, List<ChatTurn> history, String userMessage) {
-        return prepare(agentId, history, userMessage, null);
+        return prepare(agentId, history, userMessage, null, null);
     }
 
     public PreparedAgentChat prepare(Long agentId, List<ChatTurn> history, String userMessage, Long platformModelOverride) {
+        return prepare(agentId, history, userMessage, platformModelOverride, null);
+    }
+
+    public PreparedAgentChat prepare(Long agentId,
+                                     List<ChatTurn> history,
+                                     String userMessage,
+                                     Long platformModelOverride,
+                                     KnowledgeRetrievalResult retrieval) {
         Agent agent = requireAgent(agentId);
         AgentVersion version = agentVersionRepository.findLatestDraft(agent.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "智能体草稿版本不存在"));
-        return prepareWithVersion(agent, version, history, userMessage, platformModelOverride);
+        return prepareWithVersion(agent, version, history, userMessage, platformModelOverride, retrieval);
     }
 
     public KnowledgeRetrievalResult retrieveKnowledge(AgentVersion version, String userMessage) {
@@ -84,21 +92,29 @@ public class AgentChatPreparer {
     }
 
     public PreparedAgentChat preparePublished(Long agentId, List<ChatTurn> history, String userMessage) {
+        return preparePublished(agentId, history, userMessage, null);
+    }
+
+    public PreparedAgentChat preparePublished(Long agentId,
+                                              List<ChatTurn> history,
+                                              String userMessage,
+                                              KnowledgeRetrievalResult retrieval) {
         Agent agent = requireAgent(agentId);
         if (agent.getPublishedVersionId() == null) {
             throw new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体尚未发布");
         }
         AgentVersion version = agentVersionRepository.findById(agent.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "发布版本不存在"));
-        return prepareWithVersion(agent, version, history, userMessage, null);
+        return prepareWithVersion(agent, version, history, userMessage, null, retrieval);
     }
 
     private PreparedAgentChat prepareWithVersion(Agent agent,
                                                  AgentVersion draft,
                                                  List<ChatTurn> history,
                                                  String userMessage,
-                                                 Long platformModelOverride) {
-        List<ChatTurn> turns = buildTurns(agent.getId(), draft, history, userMessage);
+                                                 Long platformModelOverride,
+                                                 KnowledgeRetrievalResult retrieval) {
+        List<ChatTurn> turns = buildTurns(agent.getId(), draft, history, userMessage, retrieval);
         String modelSource = draft.getModelSource() == null ? ModelSources.PLATFORM : draft.getModelSource();
         if (ModelSources.PLATFORM.equals(modelSource)) {
             Long platformModelId;
@@ -174,12 +190,18 @@ public class AgentChatPreparer {
                 toolConfirmationToken);
     }
 
-    private List<ChatTurn> buildTurns(Long agentId, AgentVersion draft, List<ChatTurn> history, String userMessage) {
+    private List<ChatTurn> buildTurns(Long agentId,
+                                      AgentVersion draft,
+                                      List<ChatTurn> history,
+                                      String userMessage,
+                                      KnowledgeRetrievalResult retrieval) {
         List<ChatTurn> turns = new ArrayList<>();
         String systemPrompt = draft.getSystemPrompt();
         if (Boolean.TRUE.equals(draft.getKnowledgeEnabled())) {
-            KnowledgeRetrievalResult retrieval = knowledgeRetrievalService.retrieve(draft.getId(), userMessage);
-            String ragContext = retrieval.context();
+            KnowledgeRetrievalResult effective = retrieval != null
+                    ? retrieval
+                    : knowledgeRetrievalService.retrieve(draft.getId(), userMessage);
+            String ragContext = effective.context();
             if (ragContext != null && !ragContext.isBlank()) {
                 String ragBlock = "以下是与用户问题相关的知识库内容，请优先参考，并在回答中标注引用编号：\n"
                         + PromptInjectionGuard.wrapUntrustedContext("knowledge", ragContext);
