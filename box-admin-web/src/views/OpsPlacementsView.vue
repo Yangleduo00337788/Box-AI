@@ -341,6 +341,8 @@ const columns: PrimaryTableCol<OpsPlacementVO>[] = [
       ),
   },
   { colKey: 'sortOrder', title: '排序', width: 80 },
+  { colKey: 'impressions', title: '曝光', width: 90 },
+  { colKey: 'clicks', title: '点击', width: 90 },
   {
     colKey: 'actions',
     title: '操作',

@@ -22,6 +22,8 @@ export interface OpsPlacementVO {
   startsAt?: string
   endsAt?: string
   createdAt?: string
+  impressions?: number
+  clicks?: number
 }
 
 export function fetchOpsPlacements() {
