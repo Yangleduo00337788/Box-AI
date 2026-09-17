@@ -244,7 +244,16 @@ export async function chatPublishedAgentStream(
   apiKey: string,
   message: string,
   onDelta: (chunk: string) => void,
-  options?: { signal?: AbortSignal },
+  options?: {
+    signal?: AbortSignal
+    history?: AgentChatHistoryItem[]
+    toolConfirmationToken?: string
+    onCitations?: (citations: KnowledgeCitation[]) => void
+    onToolStart?: (payload: ChatToolEventPayload) => void
+    onToolDelta?: (payload: ChatToolEventPayload) => void
+    onToolEnd?: (payload: ChatToolEventPayload) => void
+    onToolConfirm?: (payload: import('./chatStream').ChatToolConfirmPayload) => void
+  },
 ): Promise<void> {
   const response = await fetch(`/api/v1/published/agents/${id}/chat`, {
     method: 'POST',
@@ -253,10 +262,24 @@ export async function chatPublishedAgentStream(
       'Content-Type': 'application/json',
       Accept: 'text/event-stream, application/json',
     },
-    body: JSON.stringify({ message, stream: true }),
+    body: JSON.stringify({
+      message,
+      stream: true,
+      history: buildChatHistory(options?.history ?? []),
+      toolConfirmationToken: options?.toolConfirmationToken,
+    }),
     signal: options?.signal,
   })
-  await consumeSseStream(response, { onDelta }, options?.signal)
+
+  const handlers: StreamEventHandlers = {
+    onDelta,
+    onCitations: options?.onCitations,
+    onToolStart: options?.onToolStart,
+    onToolDelta: options?.onToolDelta,
+    onToolEnd: options?.onToolEnd,
+    onToolConfirm: options?.onToolConfirm,
+  }
+  await consumeSseStream(response, handlers, options?.signal)
 }
 
 export function deleteAgent(id: number) {

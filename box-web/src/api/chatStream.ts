@@ -69,35 +69,42 @@ export function parseSseEvent(rawEvent: string, handlers: StreamEventHandlers): 
     if (!line.startsWith('data:')) continue
     const payload = line.slice(5).trim()
     if (!payload) continue
-    const event = JSON.parse(payload) as ChatStreamEvent
-    if (event.type === 'delta' && event.content) {
-      handlers.onDelta(event.content)
-    }
-    if (event.type === 'citations' && event.content) {
-      handlers.onCitations?.(parseCitationsJson(event.content))
-    }
-    if (event.type === 'tool.start') {
-      const toolPayload = parseToolPayload(event.content)
-      if (toolPayload) handlers.onToolStart?.(toolPayload)
-    }
-    if (event.type === 'tool.delta') {
-      const toolPayload = parseToolPayload(event.content)
-      if (toolPayload) handlers.onToolDelta?.(toolPayload)
-    }
-    if (event.type === 'tool.end') {
-      const toolPayload = parseToolPayload(event.content)
-      if (toolPayload) handlers.onToolEnd?.(toolPayload)
-    }
-    if (event.type === 'tool.confirm') {
-      const confirmPayload = parseToolConfirmPayload(event.content)
-      if (confirmPayload) handlers.onToolConfirm?.(confirmPayload)
-    }
-    if (event.type === 'error') {
-      throw new Error(event.message || '流式对话失败')
-    }
-    if (event.type === 'done') {
-      handlers.onDone?.(event.executionId)
-      return 'done'
+    try {
+      const event = JSON.parse(payload) as ChatStreamEvent
+      if (event.type === 'delta' && event.content) {
+        handlers.onDelta(event.content)
+      }
+      if (event.type === 'citations' && event.content) {
+        handlers.onCitations?.(parseCitationsJson(event.content))
+      }
+      if (event.type === 'tool.start') {
+        const toolPayload = parseToolPayload(event.content)
+        if (toolPayload) handlers.onToolStart?.(toolPayload)
+      }
+      if (event.type === 'tool.delta') {
+        const toolPayload = parseToolPayload(event.content)
+        if (toolPayload) handlers.onToolDelta?.(toolPayload)
+      }
+      if (event.type === 'tool.end') {
+        const toolPayload = parseToolPayload(event.content)
+        if (toolPayload) handlers.onToolEnd?.(toolPayload)
+      }
+      if (event.type === 'tool.confirm') {
+        const confirmPayload = parseToolConfirmPayload(event.content)
+        if (confirmPayload) handlers.onToolConfirm?.(confirmPayload)
+      }
+      if (event.type === 'error') {
+        throw new Error(event.message || '流式对话失败')
+      }
+      if (event.type === 'done') {
+        handlers.onDone?.(event.executionId)
+        return 'done'
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message !== '流式对话失败') {
+        continue
+      }
+      throw error
     }
   }
   return 'continue'
