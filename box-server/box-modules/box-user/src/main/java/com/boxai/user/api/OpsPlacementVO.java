@@ -22,6 +22,8 @@ public record OpsPlacementVO(
         Integer sortOrder,
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startsAt,
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endsAt,
-        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime createdAt
+        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime createdAt,
+        long impressions,
+        long clicks
 ) {
 }

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -28,13 +29,19 @@ public class OpsPlacementApplicationService {
             "check-circle", "info-circle", "thumb-up", "heart", "flag");
 
     private final OpsPlacementRepository opsPlacementRepository;
+    private final OpsMetricsApplicationService opsMetricsApplicationService;
 
-    public OpsPlacementApplicationService(OpsPlacementRepository opsPlacementRepository) {
+    public OpsPlacementApplicationService(OpsPlacementRepository opsPlacementRepository,
+                                          OpsMetricsApplicationService opsMetricsApplicationService) {
         this.opsPlacementRepository = opsPlacementRepository;
+        this.opsMetricsApplicationService = opsMetricsApplicationService;
     }
 
     public List<OpsPlacementVO> listForAdmin() {
-        return opsPlacementRepository.listAllForAdmin().stream().map(this::toVo).toList();
+        Map<Long, int[]> metrics = opsMetricsApplicationService.metricsSummary();
+        return opsPlacementRepository.listAllForAdmin().stream()
+                .map(placement -> toVo(placement, metrics))
+                .toList();
     }
 
     public List<OpsPlacementVO> listActive(String slot) {
@@ -232,7 +239,8 @@ public class OpsPlacementApplicationService {
         }
     }
 
-    private OpsPlacementVO toVo(OpsPlacement placement) {
+    private OpsPlacementVO toVo(OpsPlacement placement, Map<Long, int[]> metrics) {
+        int[] values = metrics.getOrDefault(placement.getId(), new int[] {0, 0});
         return new OpsPlacementVO(
                 placement.getId(),
                 placement.getSlot(),
@@ -251,7 +259,13 @@ public class OpsPlacementApplicationService {
                 placement.getSortOrder(),
                 placement.getStartsAt(),
                 placement.getEndsAt(),
-                placement.getCreatedAt());
+                placement.getCreatedAt(),
+                values[0],
+                values[1]);
+    }
+
+    private OpsPlacementVO toVo(OpsPlacement placement) {
+        return toVo(placement, Map.of());
     }
 
     private String trimToNull(String value) {
