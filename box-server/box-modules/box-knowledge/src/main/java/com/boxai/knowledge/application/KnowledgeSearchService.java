@@ -17,14 +17,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 @Service
 public class KnowledgeSearchService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeSearchService.class);
+    private static final int RRF_K = 60;
 
     private final KnowledgeBaseApplicationService knowledgeBaseApplicationService;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
@@ -65,20 +68,21 @@ public class KnowledgeSearchService {
                                                  boolean rerank) {
         int limit = topK < 1 ? 5 : topK;
         int candidateLimit = rerank ? Math.min(Math.max(limit * 4, 20), 50) : limit;
-        List<KnowledgeChunk> chunks = searchChunksInternal(knowledgeBaseId, query, candidateLimit, retrievalMode);
-        if (chunks.isEmpty()) {
+        List<ScoredChunk> scoredChunks = searchChunksInternal(knowledgeBaseId, query, candidateLimit, retrievalMode);
+        if (scoredChunks.isEmpty()) {
             return List.of();
         }
 
-        List<KnowledgeSearchHitVO> hits = new ArrayList<>(chunks.size());
-        List<String> documents = new ArrayList<>(chunks.size());
-        for (KnowledgeChunk chunk : chunks) {
+        List<KnowledgeSearchHitVO> hits = new ArrayList<>(scoredChunks.size());
+        List<String> documents = new ArrayList<>(scoredChunks.size());
+        for (ScoredChunk scored : scoredChunks) {
+            KnowledgeChunk chunk = scored.chunk();
             hits.add(new KnowledgeSearchHitVO(
                     chunk.getId(),
                     chunk.getDocumentId(),
                     chunk.getChunkIndex(),
                     chunk.getContent(),
-                    score(chunk.getContent(), query)));
+                    scored.score()));
             documents.add(chunk.getContent());
         }
 
@@ -121,10 +125,12 @@ public class KnowledgeSearchService {
     }
 
     public List<KnowledgeChunk> searchChunks(Long knowledgeBaseId, String query, int topK) {
-        return searchChunksInternal(knowledgeBaseId, query, topK, "HYBRID");
+        return searchChunksInternal(knowledgeBaseId, query, topK, "HYBRID").stream()
+                .map(ScoredChunk::chunk)
+                .toList();
     }
 
-    private List<KnowledgeChunk> searchChunksInternal(Long knowledgeBaseId, String query, int topK, String retrievalMode) {
+    private List<ScoredChunk> searchChunksInternal(Long knowledgeBaseId, String query, int topK, String retrievalMode) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
@@ -137,29 +143,56 @@ public class KnowledgeSearchService {
         }
 
         String mode = retrievalMode == null ? "HYBRID" : retrievalMode.trim().toUpperCase();
-        Set<Long> chunkIds = new LinkedHashSet<>();
+        Map<Long, Double> fusedScores = new LinkedHashMap<>();
         float[] queryVector = chunkIndexingService.embedQuery(knowledgeBase, trimmedQuery);
         if (!"KEYWORD".equals(mode) && queryVector.length > 0) {
-            chunkIds.addAll(searchIndex.searchByVector(knowledgeBaseId, queryVector, limit));
+            List<Long> vectorIds = searchIndex.searchByVector(knowledgeBaseId, queryVector, limit);
+            accumulateRrf(fusedScores, vectorIds);
         }
         if (!"VECTOR".equals(mode)) {
-            chunkIds.addAll(searchIndex.searchByKeyword(knowledgeBaseId, trimmedQuery, limit));
+            List<Long> keywordIds = searchIndex.searchByKeyword(knowledgeBaseId, trimmedQuery, limit);
+            accumulateRrf(fusedScores, keywordIds);
         }
 
-        if (!chunkIds.isEmpty()) {
-            List<KnowledgeChunk> chunks = knowledgeChunkRepository.findByIds(new ArrayList<>(chunkIds));
-            if (chunks.size() >= limit) {
-                return chunks.subList(0, Math.min(limit, chunks.size()));
+        if (!fusedScores.isEmpty()) {
+            List<Long> rankedIds = fusedScores.entrySet().stream()
+                    .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                    .limit(limit)
+                    .map(Map.Entry::getKey)
+                    .toList();
+            Map<Long, KnowledgeChunk> chunkMap = new HashMap<>();
+            for (KnowledgeChunk chunk : knowledgeChunkRepository.findByIds(new ArrayList<>(rankedIds))) {
+                chunkMap.put(chunk.getId(), chunk);
             }
-            if (!chunks.isEmpty()) {
-                return chunks;
+            List<ScoredChunk> ranked = new ArrayList<>();
+            for (Long chunkId : rankedIds) {
+                KnowledgeChunk chunk = chunkMap.get(chunkId);
+                if (chunk != null) {
+                    ranked.add(new ScoredChunk(chunk, fusedScores.getOrDefault(chunkId, 0D)));
+                }
+            }
+            if (!ranked.isEmpty()) {
+                return ranked;
             }
         }
 
-        return knowledgeChunkRepository.searchByKeyword(knowledgeBaseId, trimmedQuery, limit);
+        return knowledgeChunkRepository.searchByKeyword(knowledgeBaseId, trimmedQuery, limit).stream()
+                .map(chunk -> new ScoredChunk(chunk, keywordScore(chunk.getContent(), trimmedQuery)))
+                .sorted(Comparator.comparingDouble(ScoredChunk::score).reversed())
+                .toList();
     }
 
-    private double score(String content, String query) {
+    private void accumulateRrf(Map<Long, Double> fusedScores, List<Long> rankedIds) {
+        for (int index = 0; index < rankedIds.size(); index++) {
+            Long chunkId = rankedIds.get(index);
+            if (chunkId == null) {
+                continue;
+            }
+            fusedScores.merge(chunkId, 1.0D / (RRF_K + index + 1), Double::sum);
+        }
+    }
+
+    private double keywordScore(String content, String query) {
         if (content == null || query == null || query.isBlank()) {
             return 0D;
         }
@@ -171,6 +204,12 @@ public class KnowledgeSearchService {
             occurrences++;
             index += lowerQuery.length();
         }
-        return occurrences > 0 ? occurrences : (lowerContent.contains(lowerQuery) ? 1D : 0.5D);
+        if (occurrences > 0) {
+            return occurrences;
+        }
+        return lowerContent.contains(lowerQuery) ? 1D : 0D;
+    }
+
+    private record ScoredChunk(KnowledgeChunk chunk, double score) {
     }
 }
