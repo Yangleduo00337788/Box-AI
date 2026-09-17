@@ -58,14 +58,15 @@
               <t-tag size="small" variant="light">{{ trace.nodeType }}</t-tag>
               <t-tag
                 size="small"
-                :theme="trace.status === 'SUCCESS' || trace.status === 'SUCCEEDED' ? 'success' : 'danger'"
+                :theme="trace.status === 'SUCCESS' || trace.status === 'SUCCEEDED' || trace.status === 'RUNNING' ? (trace.status === 'RUNNING' ? 'warning' : 'success') : 'danger'"
                 variant="light"
               >
                 {{ trace.status }}
               </t-tag>
               <span>{{ trace.durationMs }} ms</span>
             </div>
-            <pre v-if="trace.output">{{ formatJson(trace.output) }}</pre>
+            <pre v-if="debugDeltas[trace.nodeId]">{{ debugDeltas[trace.nodeId] }}</pre>
+            <pre v-else-if="trace.output">{{ formatJson(trace.output) }}</pre>
             <p v-if="trace.errorMessage" class="debug-trace__error">{{ trace.errorMessage }}</p>
           </div>
         </section>
@@ -131,7 +132,7 @@ import {
   getWorkflow,
   getWorkflowPublishStatus,
   publishWorkflow,
-  runWorkflowDebug,
+  runWorkflowDebugStream,
   updateWorkflowDefinition,
   validateWorkflow,
   type WorkflowDebugResult,
@@ -157,6 +158,7 @@ const publishVisible = ref(false)
 const publishing = ref(false)
 const publishInfo = ref<WorkflowPublishVO | null>(null)
 const debugResult = ref<WorkflowDebugResult | null>(null)
+const debugDeltas = ref<Record<string, string>>({})
 const workflow = ref<WorkflowVO | null>(null)
 const platformModels = ref<PlatformModelVO[]>([])
 const canvasRef = ref<{
@@ -292,18 +294,50 @@ function formatJson(value: unknown) {
 
 async function runDebug() {
   running.value = true
+  debugVisible.value = true
+  debugDeltas.value = {}
+  debugResult.value = { status: 'RUNNING', nodeTraces: [] }
   try {
     await save()
-    const { data } = await runWorkflowDebug(workflowId.value, {
-      input: { message: 'hello from workflow debug' },
-    })
-    debugResult.value = data.data || null
-    debugVisible.value = true
-    if (data.data?.status === 'SUCCEEDED' || data.data?.status === 'SUCCESS') {
+    const result = await runWorkflowDebugStream(
+      workflowId.value,
+      { input: { message: 'hello from workflow debug' } },
+      {
+        onNodeStart(nodeId, nodeType) {
+          const traces = debugResult.value?.nodeTraces ? [...debugResult.value.nodeTraces] : []
+          if (!traces.some((item) => item.nodeId === nodeId && item.status === 'RUNNING')) {
+            traces.push({ nodeId, nodeType, status: 'RUNNING', durationMs: 0 })
+          }
+          debugResult.value = { ...(debugResult.value || { status: 'RUNNING' }), status: 'RUNNING', nodeTraces: traces }
+        },
+        onNodeDelta(nodeId, _nodeType, chunk) {
+          debugDeltas.value = {
+            ...debugDeltas.value,
+            [nodeId]: (debugDeltas.value[nodeId] || '') + chunk,
+          }
+        },
+        onNodeEnd(trace) {
+          const traces = debugResult.value?.nodeTraces ? [...debugResult.value.nodeTraces] : []
+          const index = traces.findIndex((item) => item.nodeId === trace.nodeId && item.status === 'RUNNING')
+          if (index >= 0) {
+            traces[index] = trace
+          } else {
+            traces.push(trace)
+          }
+          debugResult.value = { ...(debugResult.value || { status: 'RUNNING' }), nodeTraces: traces }
+        },
+        onDone(done) {
+          debugResult.value = done
+        },
+      },
+    )
+    if (result?.status === 'SUCCEEDED' || result?.status === 'SUCCESS') {
       MessagePlugin.success('调试完成')
     } else {
-      MessagePlugin.warning(data.data?.errorMessage || `调试结果：${data.data?.status || 'UNKNOWN'}`)
+      MessagePlugin.warning(result?.errorMessage || `调试结果：${result?.status || 'UNKNOWN'}`)
     }
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '调试失败')
   } finally {
     running.value = false
   }

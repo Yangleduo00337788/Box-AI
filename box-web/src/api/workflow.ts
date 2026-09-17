@@ -103,3 +103,129 @@ export function runWorkflowDebug(id: number, input: Record<string, unknown>) {
     { timeout: 120000 },
   )
 }
+
+export interface WorkflowStreamEvent {
+  type: 'node.start' | 'node.delta' | 'node.end' | 'done' | 'error'
+  nodeId?: string
+  nodeType?: string
+  payload?: unknown
+  message?: string
+}
+
+function workflowAuthHeaders() {
+  const token = localStorage.getItem('box.token')
+  const workspaceId = localStorage.getItem('box.workspaceId')
+  const headers: Record<string, string> = {
+    Accept: 'text/event-stream, application/json',
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  if (token && workspaceId) {
+    headers['X-Workspace-Id'] = workspaceId
+  }
+  return headers
+}
+
+export async function runWorkflowDebugStream(
+  id: number,
+  input: Record<string, unknown>,
+  handlers: {
+    onNodeStart?: (nodeId: string, nodeType: string) => void
+    onNodeDelta?: (nodeId: string, nodeType: string, chunk: string) => void
+    onNodeEnd?: (trace: WorkflowNodeTrace) => void
+    onDone?: (result: WorkflowDebugResult) => void
+  },
+  signal?: AbortSignal,
+): Promise<WorkflowDebugResult | null> {
+  const response = await fetch(`/api/v1/workflows/${id}/debug/stream`, {
+    method: 'POST',
+    headers: workflowAuthHeaders(),
+    body: JSON.stringify({ inputs: input }),
+    signal,
+  })
+  if (!response.ok) {
+    throw new Error(`调试失败 HTTP ${response.status}`)
+  }
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('无法读取调试流')
+  }
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let result: WorkflowDebugResult | null = null
+  const abort = () => {
+    try {
+      reader.cancel()
+    } catch {
+      // ignore
+    }
+  }
+  signal?.addEventListener('abort', abort, { once: true })
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (value) {
+        buffer += decoder.decode(value, { stream: true })
+      }
+      let boundary = buffer.indexOf('\n\n')
+      while (boundary >= 0) {
+        const rawEvent = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+        for (const line of rawEvent.split('\n')) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (!payload) continue
+          let event: WorkflowStreamEvent
+          try {
+            event = JSON.parse(payload) as WorkflowStreamEvent
+          } catch {
+            continue
+          }
+          if (event.type === 'node.start' && event.nodeId && event.nodeType) {
+            handlers.onNodeStart?.(event.nodeId, event.nodeType)
+          }
+          if (event.type === 'node.delta' && event.nodeId && event.nodeType && typeof event.payload === 'string') {
+            handlers.onNodeDelta?.(event.nodeId, event.nodeType, event.payload)
+          }
+          if (event.type === 'node.end' && event.nodeId && event.nodeType) {
+            const body = (event.payload || {}) as {
+              status?: string
+              durationMs?: number
+              output?: Record<string, unknown>
+              errorMessage?: string
+            }
+            handlers.onNodeEnd?.({
+              nodeId: event.nodeId,
+              nodeType: event.nodeType,
+              status: body.status || 'SUCCEEDED',
+              durationMs: body.durationMs || 0,
+              output: body.output,
+              errorMessage: body.errorMessage,
+            })
+          }
+          if (event.type === 'error') {
+            throw new Error(event.message || '工作流调试失败')
+          }
+          if (event.type === 'done') {
+            result = (event.payload || null) as WorkflowDebugResult | null
+            handlers.onDone?.(result || { status: 'UNKNOWN' })
+            return result
+          }
+        }
+        boundary = buffer.indexOf('\n\n')
+      }
+      if (done) {
+        return result
+      }
+    }
+  } finally {
+    signal?.removeEventListener('abort', abort)
+    try {
+      await reader.cancel()
+    } catch {
+      // ignore
+    }
+  }
+}

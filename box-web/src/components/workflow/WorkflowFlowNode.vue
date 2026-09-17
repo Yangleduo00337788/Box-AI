@@ -30,6 +30,20 @@
         :style="switchHandleStyle(index, switchHandles.length)"
       />
     </template>
+    <template v-else-if="data.nodeType === 'Loop' && data.config?.graphBody">
+      <Handle id="body" type="source" :position="Position.Right" :style="{ top: '40%' }" />
+      <Handle id="next" type="source" :position="Position.Right" :style="{ top: '75%' }" />
+    </template>
+    <template v-else-if="data.nodeType === 'Parallel' && data.config?.useGraphBranches">
+      <Handle
+        v-for="(handle, index) in parallelHandles"
+        :key="handle"
+        :id="handle"
+        type="source"
+        :position="Position.Right"
+        :style="switchHandleStyle(index, parallelHandles.length)"
+      />
+    </template>
     <Handle
       v-else-if="data.nodeType !== 'Output'"
       type="source"
@@ -70,6 +84,8 @@ const switchHandles = computed(() => {
   return handles
 })
 
+const parallelHandles = computed(() => ['branch-0', 'branch-1', 'branch-2'])
+
 function switchHandleStyle(index: number, total: number) {
   const top = ((index + 1) / (total + 1)) * 100
   return { top: `${top}%` }
@@ -100,6 +116,14 @@ function switchHandleStyle(index: number, total: number) {
 
 .wf-node--switch {
   border-color: #e37318;
+}
+
+.wf-node--loop {
+  border-color: #0052d9;
+}
+
+.wf-node--parallel {
+  border-color: #7c3aed;
 }
 
 .wf-node__head {

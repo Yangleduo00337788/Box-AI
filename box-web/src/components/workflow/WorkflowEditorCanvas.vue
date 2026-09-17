@@ -272,6 +272,10 @@
         </template>
 
         <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Loop'">
+          <t-form-item label="图模式">
+            <t-switch v-model="inspector.loopGraphBody" />
+            <div class="ops-kind-hint">开启后从 body 连线执行子图，next 连线为循环结束后的下一节点</div>
+          </t-form-item>
           <t-form-item label="模式">
             <t-select v-model="inspector.loopMode" :options="loopModeOptions" />
           </t-form-item>
@@ -281,7 +285,7 @@
           <t-form-item v-if="inspector.loopMode === 'COUNT'" label="次数">
             <t-input-number v-model="inspector.loopCount" :min="1" :max="100" theme="column" />
           </t-form-item>
-          <t-form-item label="迭代脚本">
+          <t-form-item v-if="!inspector.loopGraphBody" label="迭代脚本">
             <t-textarea v-model="inspector.loopCode" :autosize="{ minRows: 4, maxRows: 10 }" />
           </t-form-item>
           <t-form-item label="最大迭代">
@@ -299,7 +303,11 @@
         </template>
 
         <template v-else-if="(selectedNode.data as WorkflowNodeData).nodeType === 'Parallel'">
-          <t-form-item label="任务 JSON">
+          <t-form-item label="图分支">
+            <t-switch v-model="inspector.parallelUseGraphBranches" />
+            <div class="ops-kind-hint">开启后多条出边并行执行，汇合到同一节点</div>
+          </t-form-item>
+          <t-form-item v-if="!inspector.parallelUseGraphBranches" label="任务 JSON">
             <t-textarea
               v-model="inspector.parallelTasksJson"
               :autosize="{ minRows: 6, maxRows: 12 }"
@@ -508,6 +516,7 @@ const inspector = reactive({
   toolArgumentsJson: '{}',
   toolOutputVariable: 'toolResult',
   loopMode: 'FOREACH',
+  loopGraphBody: false,
   loopItemsVariable: 'items',
   loopCount: 3,
   loopCode: 'function execute(args) {\n  return args.loopItem;\n}',
@@ -515,6 +524,7 @@ const inspector = reactive({
   codeFunctionName: 'execute',
   codeContent: 'function execute(args) {\n  return args.input;\n}',
   parallelTasksJson: '[{"type":"TEMPLATE","template":"{{input}}"}]',
+  parallelUseGraphBranches: false,
 })
 
 const toolSourceOptions = [
@@ -608,6 +618,7 @@ function syncInspectorFromNode(node: any) {
   inspector.toolArgumentsJson = String(config.argumentsJson || '{}')
   inspector.toolOutputVariable = String(config.outputVariable || 'toolResult')
   inspector.loopMode = String(config.mode || 'FOREACH')
+  inspector.loopGraphBody = Boolean(config.graphBody)
   inspector.loopItemsVariable = String(config.itemsVariable || 'items')
   inspector.loopCount = Number(config.count ?? 3)
   inspector.loopCode = String(config.code || 'function execute(args) {\n  return args.loopItem;\n}')
@@ -617,6 +628,7 @@ function syncInspectorFromNode(node: any) {
   inspector.parallelTasksJson = config.tasks
     ? JSON.stringify(config.tasks, null, 2)
     : String(config.tasksJson || '[{"type":"TEMPLATE","template":"{{input}}"}]')
+  inspector.parallelUseGraphBranches = Boolean(config.useGraphBranches)
 }
 
 function syncNodeFromInspector(node: any) {
@@ -671,6 +683,7 @@ function syncNodeFromInspector(node: any) {
   config.outputVariable = inspector.toolOutputVariable || 'toolResult'
   if (nodeType === 'Loop') {
     config.mode = inspector.loopMode
+    config.graphBody = inspector.loopGraphBody
     config.itemsVariable = inspector.loopItemsVariable
     config.count = inspector.loopCount
     config.code = inspector.loopCode
@@ -683,10 +696,15 @@ function syncNodeFromInspector(node: any) {
     config.outputVariable = 'codeResult'
   }
   if (nodeType === 'Parallel') {
-    try {
-      config.tasks = JSON.parse(inspector.parallelTasksJson || '[]')
-    } catch {
-      config.tasks = []
+    config.useGraphBranches = inspector.parallelUseGraphBranches
+    if (!inspector.parallelUseGraphBranches) {
+      try {
+        config.tasks = JSON.parse(inspector.parallelTasksJson || '[]')
+      } catch {
+        config.tasks = []
+      }
+    } else {
+      delete config.tasks
     }
     config.outputVariable = 'parallelResults'
   }

@@ -143,6 +143,7 @@ export function createFlowNode(type: string, label: string, position: { x: numbe
   }
   if (type === 'Loop') {
     config.mode = 'FOREACH'
+    config.graphBody = false
     config.itemsVariable = 'items'
     config.itemVariable = 'loopItem'
     config.indexVariable = 'loopIndex'
@@ -155,6 +156,7 @@ export function createFlowNode(type: string, label: string, position: { x: numbe
     config.code = 'function execute(args) {\n  return args.input;\n}'
   }
   if (type === 'Parallel') {
+    config.useGraphBranches = false
     config.outputVariable = 'parallelResults'
     config.tasks = [
       { type: 'TEMPLATE', template: '{{input}}' },
