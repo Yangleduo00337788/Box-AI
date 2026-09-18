@@ -1,6 +1,9 @@
 <template>
   <div class="ops-placements-page admin-page">
-    <page-header title="运营位" desc="向 C 端投放公告、Banner 图和广告。">
+    <page-header
+      title="运营位"
+      desc="C 端仅两个展示面：顶栏文字公告（全站公告 + 顶栏公告）、右下角图片轮播（Banner + 广告）。"
+    >
       <template #actions>
         <t-button theme="primary" @click="openCreate">新建运营位</t-button>
       </template>
@@ -95,7 +98,7 @@
             />
             <div class="ops-icon-actions">
               <t-button variant="outline" :loading="uploadingImage" @click="imageFileRef?.click()">上传图片</t-button>
-              <span class="ops-icon-hint">必填，PNG / JPG，单张不超过 8MB；建议侧栏横图</span>
+              <span class="ops-icon-hint">必填，PNG / JPG，单张不超过 8MB；建议 16:9 横图（C 端约 200×112 展示）</span>
             </div>
             <div v-if="form.imageUrl" class="ops-image-preview">
               <img :src="form.imageUrl" alt="" />
@@ -117,8 +120,9 @@
         <t-form-item label="排序" name="sortOrder">
           <t-input-number v-model="form.sortOrder" :min="0" theme="column" />
         </t-form-item>
-        <t-form-item v-if="!isCreativeSlot" label="可关闭" name="dismissible">
+        <t-form-item label="可关闭" name="dismissible">
           <t-switch v-model="form.dismissible" />
+          <div v-if="isCreativeSlot" class="ops-kind-hint">图片位在 C 端右下角展示关闭按钮；关闭后本机不再显示该条。</div>
         </t-form-item>
         <t-form-item v-if="editing" label="状态" name="status">
           <t-radio-group v-model="form.status">
@@ -198,10 +202,10 @@ const iconPresets = [
 ]
 
 const slotOptions = [
-  { label: '新任务页公告', value: 'CHAT_HOME' },
-  { label: '全站公告', value: 'GLOBAL_ALERT' },
-  { label: '新任务 Banner', value: 'CHAT_BANNER' },
-  { label: '侧栏广告', value: 'CHAT_AD' },
+  { label: '顶栏公告', value: 'CHAT_HOME' },
+  { label: '全站顶栏', value: 'GLOBAL_ALERT' },
+  { label: '右下角 Banner', value: 'CHAT_BANNER' },
+  { label: '右下角广告', value: 'CHAT_AD' },
 ]
 const kindOptions = [
   { label: '公告', value: 'ANNOUNCEMENT' },
@@ -216,10 +220,10 @@ const themeOptions = [
   { label: '错误', value: 'error' },
 ]
 const slotLabel: Record<string, string> = {
-  CHAT_HOME: '新任务页公告',
-  GLOBAL_ALERT: '全站公告',
-  CHAT_BANNER: '新任务 Banner',
-  CHAT_AD: '侧栏广告',
+  CHAT_HOME: '顶栏公告',
+  GLOBAL_ALERT: '全站顶栏',
+  CHAT_BANNER: '右下角 Banner',
+  CHAT_AD: '右下角广告',
 }
 const kindLabel: Record<string, string> = {
   ANNOUNCEMENT: '公告',
@@ -251,15 +255,15 @@ const isCreativeSlot = computed(() => form.slot === 'CHAT_BANNER' || form.slot =
 
 const slotHint = computed(() => {
   if (form.slot === 'GLOBAL_ALERT') {
-    return '全站顶栏可同时上架多条，C 端用数字按钮切换。提示样式决定顶栏颜色。'
+    return '展示在 C 端页面最上方顶栏，与「顶栏公告」合并排序；多条用数字切换。提示样式决定顶栏颜色。'
   }
   if (form.slot === 'CHAT_BANNER') {
-    return '出现在新任务页标题下方，多条会自动轮播。类型固定为 Banner。'
+    return '与「右下角广告」合并为右下角小卡片轮播（约 200×112）。类型固定为 Banner，需上传图片。'
   }
   if (form.slot === 'CHAT_AD') {
-    return '出现在左侧栏账号上方，多条会自动轮播。类型固定为广告。'
+    return '与「右下角 Banner」合并为右下角小卡片轮播。类型固定为广告，需上传图片。'
   }
-  return '公告为灰色条（加粗标题 + 灰色正文）；推荐为暖色条。可同时上架多条并切换。'
+  return '与「全站顶栏」一起在 C 端顶栏展示；公告 / 推荐样式与可关闭行为同顶栏规则。'
 })
 
 const rules: FormProps['rules'] = {
@@ -284,7 +288,7 @@ watch(
       form.iconName = ''
       form.iconUrl = ''
       form.iconSvg = ''
-      form.dismissible = false
+      form.dismissible = true
       return
     }
     if (slot === 'CHAT_AD') {
@@ -292,7 +296,7 @@ watch(
       form.iconName = ''
       form.iconUrl = ''
       form.iconSvg = ''
-      form.dismissible = false
+      form.dismissible = true
       return
     }
     if (form.kind === 'BANNER' || form.kind === 'AD') {
@@ -314,7 +318,7 @@ const columns: PrimaryTableCol<OpsPlacementVO>[] = [
   {
     colKey: 'slot',
     title: '位置',
-    width: 140,
+    width: 156,
     cell: (_, { row }) => slotLabel[row.slot] || row.slot,
   },
   {
