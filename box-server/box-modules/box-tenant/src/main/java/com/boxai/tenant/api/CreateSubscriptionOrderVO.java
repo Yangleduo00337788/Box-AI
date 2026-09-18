@@ -9,6 +9,9 @@ public record CreateSubscriptionOrderVO(
         String invoiceNo,
         BigDecimal amount,
         String currency,
-        String paymentStatus
+        String paymentStatus,
+        String paymentChannel,
+        String paymentUrl,
+        boolean requiresClientConfirm
 ) {
 }

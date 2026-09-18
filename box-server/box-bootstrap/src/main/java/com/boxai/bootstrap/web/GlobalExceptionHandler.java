@@ -16,9 +16,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -60,6 +62,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public void handleNotFound(HttpServletResponse response) throws IOException {
         writeJson(response, HttpStatus.NOT_FOUND, Result.failure(ErrorCode.NOT_FOUND, "资源不存在"));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public void handleMethodNotSupported(HttpServletResponse response) throws IOException {
+        writeJson(response, HttpStatus.METHOD_NOT_ALLOWED, Result.failure(ErrorCode.BAD_REQUEST, "请求方法不支持"));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public void handleTypeMismatch(HttpServletResponse response) throws IOException {
+        writeJson(response, HttpStatus.BAD_REQUEST, Result.failure(ErrorCode.BAD_REQUEST, "请求参数无效"));
     }
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)

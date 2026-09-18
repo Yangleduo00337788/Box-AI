@@ -17,6 +17,12 @@ import com.boxai.tenant.api.BillingInvoiceVO;
 import com.boxai.tenant.api.CreateSubscriptionOrderVO;
 import com.boxai.tenant.api.PaymentRecordVO;
 import com.boxai.tenant.api.SubscribePlanRequest;
+import com.boxai.tenant.payment.PaymentCheckoutCommand;
+import com.boxai.tenant.payment.PaymentCheckoutResult;
+import com.boxai.tenant.payment.PaymentCompletionService;
+import com.boxai.tenant.payment.PaymentGateway;
+import com.boxai.tenant.payment.PaymentGatewayRegistry;
+import com.boxai.tenant.payment.PaymentProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,19 +41,26 @@ public class SubscriptionApplicationService {
     private final BillingRepository billingRepository;
     private final PlanApplicationService planApplicationService;
     private final TenantRepository tenantRepository;
-    private final TenantApplicationService tenantApplicationService;
     private final WorkspaceRepository workspaceRepository;
+    private final PaymentGatewayRegistry paymentGatewayRegistry;
+    private final PaymentProperties paymentProperties;
+    private final PaymentCompletionService paymentCompletionService;
 
     public SubscriptionApplicationService(BillingRepository billingRepository,
                                           PlanApplicationService planApplicationService,
                                           TenantRepository tenantRepository,
                                           TenantApplicationService tenantApplicationService,
-                                          WorkspaceRepository workspaceRepository) {
+                                          WorkspaceRepository workspaceRepository,
+                                          PaymentGatewayRegistry paymentGatewayRegistry,
+                                          PaymentProperties paymentProperties,
+                                          PaymentCompletionService paymentCompletionService) {
         this.billingRepository = billingRepository;
         this.planApplicationService = planApplicationService;
         this.tenantRepository = tenantRepository;
-        this.tenantApplicationService = tenantApplicationService;
         this.workspaceRepository = workspaceRepository;
+        this.paymentGatewayRegistry = paymentGatewayRegistry;
+        this.paymentProperties = paymentProperties;
+        this.paymentCompletionService = paymentCompletionService;
     }
 
     public List<com.boxai.tenant.api.PlanVO> listPublicPlans() {
@@ -65,6 +78,7 @@ public class SubscriptionApplicationService {
         if (plan.getStatus() == null || plan.getStatus() != 1) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "套餐不可用");
         }
+        cancelOpenSubscriptions(tenantId);
         LocalDate start = LocalDate.now();
         LocalDate end = start.plusMonths(1);
         Subscription subscription = new Subscription();
@@ -92,14 +106,28 @@ public class SubscriptionApplicationService {
         invoice.setStatus("OPEN");
         billingRepository.saveInvoice(invoice);
 
+        PaymentGateway gateway = paymentGatewayRegistry.resolve(paymentProperties);
         PaymentRecord payment = new PaymentRecord();
         payment.setTenantId(tenantId);
         payment.setInvoiceId(invoice.getId());
         payment.setAmount(amount);
         payment.setCurrency("CNY");
-        payment.setChannel("MOCK");
+        payment.setChannel(gateway.channel());
         payment.setStatus("PENDING");
         billingRepository.savePayment(payment);
+
+        PaymentCheckoutResult checkout = gateway.createCheckout(
+                new PaymentCheckoutCommand(
+                        payment.getId(),
+                        tenantId,
+                        invoice.getId(),
+                        invoice.getInvoiceNo(),
+                        amount,
+                        "CNY",
+                        plan.getName()),
+                paymentProperties);
+        payment.setExternalRef(checkout.externalRef());
+        billingRepository.updatePayment(payment);
 
         return new CreateSubscriptionOrderVO(
                 subscription.getId(),
@@ -108,7 +136,10 @@ public class SubscriptionApplicationService {
                 invoice.getInvoiceNo(),
                 amount,
                 "CNY",
-                "PENDING");
+                "PENDING",
+                checkout.channel(),
+                checkout.paymentUrl(),
+                checkout.requiresClientConfirm());
     }
 
     @Transactional
@@ -120,29 +151,32 @@ public class SubscriptionApplicationService {
         if (!payment.getTenantId().equals(tenantId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作该支付");
         }
-        if ("SUCCEEDED".equals(payment.getStatus())) {
-            return toPaymentVo(payment);
+        if (!"MOCK".equalsIgnoreCase(payment.getChannel())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "当前支付渠道不支持手动确认");
         }
-        BillingInvoice invoice = billingRepository.findInvoiceById(payment.getInvoiceId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "账单不存在"));
-        payment.setStatus("SUCCEEDED");
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setExternalRef("MOCK-" + payment.getId());
-        billingRepository.updatePayment(payment);
+        if (paymentProperties.isEnabled() && paymentProperties.isRealGatewayConfigured()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "已启用真实支付，不支持模拟确认");
+        }
+        PaymentRecord completed = paymentCompletionService.completePayment(
+                paymentId, "MOCK-" + payment.getId(), "MOCK");
+        return toPaymentVo(completed);
+    }
 
-        invoice.setStatus("PAID");
-        invoice.setPaidAt(LocalDateTime.now());
-        billingRepository.updateInvoice(invoice);
+    @Transactional
+    public void completePaymentFromGateway(Long paymentId, String externalRef, String expectedChannel) {
+        paymentCompletionService.completePayment(paymentId, externalRef, expectedChannel);
+    }
 
-        Subscription subscription = billingRepository.listSubscriptionsByTenant(tenantId).stream()
-                .filter(item -> item.getId().equals(invoice.getSubscriptionId()))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "订阅不存在"));
-        subscription.setStatus(SubscriptionStatuses.ACTIVE);
-        billingRepository.updateSubscription(subscription);
-
-        tenantApplicationService.assignPlan(tenantId, invoice.getPlanId());
-        return toPaymentVo(payment);
+    private void cancelOpenSubscriptions(Long tenantId) {
+        for (Subscription subscription : billingRepository.listSubscriptionsByTenant(tenantId)) {
+            String status = subscription.getStatus();
+            if (!SubscriptionStatuses.ACTIVE.equals(status)
+                    && !SubscriptionStatuses.PENDING_PAYMENT.equals(status)) {
+                continue;
+            }
+            subscription.setStatus(SubscriptionStatuses.CANCELLED);
+            billingRepository.updateSubscription(subscription);
+        }
     }
 
     public List<BillingInvoiceVO> listMyInvoices() {

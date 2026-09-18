@@ -61,6 +61,8 @@ public class SecurityConfig {
                                 "/api/v1/system/content",
                                 "/api/v1/public-assets/**",
                                 "/api/v1/hooks/**",
+                                "/api/v1/billing/payments/webhook/**",
+                                "/api/v1/billing/payments/notify/**",
                                 "/.well-known/box-domain-verify.txt")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/public/invitations/**")

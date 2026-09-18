@@ -4,6 +4,7 @@ import com.boxai.domain.plan.Plan;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.tenant.api.BillingOverviewVO;
 import com.boxai.tenant.api.QuotaSnapshotVO;
+import com.boxai.tenant.payment.PaymentProperties;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -13,11 +14,14 @@ public class BillingApplicationService {
 
     private final QuotaApplicationService quotaApplicationService;
     private final PlanApplicationService planApplicationService;
+    private final PaymentProperties paymentProperties;
 
     public BillingApplicationService(QuotaApplicationService quotaApplicationService,
-                                     PlanApplicationService planApplicationService) {
+                                     PlanApplicationService planApplicationService,
+                                     PaymentProperties paymentProperties) {
         this.quotaApplicationService = quotaApplicationService;
         this.planApplicationService = planApplicationService;
+        this.paymentProperties = paymentProperties;
     }
 
     public BillingOverviewVO overview(Long workspaceId) {
@@ -39,7 +43,7 @@ public class BillingApplicationService {
                 plan.getOveragePolicy(),
                 estimated,
                 "CNY",
-                false);
+                paymentProperties.isEnabled() && paymentProperties.isRealGatewayConfigured());
     }
 
     private BigDecimal calculateOverageAmount(Plan plan, QuotaSnapshotVO quota) {

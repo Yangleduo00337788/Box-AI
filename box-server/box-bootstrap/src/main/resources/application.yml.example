@@ -63,6 +63,22 @@ box:
   embed:
     # 本地开发可跳过 TXT / well-known 校验；生产必须为 false
     skip-domain-verify: true
+    gateway-host: embed.box.ai
+    gateway-tls-mode: platform
+  payment:
+    enabled: false
+    provider: mock
+    success-url: http://127.0.0.1:5173/settings/plan?tab=billing&payment=success
+    cancel-url: http://127.0.0.1:5173/settings/plan?tab=plans&payment=cancel
+    stripe:
+      secret-key: ${BOX_STRIPE_SECRET_KEY:}
+      webhook-secret: ${BOX_STRIPE_WEBHOOK_SECRET:}
+    alipay:
+      gateway-url: https://openapi.alipay.com/gateway.do
+      app-id: ${BOX_ALIPAY_APP_ID:}
+      private-key: ${BOX_ALIPAY_PRIVATE_KEY:}
+      alipay-public-key: ${BOX_ALIPAY_PUBLIC_KEY:}
+      notify-url: http://127.0.0.1:8080/api/v1/billing/payments/notify/alipay
   minio:
     endpoint: http://127.0.0.1:9000
     access-key: box
