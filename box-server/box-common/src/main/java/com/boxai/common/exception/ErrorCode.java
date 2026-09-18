@@ -17,6 +17,7 @@ public interface ErrorCode {
     int INVALID_CREDENTIALS = 9004;
     int OAUTH_NOT_CONFIGURED = 9010;
     int OAUTH_PROVIDER_UNKNOWN = 9011;
+    int OAUTH_FAILED = 9012;
 
     int AGENT_NOT_FOUND = 10001;
     int AGENT_VERSION_NOT_FOUND = 10002;
