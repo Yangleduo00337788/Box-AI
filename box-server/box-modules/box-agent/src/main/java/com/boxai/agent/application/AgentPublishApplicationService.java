@@ -154,6 +154,7 @@ public class AgentPublishApplicationService {
         version.setModelId(source.getModelId());
         version.setPlatformModelId(source.getPlatformModelId());
         version.setModelSource(source.getModelSource());
+        version.setRoutingPreference(source.getRoutingPreference());
         version.setTemperature(source.getTemperature());
         version.setTopP(source.getTopP());
         version.setMaxTokens(source.getMaxTokens());

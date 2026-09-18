@@ -30,6 +30,8 @@ public class AgentVersionDO {
     private Long platformModelId;
     @Column("model_source")
     private String modelSource;
+    @Column("routing_preference")
+    private String routingPreference;
     private BigDecimal temperature;
     @Column("top_p")
     private BigDecimal topP;

@@ -144,8 +144,24 @@ public class PlatformModelApplicationService {
                 .filter(item -> keyedProviders.contains(item.getId()))
                 .collect(Collectors.toMap(PlatformProvider::getId, Function.identity()));
         return modelRepository.listActive().stream()
+                .filter(this::isChatModel)
                 .filter(model -> providerMap.containsKey(model.getProviderId()))
                 .map(model -> toModelVO(model, providerMap.get(model.getProviderId())))
+                .toList();
+    }
+
+    public List<PlatformModel> listRunnablePlatformModels() {
+        Set<Long> keyedProviders = credentialRepository.listActiveProviderIds();
+        return modelRepository.listActive().stream()
+                .filter(this::isChatModel)
+                .filter(model -> model.getStatus() != null && model.getStatus() == 1)
+                .filter(model -> {
+                    Optional<PlatformProvider> provider = providerRepository.findById(model.getProviderId());
+                    return provider.isPresent()
+                            && provider.get().getStatus() != null
+                            && provider.get().getStatus() == 1
+                            && keyedProviders.contains(provider.get().getId());
+                })
                 .toList();
     }
 
@@ -578,6 +594,14 @@ public class PlatformModelApplicationService {
             return "****";
         }
         return "sk-****" + encrypted.substring(encrypted.length() - 4);
+    }
+
+    private boolean isChatModel(PlatformModel model) {
+        if (model == null) {
+            return false;
+        }
+        String modelType = model.getModelType();
+        return modelType == null || modelType.isBlank() || "CHAT".equalsIgnoreCase(modelType);
     }
 
     private String trimToNull(String value) {

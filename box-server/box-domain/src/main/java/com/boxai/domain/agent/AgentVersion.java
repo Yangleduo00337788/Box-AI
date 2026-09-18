@@ -19,6 +19,7 @@ public class AgentVersion {
     private Long modelId;
     private Long platformModelId;
     private String modelSource;
+    private String routingPreference;
     private BigDecimal temperature;
     private BigDecimal topP;
     private Integer maxTokens;

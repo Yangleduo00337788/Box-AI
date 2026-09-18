@@ -16,6 +16,7 @@ import com.boxai.domain.model.ModelDefinition;
 import com.boxai.domain.model.ModelDefinitionRepository;
 import com.boxai.domain.model.ModelProvider;
 import com.boxai.domain.model.ModelProviderRepository;
+import com.boxai.model.application.ModelRouterApplicationService;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.model.platform.ResolvedPlatformModel;
 import com.boxai.common.security.PromptInjectionGuard;
@@ -38,6 +39,7 @@ public class AgentChatPreparer {
     private final ModelProviderRepository modelProviderRepository;
     private final ModelCredentialRepository credentialRepository;
     private final PlatformModelApplicationService platformModelApplicationService;
+    private final ModelRouterApplicationService modelRouterApplicationService;
     private final SecretCipher secretCipher;
     private final KnowledgeRetrievalService knowledgeRetrievalService;
     private final AgentToolRuntimeService agentToolRuntimeService;
@@ -49,6 +51,7 @@ public class AgentChatPreparer {
                              ModelProviderRepository modelProviderRepository,
                              ModelCredentialRepository credentialRepository,
                              PlatformModelApplicationService platformModelApplicationService,
+                             ModelRouterApplicationService modelRouterApplicationService,
                              SecretCipher secretCipher,
                              KnowledgeRetrievalService knowledgeRetrievalService,
                              AgentToolRuntimeService agentToolRuntimeService,
@@ -59,6 +62,7 @@ public class AgentChatPreparer {
         this.modelProviderRepository = modelProviderRepository;
         this.credentialRepository = credentialRepository;
         this.platformModelApplicationService = platformModelApplicationService;
+        this.modelRouterApplicationService = modelRouterApplicationService;
         this.secretCipher = secretCipher;
         this.knowledgeRetrievalService = knowledgeRetrievalService;
         this.agentToolRuntimeService = agentToolRuntimeService;
@@ -116,6 +120,27 @@ public class AgentChatPreparer {
                                                  KnowledgeRetrievalResult retrieval) {
         List<ChatTurn> turns = buildTurns(agent.getId(), draft, history, userMessage, retrieval);
         String modelSource = draft.getModelSource() == null ? ModelSources.PLATFORM : draft.getModelSource();
+        if (ModelSources.AUTO.equals(modelSource)) {
+            if (platformModelOverride != null) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "智能路由模式下不支持手动指定平台模型");
+            }
+            Long selectedModelId = modelRouterApplicationService.selectFromPlatformModels(
+                    platformModelApplicationService.listRunnablePlatformModels(),
+                    modelRouterApplicationService.parsePreference(draft.getRoutingPreference()));
+            if (selectedModelId == null) {
+                throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "没有可用于智能路由的平台模型");
+            }
+            ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(selectedModelId);
+            return buildPrepared(
+                    agent.getId(),
+                    resolved.runtimeConfig(),
+                    turns,
+                    draft,
+                    resolved.platformCredentialId(),
+                    true,
+                    resolved.platformModelId(),
+                    null);
+        }
         if (ModelSources.PLATFORM.equals(modelSource)) {
             Long platformModelId;
             if (platformModelOverride != null) {

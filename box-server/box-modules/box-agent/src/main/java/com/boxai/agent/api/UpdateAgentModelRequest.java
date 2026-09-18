@@ -12,6 +12,7 @@ public record UpdateAgentModelRequest(
         @NotBlank String modelSource,
         Long platformModelId,
         Long modelId,
+        String routingPreference,
         @DecimalMin("0.0") @DecimalMax("2.0") BigDecimal temperature,
         @DecimalMin("0.0") @DecimalMax("1.0") BigDecimal topP,
         @Min(1) @Max(128000) Integer maxTokens,

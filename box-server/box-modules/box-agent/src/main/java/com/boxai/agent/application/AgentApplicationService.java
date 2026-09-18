@@ -34,6 +34,7 @@ import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.platform.PlatformModel;
 import com.boxai.domain.platform.PlatformModelRepository;
+import com.boxai.model.application.ModelRouterApplicationService;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.domain.agent.Agent;
 import com.boxai.domain.agent.AgentRepository;
@@ -73,6 +74,7 @@ public class AgentApplicationService {
     private final AgentChatPreparer agentChatPreparer;
     private final AgentChatExecutor agentChatExecutor;
     private final PlatformModelApplicationService platformModelApplicationService;
+    private final ModelRouterApplicationService modelRouterApplicationService;
     private final PlatformModelRepository platformModelRepository;
     private final ExecutionRecorder executionRecorder;
     private final AgentBindingApplicationService agentBindingApplicationService;
@@ -92,6 +94,7 @@ public class AgentApplicationService {
                                    AgentChatPreparer agentChatPreparer,
                                    AgentChatExecutor agentChatExecutor,
                                    PlatformModelApplicationService platformModelApplicationService,
+                                   ModelRouterApplicationService modelRouterApplicationService,
                                    PlatformModelRepository platformModelRepository,
                                    ExecutionRecorder executionRecorder,
                                    AgentBindingApplicationService agentBindingApplicationService,
@@ -110,6 +113,7 @@ public class AgentApplicationService {
         this.agentChatPreparer = agentChatPreparer;
         this.agentChatExecutor = agentChatExecutor;
         this.platformModelApplicationService = platformModelApplicationService;
+        this.modelRouterApplicationService = modelRouterApplicationService;
         this.platformModelRepository = platformModelRepository;
         this.executionRecorder = executionRecorder;
         this.agentBindingApplicationService = agentBindingApplicationService;
@@ -173,6 +177,7 @@ public class AgentApplicationService {
         version.setLongTermMemoryEnabled(false);
         version.setKnowledgeEnabled(false);
         version.setToolEnabled(false);
+        version.setRoutingPreference("BALANCED");
         version.setCreatedBy(userId);
         version.setUpdatedBy(userId);
         agentVersionRepository.save(version);
@@ -310,7 +315,13 @@ public class AgentApplicationService {
         Agent agent = requireAgent(id);
         Long userId = WorkspaceContext.require().userId();
         AgentVersion draft = requireDraft(agent);
-        applyModelSelection(draft, request.modelSource(), request.platformModelId(), request.modelId(), userId);
+        applyModelSelection(
+                draft,
+                request.modelSource(),
+                request.platformModelId(),
+                request.modelId(),
+                request.routingPreference(),
+                userId);
         draft.setTemperature(request.temperature() == null ? DEFAULT_TEMPERATURE : request.temperature());
         draft.setTopP(request.topP() == null ? DEFAULT_TOP_P : request.topP());
         draft.setMaxTokens(request.maxTokens() == null ? DEFAULT_MAX_TOKENS : request.maxTokens());
@@ -450,6 +461,7 @@ public class AgentApplicationService {
         version.setModelId(sourceDraft.getModelId());
         version.setPlatformModelId(sourceDraft.getPlatformModelId());
         version.setModelSource(sourceDraft.getModelSource());
+        version.setRoutingPreference(sourceDraft.getRoutingPreference());
         version.setTemperature(sourceDraft.getTemperature());
         version.setTopP(sourceDraft.getTopP());
         version.setMaxTokens(sourceDraft.getMaxTokens());
@@ -537,6 +549,7 @@ public class AgentApplicationService {
         Integer draftVersion = draft == null ? null : draft.getVersionNo();
         Integer publishedVersion = null;
         String modelSource = draft == null ? ModelSources.PLATFORM : draft.getModelSource();
+        String routingPreference = draft == null ? "BALANCED" : draft.getRoutingPreference();
         Long modelId = draft == null ? null : draft.getModelId();
         String modelName = null;
         Long platformModelId = draft == null ? null : draft.getPlatformModelId();
@@ -574,6 +587,7 @@ public class AgentApplicationService {
                 draftVersion,
                 publishedVersion,
                 modelSource,
+                routingPreference,
                 modelId,
                 modelName,
                 platformModelId,
@@ -592,7 +606,24 @@ public class AgentApplicationService {
                 agent.getUpdatedAt());
     }
 
-    private void applyModelSelection(AgentVersion draft, String modelSource, Long platformModelId, Long modelId, Long userId) {
+    private void applyModelSelection(AgentVersion draft,
+                                     String modelSource,
+                                     Long platformModelId,
+                                     Long modelId,
+                                     String routingPreference,
+                                     Long userId) {
+        if (ModelSources.AUTO.equals(modelSource)) {
+            if (modelRouterApplicationService.selectFromPlatformModels(
+                    platformModelApplicationService.listRunnablePlatformModels(),
+                    modelRouterApplicationService.parsePreference(routingPreference)) == null) {
+                throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "没有可用于智能路由的平台模型");
+            }
+            draft.setModelSource(ModelSources.AUTO);
+            draft.setPlatformModelId(null);
+            draft.setModelId(null);
+            draft.setRoutingPreference(modelRouterApplicationService.parsePreference(routingPreference).name());
+            return;
+        }
         if (ModelSources.PLATFORM.equals(modelSource)) {
             if (platformModelId == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "请选择平台模型");
@@ -601,6 +632,7 @@ public class AgentApplicationService {
             draft.setModelSource(ModelSources.PLATFORM);
             draft.setPlatformModelId(platformModelId);
             draft.setModelId(null);
+            draft.setRoutingPreference("BALANCED");
             return;
         }
         if (!ModelSources.BYOK.equals(modelSource)) {
@@ -614,6 +646,7 @@ public class AgentApplicationService {
         draft.setModelSource(ModelSources.BYOK);
         draft.setModelId(modelId);
         draft.setPlatformModelId(null);
+        draft.setRoutingPreference("BALANCED");
     }
 
     private Long workspaceId() {

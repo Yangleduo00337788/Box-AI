@@ -11,6 +11,7 @@ public record AgentVO(
         Integer draftVersion,
         Integer publishedVersion,
         String modelSource,
+        String routingPreference,
         Long modelId,
         String modelName,
         Long platformModelId,

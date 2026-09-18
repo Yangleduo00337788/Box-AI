@@ -98,6 +98,7 @@ public class AgentVersionRepositoryImpl implements AgentVersionRepository {
         version.setModelId(row.getModelId());
         version.setPlatformModelId(row.getPlatformModelId());
         version.setModelSource(row.getModelSource());
+        version.setRoutingPreference(row.getRoutingPreference());
         version.setTemperature(row.getTemperature());
         version.setTopP(row.getTopP());
         version.setMaxTokens(row.getMaxTokens());
@@ -126,6 +127,7 @@ public class AgentVersionRepositoryImpl implements AgentVersionRepository {
         row.setModelId(version.getModelId());
         row.setPlatformModelId(version.getPlatformModelId());
         row.setModelSource(version.getModelSource());
+        row.setRoutingPreference(version.getRoutingPreference() == null ? "BALANCED" : version.getRoutingPreference());
         row.setTemperature(version.getTemperature());
         row.setTopP(version.getTopP());
         row.setMaxTokens(version.getMaxTokens());
