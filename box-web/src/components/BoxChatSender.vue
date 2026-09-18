@@ -88,6 +88,7 @@ const props = withDefaults(
     canSend?: boolean
     placeholder?: string
     maxRows?: number
+    minRows?: number
     showCloud?: boolean
     showAttach?: boolean
     showVoice?: boolean
@@ -105,6 +106,7 @@ const props = withDefaults(
     canSend: false,
     placeholder: '说说你想聊什么...',
     maxRows: 8,
+    minRows: 2,
     showCloud: true,
     showAttach: true,
     showVoice: false,
@@ -146,7 +148,7 @@ watch(modelKey, (value) => {
 
 const textareaProps = computed<TextareaProps>(() => ({
   placeholder: props.placeholder,
-  autosize: { minRows: 2, maxRows: props.maxRows },
+  autosize: { minRows: props.minRows, maxRows: props.maxRows },
 }))
 
 const attachmentsProps = computed(() => ({
@@ -206,9 +208,24 @@ function onFileChange(event: Event) {
 }
 
 .box-chat-sender__input :deep(.t-chat-sender) {
-  border-radius: 18px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.box-chat-sender__input :deep(.t-chat-sender__textarea) {
+  border: 1px solid var(--box-composer-border, var(--box-border));
+  border-radius: var(--box-composer-radius);
   background: var(--box-surface);
-  box-shadow: var(--box-shadow-card);
+  box-shadow: var(--box-composer-shadow, var(--box-shadow-card));
+}
+
+.box-chat-sender__input :deep(.t-chat-sender__textarea:hover),
+.box-chat-sender__input :deep(.t-chat-sender__textarea--focus),
+.box-chat-sender__input :deep(.t-chat-sender__textarea--focus:hover) {
+  border-color: var(--box-composer-border, var(--box-border));
+  background: var(--box-surface);
+  box-shadow: var(--box-composer-shadow, var(--box-shadow-card));
 }
 
 .box-chat-sender__input :deep(.t-textarea__inner) {

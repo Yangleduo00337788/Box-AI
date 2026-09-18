@@ -2,64 +2,34 @@
   <div class="chat-workspace">
     <div v-if="!conversationId" class="chat-new">
       <div class="chat-stage">
-      <h1 class="chat-new__title">
-        有什么想交给
-        <t-dropdown
-          v-if="selectedAgent"
-          :options="agentOptions"
-          trigger="click"
-          :min-column-width="180"
-          :popup-props="{ overlayInnerClassName: 'chat-agent-switch' }"
-          @click="onAgentDropdown"
-        >
-          <button type="button" class="chat-new__agent" aria-haspopup="listbox" aria-label="切换智能体">
-            <t-avatar size="24px" class="chat-new__agent-avatar" :style="{ background: agentAvatarColor }">
-              {{ selectedAgent.name.slice(0, 1) }}
-            </t-avatar>
-            {{ selectedAgent.name }}
-            <t-icon name="chevron-down" class="chat-new__agent-arrow" />
-          </button>
-        </t-dropdown>
-        <template v-else> Box </template>
-        ？
-      </h1>
+      <chat-brand-hero />
 
-      <ops-chat-banner />
-
-      <chat-composer-shell>
-      <div class="composer-stack">
-        <ops-notice-bar
-          v-if="currentChatOps"
-          class="composer-stack__ops"
-          :item="currentChatOps"
-          :index="chatOpsIndex"
-          :total="chatOps.length"
-          @dismiss="dismissOps"
-          @open="openOpsLink"
-          @page="chatOpsIndex = $event"
+      <chat-composer-stack class="chat-new__composer">
+        <box-chat-sender
+          v-model="composerText"
+          data-testid="chat-composer-input"
+          :loading="chatting"
+          :can-send="canSendNewChat"
+          :placeholder="composerPlaceholder"
+          :min-rows="3"
+          :show-voice="true"
+          :show-model-picker="true"
+          :listening="listening"
+          :models="platformModels"
+          :model-picker-disabled="!modelPickerEnabled"
+          :auto-hint="autoModelHint"
+          v-model:selected-model-key="selectedModelKey"
+          :attachment-items="composerAttachmentItems"
+          @send="onComposerSend"
+          @stop="stopGeneration"
+          @toggle-voice="toggleVoiceInput"
+          @remove-attachment="removeComposerAttachment"
+          @file-change="onFileSelected"
         />
-      <box-chat-sender
-        v-model="composerText"
-        data-testid="chat-composer-input"
-        :loading="chatting"
-        :can-send="canSendNewChat"
-        :placeholder="composerPlaceholder"
-        :show-voice="true"
-        :show-model-picker="true"
-        :listening="listening"
-        :models="platformModels"
-        :model-picker-disabled="!modelPickerEnabled"
-        :auto-hint="autoModelHint"
-        v-model:selected-model-key="selectedModelKey"
-        :attachment-items="composerAttachmentItems"
-        @send="onComposerSend"
-        @stop="stopGeneration"
-        @toggle-voice="toggleVoiceInput"
-        @remove-attachment="removeComposerAttachment"
-        @file-change="onFileSelected"
-      />
-      </div>
-      </chat-composer-shell>
+        <template #agent>
+          <chat-agent-rail />
+        </template>
+      </chat-composer-stack>
 
       <div v-if="suggestionsLoading" class="suggestions-loading">
         <t-loading size="small" />
@@ -198,7 +168,7 @@
         </div>
       </div>
 
-      <chat-composer-shell>
+      <chat-composer-stack class="chat-active__composer">
         <box-chat-sender
           v-model="composerText"
           data-testid="chat-composer-input"
@@ -217,7 +187,10 @@
           @remove-attachment="removeComposerAttachment"
           @file-change="onFileSelected"
         />
-      </chat-composer-shell>
+        <template #agent>
+          <chat-agent-rail />
+        </template>
+      </chat-composer-stack>
       </div>
 
       <aside v-if="tracePanelOpen" class="chat-trace-panel">
@@ -254,9 +227,9 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import { ChatMessage, type TdAttachmentItem } from '@tdesign-vue-next/chat'
 import BoxChatSender from '@/components/BoxChatSender.vue'
-import ChatComposerShell from '@/components/ChatComposerShell.vue'
-import OpsNoticeBar from '@/components/OpsNoticeBar.vue'
-import OpsChatBanner from '@/components/OpsChatBanner.vue'
+import ChatAgentRail from '@/components/ChatAgentRail.vue'
+import ChatBrandHero from '@/components/ChatBrandHero.vue'
+import ChatComposerStack from '@/components/ChatComposerStack.vue'
 import { parseUserContent } from '@/utils/chatContent'
 import {
   toChatUiContent,
@@ -274,7 +247,6 @@ import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSu
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
 import { useActiveProject } from '@/composables/useActiveProject'
-import { useOpsPlacements } from '@/composables/useOpsPlacements'
 import { getAvatarColor } from '@/utils/format'
 import { classifyModelChatKind } from '@/utils/modelCapability'
 import {
@@ -309,17 +281,6 @@ async function refreshConversationNav() {
 const { openCreateAgentDialog } = useCreateAgentDialog()
 const { agents, selectedAgent, refresh: refreshAgents, selectAgent, selectAgentByConversation } = useAgentSelection()
 const { suggestions, loading: suggestionsLoading, refresh: refreshSuggestions } = useChatSuggestions()
-const { items: chatOps, dismiss: dismissOps, openLink: openOpsLink } = useOpsPlacements('CHAT_HOME')
-const chatOpsIndex = ref(0)
-const currentChatOps = computed(() => chatOps.value[chatOpsIndex.value] || chatOps.value[0])
-
-watch(
-  () => chatOps.value.length,
-  (length) => {
-    if (chatOpsIndex.value >= length) chatOpsIndex.value = 0
-  },
-)
-
 const chatting = ref(false)
 const composerText = ref('')
 const composerAttachments = ref<ComposerAttachment[]>([])
@@ -486,7 +447,9 @@ const agentOptions = computed<DropdownOption[]>(() =>
 )
 
 const composerPlaceholder = computed(() =>
-  selectedAgent.value ? `告诉${selectedAgent.value.name}，你想先从哪件事开始...` : '告诉我 Box，你想先从哪件事开始...',
+  selectedAgent.value
+    ? `先把这次对话的目标丢进来，材料也可以一起带上…`
+    : '先把这次对话的目标丢进来，材料也可以一起带上…',
 )
 
 const conversationId = computed(() => {
@@ -1073,69 +1036,15 @@ useReloadOnWorkspaceChange(async () => {
   box-sizing: border-box;
 }
 
-.chat-new__title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+.chat-new__composer,
+.chat-active__composer {
   width: 100%;
-  margin: 0 0 28px;
-  font-size: 28px;
-  font-weight: 500;
-  line-height: 1.35;
-  color: var(--box-ink);
-  text-align: center;
+  margin-bottom: 4px;
 }
 
-.chat-new__agent {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 2px;
-  padding: 0 4px 0 2px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  vertical-align: middle;
-}
-
-.chat-new__agent:hover {
-  background: var(--box-hover);
-}
-
-.chat-new__agent-avatar {
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.chat-new__agent-arrow {
-  font-size: 18px;
-  color: var(--box-muted);
-}
-
-.composer-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-
-.composer-stack__ops :deep(.ops-notice) {
-  border: 1px solid var(--box-border);
-  border-radius: 16px;
-  min-height: 36px;
-  padding: 8px 12px;
-  background: var(--box-shell);
-  box-shadow: var(--box-shadow-card);
-}
-
-.composer-stack__ops :deep(.ops-notice--promo) {
-  background: var(--td-warning-color-1);
+.suggestions-loading,
+.suggestions {
+  margin-top: 16px;
 }
 
 .composer {
@@ -1727,8 +1636,5 @@ useReloadOnWorkspaceChange(async () => {
     grid-template-columns: 1fr;
   }
 
-  .chat-new__title {
-    font-size: 22px;
-  }
 }
 </style>
