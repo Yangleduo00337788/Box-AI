@@ -24,7 +24,7 @@ public final class AgentEmbedConfigSupport {
         ObjectNode root = readRoot(configJson);
         JsonNode embed = root.get("embed");
         if (embed == null || embed.isNull()) {
-            return new AgentEmbedConfigVO(DEFAULT_THEME, "", "", List.of(), agentName, "", false, null, false);
+            return empty(agentName);
         }
         return new AgentEmbedConfigVO(
                 textOrDefault(embed.get("themeColor"), DEFAULT_THEME),
@@ -35,7 +35,10 @@ public final class AgentEmbedConfigSupport {
                 textOrDefault(embed.get("customDomain"), ""),
                 embed.path("domainVerified").asBoolean(false),
                 null,
-                false);
+                false,
+                null,
+                null,
+                null);
     }
 
     public static AgentEmbedConfigVO withDomain(AgentEmbedConfigVO vo,
@@ -45,7 +48,8 @@ public final class AgentEmbedConfigSupport {
                                                 boolean verifySkipped) {
         if (vo == null) {
             return new AgentEmbedConfigVO(
-                    DEFAULT_THEME, "", "", List.of(), null, customDomain, verified, verifyToken, verifySkipped);
+                    DEFAULT_THEME, "", "", List.of(), null, customDomain, verified, verifyToken, verifySkipped,
+                    null, null, null);
         }
         return new AgentEmbedConfigVO(
                 vo.themeColor(),
@@ -56,7 +60,34 @@ public final class AgentEmbedConfigSupport {
                 customDomain,
                 verified,
                 verifyToken,
-                verifySkipped);
+                verifySkipped,
+                vo.gatewayCnameTarget(),
+                vo.gatewayTlsMode(),
+                vo.gatewaySetupHint());
+    }
+
+    public static AgentEmbedConfigVO withGateway(AgentEmbedConfigVO vo,
+                                                 String gatewayCnameTarget,
+                                                 String gatewayTlsMode,
+                                                 String gatewaySetupHint) {
+        if (vo == null) {
+            return new AgentEmbedConfigVO(
+                    DEFAULT_THEME, "", "", List.of(), null, "", false, null, false,
+                    gatewayCnameTarget, gatewayTlsMode, gatewaySetupHint);
+        }
+        return new AgentEmbedConfigVO(
+                vo.themeColor(),
+                vo.logoUrl(),
+                vo.welcomeMessage(),
+                vo.suggestedQuestions(),
+                vo.agentName(),
+                vo.customDomain(),
+                vo.domainVerified(),
+                vo.domainVerifyToken(),
+                vo.domainVerifySkipped(),
+                gatewayCnameTarget,
+                gatewayTlsMode,
+                gatewaySetupHint);
     }
 
     public static String merge(String configJson, UpdateAgentEmbedConfigRequest request) {
@@ -73,6 +104,11 @@ public final class AgentEmbedConfigSupport {
         embed.put("customDomain", domain);
         root.set("embed", embed);
         return root.toString();
+    }
+
+    private static AgentEmbedConfigVO empty(String agentName) {
+        return new AgentEmbedConfigVO(
+                DEFAULT_THEME, "", "", List.of(), agentName, "", false, null, false, null, null, null);
     }
 
     private static ObjectNode readRoot(String configJson) {

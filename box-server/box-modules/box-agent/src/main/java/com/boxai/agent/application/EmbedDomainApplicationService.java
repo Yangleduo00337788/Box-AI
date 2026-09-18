@@ -30,13 +30,19 @@ public class EmbedDomainApplicationService {
     private final EmbedCustomDomainRepository embedCustomDomainRepository;
     private final AgentRepository agentRepository;
     private final boolean skipDomainVerify;
+    private final String gatewayHost;
+    private final String gatewayTlsMode;
 
     public EmbedDomainApplicationService(EmbedCustomDomainRepository embedCustomDomainRepository,
                                          AgentRepository agentRepository,
-                                         @Value("${box.embed.skip-domain-verify:true}") boolean skipDomainVerify) {
+                                         @Value("${box.embed.skip-domain-verify:true}") boolean skipDomainVerify,
+                                         @Value("${box.embed.gateway-host:}") String gatewayHost,
+                                         @Value("${box.embed.gateway-tls-mode:platform}") String gatewayTlsMode) {
         this.embedCustomDomainRepository = embedCustomDomainRepository;
         this.agentRepository = agentRepository;
         this.skipDomainVerify = skipDomainVerify;
+        this.gatewayHost = gatewayHost == null ? "" : gatewayHost.trim();
+        this.gatewayTlsMode = gatewayTlsMode == null || gatewayTlsMode.isBlank() ? "platform" : gatewayTlsMode.trim();
     }
 
     public Optional<EmbedCustomDomain> findByAgentId(Long agentId) {
@@ -117,20 +123,35 @@ public class EmbedDomainApplicationService {
 
     public AgentEmbedConfigVO attach(AgentEmbedConfigVO vo, Long agentId, boolean includeToken) {
         EmbedCustomDomain domain = embedCustomDomainRepository.findByAgentId(agentId).orElse(null);
-        if (domain == null) {
-            return AgentEmbedConfigSupport.withDomain(
-                    vo,
-                    vo == null ? "" : vo.customDomain(),
-                    false,
-                    null,
-                    skipDomainVerify);
-        }
-        return AgentEmbedConfigSupport.withDomain(
+        AgentEmbedConfigVO base = domain == null
+                ? AgentEmbedConfigSupport.withDomain(
+                vo,
+                vo == null ? "" : vo.customDomain(),
+                false,
+                null,
+                skipDomainVerify)
+                : AgentEmbedConfigSupport.withDomain(
                 vo,
                 domain.getDomain(),
                 domain.getVerified() != null && domain.getVerified() == 1,
                 includeToken ? domain.getVerifyToken() : null,
                 skipDomainVerify);
+        return AgentEmbedConfigSupport.withGateway(
+                base,
+                gatewayHost.isBlank() ? null : gatewayHost,
+                gatewayTlsMode,
+                buildGatewayHint(domain == null ? null : domain.getDomain()));
+    }
+
+    private String buildGatewayHint(String customDomain) {
+        if (gatewayHost.isBlank()) {
+            return "请在 box.embed.gateway-host 配置 Embed 网关 CNAME 目标";
+        }
+        if (customDomain == null || customDomain.isBlank()) {
+            return "绑定自定义域名后，请将 CNAME 指向 " + gatewayHost + "，TLS 由 " + gatewayTlsMode + " 模式托管";
+        }
+        return "请将 " + customDomain + " 的 CNAME 指向 " + gatewayHost
+                + "，并完成 TXT / well-known 校验；TLS 模式：" + gatewayTlsMode;
     }
 
     public Agent requirePublished(Long agentId) {

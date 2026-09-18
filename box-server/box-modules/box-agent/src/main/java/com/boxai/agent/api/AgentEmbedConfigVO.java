@@ -11,6 +11,9 @@ public record AgentEmbedConfigVO(
         String customDomain,
         Boolean domainVerified,
         String domainVerifyToken,
-        Boolean domainVerifySkipped
+        Boolean domainVerifySkipped,
+        String gatewayCnameTarget,
+        String gatewayTlsMode,
+        String gatewaySetupHint
 ) {
 }
