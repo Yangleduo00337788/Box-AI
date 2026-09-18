@@ -46,7 +46,15 @@ import { computed, ref, watch } from 'vue'
 import OpsPlacementIcon from '@/components/OpsPlacementIcon.vue'
 import { useOpsPlacements } from '@/composables/useOpsPlacements'
 
-const { items, dismiss, openLink } = useOpsPlacements('GLOBAL_ALERT')
+const { items: globalAlerts, dismiss, openLink } = useOpsPlacements('GLOBAL_ALERT')
+const { items: chatHomeAlerts } = useOpsPlacements('CHAT_HOME')
+
+const items = computed(() =>
+  [...globalAlerts.value, ...chatHomeAlerts.value].sort(
+    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id - b.id,
+  ),
+)
+
 const index = ref(0)
 const current = computed(() => items.value[index.value] || items.value[0])
 

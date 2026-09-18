@@ -43,10 +43,13 @@ function markImpression(id: number) {
 }
 
 function visible(item: OpsPlacementVO) {
+  if (dismissedIds.value.includes(item.id)) {
+    return false
+  }
   if (item.slot === 'CHAT_BANNER' || item.slot === 'CHAT_AD') {
     return Boolean(item.imageUrl)
   }
-  return !item.dismissible || !dismissedIds.value.includes(item.id)
+  return true
 }
 
 export function useOpsPlacements(slot?: OpsSlot) {
