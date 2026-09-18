@@ -55,6 +55,9 @@ export interface CreateSubscriptionOrderVO {
   amount: number
   currency: string
   paymentStatus: string
+  paymentChannel?: string
+  paymentUrl?: string | null
+  requiresClientConfirm?: boolean
 }
 
 export function fetchBillingOverview() {

@@ -95,8 +95,19 @@
               <t-form-item label="模型来源" name="modelSource">
                 <t-radio-group v-model="modelForm.modelSource">
                   <t-radio value="PLATFORM">平台模型（扣配额）</t-radio>
+                  <t-radio value="AUTO">智能路由（Auto）</t-radio>
                   <t-radio v-if="byokEnabled" value="BYOK">自带密钥（BYOK）</t-radio>
                 </t-radio-group>
+              </t-form-item>
+              <t-form-item v-if="modelForm.modelSource === 'AUTO'" label="路由策略" name="routingPreference">
+                <t-radio-group v-model="modelForm.routingPreference">
+                  <t-radio value="BALANCED">均衡</t-radio>
+                  <t-radio value="QUALITY">质量优先</t-radio>
+                  <t-radio value="COST">成本优先</t-radio>
+                </t-radio-group>
+                <p class="model-auto-hint">
+                  对话时由平台从可用模型池中自动选择，无需手动指定模型；调试与发布均按当前策略路由。
+                </p>
               </t-form-item>
               <t-form-item
                 v-if="modelForm.modelSource === 'PLATFORM'"
@@ -109,7 +120,7 @@
                   placeholder="请选择平台模型"
                 />
               </t-form-item>
-              <t-form-item v-else label="自带模型" name="modelId">
+              <t-form-item v-else-if="modelForm.modelSource === 'BYOK'" label="自带模型" name="modelId">
                 <t-select v-model="modelForm.modelId" :options="byokModelOptions" placeholder="请选择模型" />
               </t-form-item>
               <t-form-item label="Temperature">
@@ -356,6 +367,13 @@
                         <span v-if="embedForm.domainVerifySkipped && embedForm.domainVerified">本地已跳过校验。</span>
                         <span v-else-if="embedForm.domainVerified">已验证。</span>
                         <span v-else>尚未验证。</span>
+                      </p>
+                      <p v-if="embedForm.gatewaySetupHint" class="embed-domain-hint">
+                        {{ embedForm.gatewaySetupHint }}
+                      </p>
+                      <p v-if="embedForm.gatewayCnameTarget" class="embed-domain-hint">
+                        网关 CNAME：<code>{{ embedForm.gatewayCnameTarget }}</code>
+                        <span v-if="embedForm.gatewayTlsMode">（TLS：{{ embedForm.gatewayTlsMode }}）</span>
                       </p>
                       <p v-if="embedForm.domainVerifyToken" class="embed-domain-hint">
                         任选其一完成校验：TXT 记录
@@ -818,6 +836,7 @@ const modelForm = reactive({
   modelSource: 'PLATFORM' as ModelSource,
   platformModelId: undefined as number | undefined,
   modelId: undefined as number | undefined,
+  routingPreference: 'BALANCED',
   temperature: 0.7,
   topP: 1,
   maxTokens: 4096,
@@ -850,6 +869,9 @@ const embedForm = reactive({
   domainVerified: false,
   domainVerifyToken: '',
   domainVerifySkipped: false,
+  gatewayCnameTarget: '',
+  gatewayTlsMode: '',
+  gatewaySetupHint: '',
 })
 
 interface AgentConfigPayload {
@@ -888,6 +910,9 @@ const displayModelName = computed(() => {
   if (!agent.value) return ''
   if (agent.value.modelSource === 'BYOK') {
     return agent.value.modelName ? `${agent.value.modelName}（BYOK）` : '自带密钥'
+  }
+  if (agent.value.modelSource === 'AUTO') {
+    return `智能路由（${agent.value.routingPreference || 'BALANCED'}）`
   }
   return agent.value.platformModelName || agent.value.modelName || ''
 })
@@ -985,7 +1010,9 @@ function applyAgent(data: AgentVO) {
   overviewForm.description = data.description || ''
   overviewForm.avatarUrl = data.avatarUrl || ''
   promptForm.systemPrompt = data.systemPrompt || ''
-  modelForm.modelSource = data.modelSource === 'BYOK' ? 'BYOK' : 'PLATFORM'
+  modelForm.modelSource =
+    data.modelSource === 'BYOK' ? 'BYOK' : data.modelSource === 'AUTO' ? 'AUTO' : 'PLATFORM'
+  modelForm.routingPreference = data.routingPreference || 'BALANCED'
   modelForm.platformModelId = data.platformModelId
   modelForm.modelId = data.modelId
   modelForm.temperature = data.temperature ?? 0.7
@@ -1095,6 +1122,9 @@ function applyEmbedVo(data: {
   embedForm.domainVerified = Boolean(data.domainVerified)
   embedForm.domainVerifyToken = data.domainVerifyToken || ''
   embedForm.domainVerifySkipped = Boolean(data.domainVerifySkipped)
+  embedForm.gatewayCnameTarget = data.gatewayCnameTarget || ''
+  embedForm.gatewayTlsMode = data.gatewayTlsMode || ''
+  embedForm.gatewaySetupHint = data.gatewaySetupHint || ''
 }
 
 async function loadEmbedConfig() {
@@ -1455,6 +1485,7 @@ const saveModel: FormProps['onSubmit'] = async ({ validateResult }) => {
       modelSource: modelForm.modelSource,
       platformModelId: modelForm.modelSource === 'PLATFORM' ? modelForm.platformModelId : undefined,
       modelId: modelForm.modelSource === 'BYOK' ? modelForm.modelId : undefined,
+      routingPreference: modelForm.modelSource === 'AUTO' ? modelForm.routingPreference : undefined,
       temperature: modelForm.temperature,
       topP: modelForm.topP,
       maxTokens: modelForm.maxTokens,
@@ -1594,6 +1625,13 @@ onMounted(loadAgent)
 </script>
 
 <style scoped>
+.model-auto-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
+}
+
 .builder {
   display: flex;
   flex-direction: column;

@@ -41,7 +41,7 @@
               <p class="plan-offer__price">{{ plan.priceMonthly }} CNY / 月</p>
               <p class="plan-offer__desc">{{ plan.description || '—' }}</p>
               <t-button theme="primary" variant="outline" :loading="subscribingId === plan.id" @click="onSubscribe(plan.id)">
-                订阅并模拟支付
+                {{ overview?.paymentEnabled ? '订阅并支付' : '订阅并模拟支付' }}
               </t-button>
             </t-card>
           </div>
@@ -349,7 +349,11 @@ async function onSubscribe(planId: number) {
   try {
     const { data } = await subscribePlan(planId)
     const order = data.data
-    if (order?.paymentId) {
+    if (order?.paymentUrl) {
+      window.location.href = order.paymentUrl
+      return
+    }
+    if (order?.requiresClientConfirm && order?.paymentId) {
       await confirmPayment(order.paymentId)
     }
     MessagePlugin.success('套餐已更新')
@@ -385,7 +389,21 @@ watch(
   },
 )
 
+function handlePaymentReturn() {
+  const payment = route.query.payment
+  if (payment === 'success') {
+    MessagePlugin.success('支付已完成，套餐已更新')
+    tab.value = 'billing'
+    void router.replace({ path: route.path, query: { tab: 'billing' } })
+  } else if (payment === 'cancel') {
+    MessagePlugin.warning('已取消支付')
+    tab.value = 'plans'
+    void router.replace({ path: route.path, query: { tab: 'plans' } })
+  }
+}
+
 onMounted(() => {
+  handlePaymentReturn()
   void loadAll()
   window.addEventListener('resize', handleResize)
 })

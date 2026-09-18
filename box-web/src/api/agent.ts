@@ -8,7 +8,7 @@ import {
 
 export type { ChatStreamEvent, ChatToolEventPayload }
 
-export type ModelSource = 'PLATFORM' | 'BYOK'
+export type ModelSource = 'PLATFORM' | 'BYOK' | 'AUTO'
 
 export interface AgentVO {
   id: number
@@ -19,6 +19,7 @@ export interface AgentVO {
   draftVersion?: number
   publishedVersion?: number
   modelSource?: ModelSource
+  routingPreference?: string
   modelId?: number
   modelName?: string
   platformModelId?: number
@@ -72,6 +73,7 @@ export function updateAgentModel(
     modelSource: ModelSource
     platformModelId?: number
     modelId?: number
+    routingPreference?: string
     temperature?: number
     topP?: number
     maxTokens?: number
@@ -117,6 +119,9 @@ export interface AgentEmbedConfigVO {
   domainVerified?: boolean
   domainVerifyToken?: string | null
   domainVerifySkipped?: boolean
+  gatewayCnameTarget?: string | null
+  gatewayTlsMode?: string | null
+  gatewaySetupHint?: string | null
 }
 
 export interface PublishedEmbedResolveVO {
