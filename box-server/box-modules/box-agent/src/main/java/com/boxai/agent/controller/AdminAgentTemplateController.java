@@ -57,6 +57,12 @@ public class AdminAgentTemplateController {
         return Result.success(agentTemplateApplicationService.updateReview(id, request));
     }
 
+    @PutMapping("/{id}/rollout")
+    public Result<AgentTemplateVO> updateRollout(@PathVariable Long id,
+                                                 @Valid @RequestBody com.boxai.agent.api.market.UpdateMarketRolloutRequest request) {
+        return Result.success(agentTemplateApplicationService.updateRollout(id, request));
+    }
+
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         agentTemplateApplicationService.delete(id);

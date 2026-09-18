@@ -11,6 +11,8 @@ import com.boxai.common.constant.ModelSources;
 import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.common.market.MarketRolloutSupport;
+import com.boxai.agent.api.market.UpdateMarketRolloutRequest;
 import com.boxai.domain.agent.Agent;
 import com.boxai.domain.agent.AgentRepository;
 import com.boxai.domain.agent.AgentTemplate;
@@ -45,6 +47,7 @@ public class AgentTemplateApplicationService {
     private final PlatformModelRepository platformModelRepository;
     private final AgentApplicationService agentApplicationService;
     private final WorkspacePermissionService workspacePermissionService;
+    private final MarketRolloutResolver marketRolloutResolver;
 
     public AgentTemplateApplicationService(AgentTemplateRepository agentTemplateRepository,
                                            AgentRepository agentRepository,
@@ -52,7 +55,8 @@ public class AgentTemplateApplicationService {
                                            PlatformModelApplicationService platformModelApplicationService,
                                            PlatformModelRepository platformModelRepository,
                                            AgentApplicationService agentApplicationService,
-                                           WorkspacePermissionService workspacePermissionService) {
+                                           WorkspacePermissionService workspacePermissionService,
+                                           MarketRolloutResolver marketRolloutResolver) {
         this.agentTemplateRepository = agentTemplateRepository;
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
@@ -60,6 +64,7 @@ public class AgentTemplateApplicationService {
         this.platformModelRepository = platformModelRepository;
         this.agentApplicationService = agentApplicationService;
         this.workspacePermissionService = workspacePermissionService;
+        this.marketRolloutResolver = marketRolloutResolver;
     }
 
     public List<AgentTemplateVO> listAdmin() {
@@ -70,6 +75,11 @@ public class AgentTemplateApplicationService {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         return agentTemplateRepository.listListed().stream()
                 .filter(template -> platformModelApplicationService.isRunnable(template.getPlatformModelId()))
+                .filter(template -> marketRolloutResolver.isVisible(
+                        template.getId(),
+                        template.getVisibility(),
+                        template.getTenantIdsJson(),
+                        template.getRolloutPercent()))
                 .map(this::toConsumerVO)
                 .toList();
     }
@@ -161,6 +171,29 @@ public class AgentTemplateApplicationService {
     }
 
     @Transactional
+    public AgentTemplateVO updateRollout(Long id, UpdateMarketRolloutRequest request) {
+        AgentTemplate template = requireTemplate(id);
+        String visibility = request.visibility().trim().toUpperCase();
+        if (!Set.of("GLOBAL", "TENANT").contains(visibility)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "可见范围无效");
+        }
+        template.setVisibility(visibility);
+        if ("TENANT".equals(visibility)) {
+            var tenantIds = MarketRolloutSupport.parseTenantIdList(request.tenantIds());
+            if (tenantIds.isEmpty()) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写至少一个租户 ID");
+            }
+            template.setTenantIdsJson(MarketRolloutSupport.serializeTenantIds(tenantIds));
+        } else {
+            template.setTenantIdsJson(null);
+        }
+        template.setRolloutPercent(request.rolloutPercent() == null ? 100 : request.rolloutPercent());
+        template.setUpdatedBy(SecurityContexts.currentUser().userId());
+        agentTemplateRepository.update(template);
+        return toVO(template);
+    }
+
+    @Transactional
     public AgentVO enable(Long templateId) {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_CREATE);
         AgentTemplate template = requireListedTemplate(templateId);
@@ -224,6 +257,13 @@ public class AgentTemplateApplicationService {
         if (!MarketReviewStatuses.visibleToConsumers(template.getStatus(), template.getReviewStatus())) {
             throw new BusinessException(ErrorCode.AGENT_TEMPLATE_NOT_FOUND, "模板未上架、未通过审核或已下架");
         }
+        if (!marketRolloutResolver.isVisible(
+                template.getId(),
+                template.getVisibility(),
+                template.getTenantIdsJson(),
+                template.getRolloutPercent())) {
+            throw new BusinessException(ErrorCode.AGENT_TEMPLATE_NOT_FOUND, "模板尚未向当前租户放量");
+        }
         return template;
     }
 
@@ -250,6 +290,9 @@ public class AgentTemplateApplicationService {
                 template.getStreamEnabled(),
                 template.getStatus(),
                 template.getReviewStatus(),
+                template.getVisibility(),
+                template.getTenantIdsJson(),
+                template.getRolloutPercent(),
                 template.getSortOrder(),
                 template.getInstallCount(),
                 template.getCreatedAt(),
@@ -274,6 +317,9 @@ public class AgentTemplateApplicationService {
                 vo.streamEnabled(),
                 vo.status(),
                 vo.reviewStatus(),
+                null,
+                null,
+                null,
                 vo.sortOrder(),
                 vo.installCount(),
                 vo.createdAt(),

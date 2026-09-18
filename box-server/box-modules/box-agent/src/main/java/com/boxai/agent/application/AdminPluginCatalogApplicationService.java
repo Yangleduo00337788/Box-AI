@@ -4,7 +4,9 @@ import com.boxai.agent.api.plugin.AdminPluginCatalogVO;
 import com.boxai.agent.api.plugin.CreatePluginCatalogRequest;
 import com.boxai.agent.api.plugin.UpdatePluginCatalogRequest;
 import com.boxai.agent.api.plugin.UpdatePluginReviewRequest;
+import com.boxai.agent.api.market.UpdateMarketRolloutRequest;
 import com.boxai.common.constant.MarketReviewStatuses;
+import com.boxai.common.market.MarketRolloutSupport;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.plugin.PluginCatalog;
@@ -117,6 +119,29 @@ public class AdminPluginCatalogApplicationService {
     }
 
     @Transactional
+    public AdminPluginCatalogVO updateRollout(Long id, UpdateMarketRolloutRequest request) {
+        PluginCatalog plugin = pluginCatalogRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在"));
+        String visibility = request.visibility().trim().toUpperCase();
+        if (!Set.of("GLOBAL", "TENANT").contains(visibility)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "可见范围无效");
+        }
+        plugin.setVisibility(visibility);
+        if ("TENANT".equals(visibility)) {
+            var tenantIds = MarketRolloutSupport.parseTenantIdList(request.tenantIds());
+            if (tenantIds.isEmpty()) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写至少一个租户 ID");
+            }
+            plugin.setTenantIdsJson(MarketRolloutSupport.serializeTenantIds(tenantIds));
+        } else {
+            plugin.setTenantIdsJson(null);
+        }
+        plugin.setRolloutPercent(request.rolloutPercent() == null ? 100 : request.rolloutPercent());
+        pluginCatalogRepository.update(plugin);
+        return toVO(plugin);
+    }
+
+    @Transactional
     public void delete(Long id) {
         PluginCatalog plugin = pluginCatalogRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在"));
@@ -156,6 +181,9 @@ public class AdminPluginCatalogApplicationService {
                 plugin.getManifestJson(),
                 plugin.getStatus(),
                 plugin.getReviewStatus(),
+                plugin.getVisibility(),
+                plugin.getTenantIdsJson(),
+                plugin.getRolloutPercent(),
                 plugin.getSortOrder(),
                 plugin.getInstallCount());
     }
