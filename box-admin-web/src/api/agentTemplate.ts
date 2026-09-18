@@ -16,6 +16,9 @@ export interface AgentTemplateVO {
   streamEnabled?: boolean
   status: string
   reviewStatus?: string
+  visibility?: string
+  tenantIdsJson?: string | null
+  rolloutPercent?: number
   sortOrder?: number
   installCount?: number
   createdAt?: string
@@ -66,6 +69,13 @@ export function updateAgentTemplateStatus(id: number, status: string) {
 
 export function updateAgentTemplateReview(id: number, reviewStatus: string) {
   return http.put<Result<AgentTemplateVO>>(`/agent-templates/${id}/review`, { reviewStatus })
+}
+
+export function updateAgentTemplateRollout(
+  id: number,
+  payload: { visibility: string; tenantIds?: string; rolloutPercent?: number },
+) {
+  return http.put<Result<AgentTemplateVO>>(`/agent-templates/${id}/rollout`, payload)
 }
 
 export function deleteAgentTemplate(id: number) {

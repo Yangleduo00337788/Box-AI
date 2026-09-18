@@ -56,6 +56,13 @@ html:has(.admin-layout) {
   min-height: calc(100vh - 240px);
 }
 
+.rollout-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
+}
+
 .dashboard-page.admin-page {
   height: auto;
   min-height: 100%;

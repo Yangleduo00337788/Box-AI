@@ -15,6 +15,9 @@ export interface AdminPluginCatalogVO {
   manifestJson?: string
   status: string
   reviewStatus?: string
+  visibility?: string
+  tenantIdsJson?: string | null
+  rolloutPercent?: number
   sortOrder: number
   installCount: number
 }
@@ -74,6 +77,13 @@ export function updatePlugin(
 
 export function updatePluginReview(id: number, reviewStatus: string) {
   return http.put<Result<AdminPluginCatalogVO>>(`/plugins/${id}/review`, { reviewStatus })
+}
+
+export function updatePluginRollout(
+  id: number,
+  payload: { visibility: string; tenantIds?: string; rolloutPercent?: number },
+) {
+  return http.put<Result<AdminPluginCatalogVO>>(`/plugins/${id}/rollout`, payload)
 }
 
 export function deletePlugin(id: number) {

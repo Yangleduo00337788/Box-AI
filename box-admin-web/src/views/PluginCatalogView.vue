@@ -152,6 +152,31 @@
         </t-form-item>
       </t-form>
     </t-dialog>
+
+    <t-dialog
+      v-model:visible="rolloutVisible"
+      header="灰度放量"
+      width="520px"
+      :confirm-btn="{ content: '保存', loading: rolloutSaving }"
+      @confirm="saveRollout"
+    >
+      <t-form label-width="110px">
+        <t-form-item label="可见范围">
+          <t-radio-group v-model="rolloutForm.visibility">
+            <t-radio value="GLOBAL">全平台</t-radio>
+            <t-radio value="TENANT">指定租户</t-radio>
+          </t-radio-group>
+        </t-form-item>
+        <t-form-item v-if="rolloutForm.visibility === 'TENANT'" label="租户 ID">
+          <t-input v-model="rolloutForm.tenantIds" placeholder="多个 ID 用逗号分隔，如 1,2,3" />
+          <p class="rollout-hint">仅列出的租户可在 C 端插件市场看到该插件。</p>
+        </t-form-item>
+        <t-form-item v-else label="灰度百分比">
+          <t-input-number v-model="rolloutForm.rolloutPercent" :min="0" :max="100" theme="column" />
+          <p class="rollout-hint">全平台模式下按租户 ID 与插件 ID 稳定分桶，0 表示全隐藏。</p>
+        </t-form-item>
+      </t-form>
+    </t-dialog>
   </div>
 </template>
 
@@ -170,6 +195,7 @@ import {
   updatePlugin,
   updatePluginCategory,
   updatePluginReview,
+  updatePluginRollout,
   type AdminPluginCatalogVO,
   type PluginCategoryVO,
 } from '@/api/plugin'
@@ -197,6 +223,14 @@ const categorySaving = ref(false)
 const categoryEditing = ref(false)
 const categoryEditingCode = ref('')
 const categoryFormRef = ref<FormInstanceFunctions>()
+const rolloutVisible = ref(false)
+const rolloutSaving = ref(false)
+const rolloutTargetId = ref<number | null>(null)
+const rolloutForm = reactive({
+  visibility: 'GLOBAL',
+  tenantIds: '',
+  rolloutPercent: 100,
+})
 
 const methodOptions = [
   { label: 'GET', value: 'GET' },
@@ -268,6 +302,18 @@ const pluginColumns: PrimaryTableCol<AdminPluginCatalogVO>[] = [
   { colKey: 'category', title: '分类', width: 100, cell: (_, { row }) => categoryLabel(row.category) },
   { colKey: 'installCount', title: '安装数', width: 90 },
   {
+    colKey: 'visibility',
+    title: '可见范围',
+    width: 100,
+    cell: (_, { row }) => (row.visibility === 'TENANT' ? '指定租户' : '全平台'),
+  },
+  {
+    colKey: 'rolloutPercent',
+    title: '灰度%',
+    width: 80,
+    cell: (_, { row }) => (row.visibility === 'TENANT' ? '—' : `${row.rolloutPercent ?? 100}%`),
+  },
+  {
     colKey: 'status',
     title: '上架',
     width: 90,
@@ -290,10 +336,11 @@ const pluginColumns: PrimaryTableCol<AdminPluginCatalogVO>[] = [
   {
     colKey: 'actions',
     title: '操作',
-    width: 280,
+    width: 320,
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
+        h(Link, { theme: 'primary', hover: 'color', onClick: () => openRollout(row) }, () => '灰度'),
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openPluginEdit(row) }, () => '编辑'),
         row.reviewStatus !== 'APPROVED'
           ? h(Link, { theme: 'success', hover: 'color', onClick: () => reviewPlugin(row, 'APPROVED') }, () => '通过')
@@ -483,6 +530,36 @@ async function reviewPlugin(row: AdminPluginCatalogVO, reviewStatus: 'APPROVED' 
   await updatePluginReview(row.id, reviewStatus)
   MessagePlugin.success(reviewStatus === 'APPROVED' ? '已通过审核' : '已拒绝')
   await loadPlugins()
+}
+
+function openRollout(row: AdminPluginCatalogVO) {
+  rolloutTargetId.value = row.id
+  rolloutForm.visibility = row.visibility || 'GLOBAL'
+  rolloutForm.tenantIds = (row.tenantIdsJson || '').replace(/[\[\]\s]/g, '')
+  rolloutForm.rolloutPercent = row.rolloutPercent ?? 100
+  rolloutVisible.value = true
+}
+
+async function saveRollout() {
+  if (!rolloutTargetId.value) return false
+  if (rolloutForm.visibility === 'TENANT' && !rolloutForm.tenantIds.trim()) {
+    MessagePlugin.warning('请填写至少一个租户 ID')
+    return false
+  }
+  rolloutSaving.value = true
+  try {
+    await updatePluginRollout(rolloutTargetId.value, {
+      visibility: rolloutForm.visibility,
+      tenantIds: rolloutForm.visibility === 'TENANT' ? rolloutForm.tenantIds : undefined,
+      rolloutPercent: rolloutForm.rolloutPercent,
+    })
+    MessagePlugin.success('灰度配置已保存')
+    rolloutVisible.value = false
+    await loadPlugins()
+  } finally {
+    rolloutSaving.value = false
+  }
+  return true
 }
 
 async function listPlugin(row: AdminPluginCatalogVO) {
