@@ -224,11 +224,14 @@ P0 / P1 / P2 共 50 项已全部完成。后续需求见下方 §八，勿与本
 
 | ID | 优先级 | 状态 | 任务 | 说明 |
 |----|--------|------|------|------|
-| BL-01 | P2 | 🟡 | 真实 OAuth / 企业 SSO | 现有 providers + authorize/callback **stub（501）** |
+| BL-01 | P2 | 🟡 | 真实 OAuth / 企业 SSO | providers + authorize/callback **stub（501）**；身份表 V40 已预留，登录流待下一迭代 |
+| BL-26 | P1 | ✅ | B 端市场灰度 UI | 模板/插件 `rollout_percent` + TENANT 白名单；`PUT .../rollout` |
+| BL-27 | P1 | ✅ | C 端 Model Router | Builder `AUTO` + `routing_preference`；chat 运行时自动选模 |
+| BL-28 | P1 | ✅ | C 端套餐 Mock 支付 | Settings 套餐订阅 + `confirmPayment`；真实 Stripe/Alipay 待下一迭代 |
 | BL-02 | P2 | ✅ | B 端平台 Analytics | `/analytics` + `GET /api/v1/admin/analytics/overview|trends` |
 | BL-03 | P2 | ✅ | B 端工具 / MCP 目录 | `/platform-tools`、`/platform-mcp`，复用插件目录 category |
-| BL-04 | P2 | 🟡 | Embed 自定义域名生效 | 真校验（TXT / well-known）+ resolve + CNAME 指引已落地；独立证书/网关未做 |
-| BL-05 | P2 | 🟡 | 计费支付闭环 | 订阅/账单/ mock 支付已落地；真实支付网关仍缺 |
+| BL-04 | P2 | ✅ | Embed 自定义域名生效 | TXT / well-known + resolve + `box.embed.gateway-host` CNAME/TLS 指引 |
+| BL-05 | P2 | ✅ | 计费支付闭环 | Stripe / Alipay / Mock 网关 + webhook/notify + C 端跳转支付 |
 | BL-06 | P2 | ⬜ | Kubernetes / 分布式 Runtime | PRD §97 明确暂时不追求 |
 | BL-07 | P1 | ✅ | 抽检 `05-Backend.md` B 端路由 | 已对齐 dashboard/users/audit 等管理端路由与 Admin API |
 | BL-08 | P2 | ✅ | B 端创建平台管理员 | `POST /api/v1/admin/users` + 用户页弹窗 |
@@ -244,9 +247,9 @@ P0 / P1 / P2 共 50 项已全部完成。后续需求见下方 §八，勿与本
 | BL-18 | P2 | ✅ | API 文档 Tab | Settings API Keys OpenAPI/curl |
 | BL-19 | P1 | ✅ | Session 设备管理 | `user_session` + `/auth/sessions` |
 | BL-20 | P1 | ✅ | 平台 RBAC + 配置中心 | `platformAdminRole` JWT + Interceptor 路径矩阵；B 端菜单/路由显隐 |
-| BL-21 | P2 | 🟡 | 市场审核灰度 | 审核闭环已落地；`rollout_percent` 灰度仍未执行 |
+| BL-21 | P2 | ✅ | 市场审核灰度 | `rollout_percent` + TENANT 白名单；C 端列表/安装按租户桶过滤 |
 | BL-22 | P2 | ✅ | 运营位埋点 | `ops_placement_metric` + track API + C 端上报 |
-| BL-23 | P2 | 🟡 | Auto 智能路由 | `ModelRouterApplicationService` stub，未接入 chat |
+| BL-23 | P2 | ✅ | Auto 智能路由 | `model_source=AUTO` + `routing_preference`；chat 接入 Model Router |
 | BL-24 | P2 | ✅ | 知识库 URL 导入 | `import-url` API + KnowledgeView UI |
 | BL-25 | P1 | ✅ | 统一其余对话 UI | Builder 调试预览 + Embed 页对齐 `/chat` 的 TDesign Chat |
 | E2E-01 | P1 | ✅ | C 端未知路由 404 | R15：`NotFoundView` + catch-all；设置子路由同步 |

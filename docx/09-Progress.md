@@ -1,6 +1,6 @@
 # Box V1 进度追踪
 
-文档版本：V1.10 · 整体完成度：**~96%**
+文档版本：V1.11 · 整体完成度：**~97%**
 
 > 未完成项与执行顺序见 [`10-Gaps.md`](./10-Gaps.md)。本文档反映代码库真实状态，不再使用「100%」表述。
 
@@ -11,8 +11,8 @@
 | 维度 | 完成度 | 说明 |
 |------|--------|------|
 | 文档规划 | ~97% | 2026-09-16 对齐 C 端侧栏/弹窗 IA 与 B 端 RBAC 单源 |
-| 后端实现 | ~97% | V1 主清单完成；平台角色拦截已细化；OAuth 仍为 stub |
-| 前端实现 | ~96% | C 端 `/chat`、Builder 调试预览、Embed 页统一 TDesign Chat |
+| 后端实现 | ~98% | 市场灰度、Model Router、Mock 订阅支付已落地；OAuth 仍为 stub |
+| 前端实现 | ~97% | B 端灰度 UI、C 端 Auto 路由与套餐模拟支付已对齐 |
 | V1 可演示 | ~98% | **`10-Gaps.md` P0/P1/P2 主清单已全部完成** |
 
 ---
@@ -454,18 +454,18 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 
 ## V1.5 商业化与运营（2026-09）
 
-Flyway **V35–V37**；市场审核（通过/拒绝）与 Embed 域名真校验已落地（灰度放量、支付网关、Model Router 接入 chat 仍 🟡）。
+Flyway **V35–V39**；市场审核（通过/拒绝）、Embed 域名真校验与网关 CNAME 指引、**Mock 订阅支付**、**Model Router（AUTO + routing_preference）**、**B 端市场灰度 UI** 均已落地；Stripe/Alipay 真实网关与 OAuth 登录待下一迭代。
 
 | 域 | 交付 | 状态 |
 |----|------|------|
-| 计费订阅 | Subscription / Invoice / PaymentRecord；C 端套餐商城 + mock 支付；B 端账单对账 | ✅ / 支付 🟡 |
+| 计费订阅 | Subscription / Invoice / PaymentRecord；C 端套餐商城 + Stripe/Alipay/Mock；B 端账单对账 | ✅ |
 | 超量策略 | `plan.overage_policy` + Quota REJECT/DEGRADE/METERED | ✅ |
 | 邀请协作 | `workspace_invitation` + `/invite/{token}` + 待接受列表 | ✅ |
 | 企业升级 | 个人→企业 `upgradeToEnterprise` | ✅ |
 | 运营排障 | 用户上下文 Drawer；Analytics 租户下钻（不含代登录进 C 端） | ✅ |
 | C 端体验 | 侧栏 IA；Debug/Executions 合并；对话导出；API 文档 Tab；Session 管理 | ✅ |
 | B 端治理 | 平台角色创建；SMTP/OAuth 系统配置；管理端找回密码；RBAC 拦截 | ✅ |
-| Phase E | 运营位埋点；知识库 URL 导入；市场审核；Embed 域名校验；Model Router stub | 部分 🟡 |
+| Phase E | 运营位埋点；知识库 URL 导入；市场审核；Embed 域名校验 + 网关指引；Model Router 接入 chat | ✅ |
 
 **主要路由**：C 端 `/settings/plan`、`/team`、`/invite/:token`；B 端 `/billing-invoices`、`/forgot-password`。
 
