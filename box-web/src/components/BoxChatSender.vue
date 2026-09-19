@@ -162,8 +162,8 @@ function onValueChange(value: string) {
 }
 
 function onSend(value: string) {
-  emit('update:modelValue', value)
   emit('send', value)
+  emit('update:modelValue', '')
 }
 
 function shouldSendOnEnter(event: KeyboardEvent) {

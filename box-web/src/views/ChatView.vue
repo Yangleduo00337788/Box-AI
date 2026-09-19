@@ -91,84 +91,37 @@
         </div>
       </div>
 
-      <div ref="chatListRef" class="chat-messages box-hide-scrollbar chat-messages--td">
-        <div v-for="(item, index) in messages" :key="item.id ?? index" class="chat-message-wrap">
-          <ChatMessage
-            :role="toChatUiRole(item.role)"
-            :content="toChatUiContent(item, index, messages, chatting)"
-            :status="toChatUiStatus(item, index, messages, chatting)"
-            :placement="item.role === 'USER' ? 'right' : 'left'"
-            variant="text"
-            :animation="isLoadingBubble(item, index) ? 'gradient' : undefined"
-            class="chat-message-td"
-          >
-            <template v-if="item.role === 'USER' && userMessageImages(item).length" #content>
-              <div class="chat-message__images">
-                <a
-                  v-for="(image, imageIndex) in userMessageImages(item)"
-                  :key="`${image.url}-${imageIndex}`"
-                  class="chat-message__image"
-                  :href="image.url"
-                  target="_blank"
-                  rel="noreferrer"
-                  @click.stop
-                >
-                  <t-image :src="image.url" :alt="image.name" fit="cover" shape="round" />
-                </a>
-              </div>
-              <span v-if="userMessageParts(item, index).text">{{ userMessageParts(item, index).text }}</span>
-            </template>
-            <template v-if="canShowMessageActions(item, index)" #actionbar>
-              <div class="t-chat__actions chat-message-td__actions">
-                <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
-                  <t-button theme="default" size="small" :disabled="chatting" @click="copyMessage(item)">
-                    <template #icon><t-icon name="file-copy" /></template>
-                  </t-button>
-                </t-tooltip>
-                <template v-if="canRegenerate(item, index)">
-                  <span class="t-chat__refresh-line" aria-hidden="true" />
-                  <t-tooltip content="重新生成" placement="top" theme="light" :show-arrow="false">
-                    <t-button theme="default" size="small" :disabled="chatting" @click="regenerateReply(index)">
-                      <template #icon><t-icon name="refresh" /></template>
-                    </t-button>
-                  </t-tooltip>
-                </template>
-                <span class="t-chat__refresh-line" aria-hidden="true" />
-                <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false">
-                  <t-button theme="default" size="small" :disabled="chatting" @click="removeMessage(item, index)">
-                    <template #icon><t-icon name="delete" /></template>
-                  </t-button>
-                </t-tooltip>
-              </div>
-            </template>
-          </ChatMessage>
-          <div v-if="messageCitations(item).length" class="chat-citations">
-            <span class="chat-citations__label">引用来源</span>
-            <div class="chat-citations__list">
-              <t-popup
-                v-for="cite in messageCitations(item)"
-                :key="cite.index"
-                placement="top"
-                trigger="hover"
-                show-arrow
-                destroy-on-close
-              >
-                <template #content>
-                  <div class="chat-citation-popup">
-                    <div class="chat-citation-popup__title">{{ cite.documentName }}</div>
-                    <div class="chat-citation-popup__body">{{ cite.content }}</div>
-                  </div>
-                </template>
-                <button type="button" class="chat-citation-chip">
-                  [{{ cite.index }}] {{ cite.documentName }}
-                </button>
-              </t-popup>
-            </div>
-          </div>
+      <box-chat-message-list
+        ref="chatListRef"
+        class="chat-messages"
+        :items="chatListItems"
+        :actions-disabled="chatting"
+        :show-scroll-button="true"
+        :share-mode="shareMode"
+        :selected-share-ids="selectedShareMessageIds"
+        @regenerate="regenerateReply"
+        @share="onShareMessage"
+        @feedback="onMessageFeedback"
+        @toggle-share-select="onToggleShareSelect"
+      />
+
+      <div v-if="shareMode" class="chat-share-bar">
+        <span class="chat-share-bar__hint">勾选要分享的消息</span>
+        <div class="chat-share-bar__actions">
+          <t-button variant="outline" @click="cancelShareMode">取消</t-button>
+          <t-button theme="primary" :loading="shareCreating" @click="createShareLink">创建分享链接</t-button>
         </div>
       </div>
 
-      <chat-composer-stack class="chat-active__composer">
+      <chat-share-link-dialog v-model:visible="shareLinkDialogVisible" :share-url="createdShareUrl" />
+      <chat-message-feedback-dialog
+        v-if="conversationId && feedbackMessageId"
+        v-model:visible="feedbackDialogVisible"
+        :conversation-id="conversationId"
+        :message-id="feedbackMessageId"
+      />
+
+      <chat-composer-stack v-if="!shareMode" class="chat-active__composer">
         <box-chat-sender
           v-model="composerText"
           data-testid="chat-composer-input"
@@ -225,18 +178,15 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
-import { ChatMessage, type TdAttachmentItem } from '@tdesign-vue-next/chat'
+import type { TdAttachmentItem } from '@tdesign-vue-next/chat'
+import BoxChatMessageList from '@/components/BoxChatMessageList.vue'
 import BoxChatSender from '@/components/BoxChatSender.vue'
+import ChatMessageFeedbackDialog from '@/components/ChatMessageFeedbackDialog.vue'
+import ChatShareLinkDialog from '@/components/ChatShareLinkDialog.vue'
 import ChatAgentRail from '@/components/ChatAgentRail.vue'
 import ChatBrandHero from '@/components/ChatBrandHero.vue'
 import ChatComposerStack from '@/components/ChatComposerStack.vue'
-import { parseUserContent } from '@/utils/chatContent'
-import {
-  toChatUiContent,
-  toChatUiRole,
-  toChatUiStatus,
-  userMessageImages,
-} from '@/utils/chatMessageAdapter'
+import { buildConversationListItems } from '@/utils/boxChatListItems'
 import { extractApiError } from '@/api/apiError'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
@@ -247,6 +197,7 @@ import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSu
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
 import { useActiveProject } from '@/composables/useActiveProject'
+import { useAuthStore } from '@/stores/auth'
 import { getAvatarColor } from '@/utils/format'
 import { classifyModelChatKind } from '@/utils/modelCapability'
 import {
@@ -257,6 +208,8 @@ import {
   regenerateMessageStream,
   sendMessageStream,
   parseMessageCitations,
+  createConversationShare,
+  submitMessageFeedback,
   type MessageVO,
 } from '@/api/conversation'
 import type { KnowledgeCitation } from '@/api/agent'
@@ -269,6 +222,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const { refresh: refreshConversations, refreshProjectConversations, conversations } = useConversationNav()
 const { activeProjectId } = useActiveProject()
 
@@ -285,7 +239,7 @@ const chatting = ref(false)
 const composerText = ref('')
 const composerAttachments = ref<ComposerAttachment[]>([])
 const messages = ref<MessageVO[]>([])
-const chatListRef = ref<HTMLElement | null>(null)
+const chatListRef = ref<InstanceType<typeof BoxChatMessageList> | null>(null)
 const listening = ref(false)
 
 interface ComposerAttachment {
@@ -459,39 +413,106 @@ const conversationId = computed(() => {
   return Number.isFinite(num) ? num : null
 })
 
-function messageCitations(item: MessageVO): KnowledgeCitation[] {
-  if (item.citations?.length) return item.citations
-  return parseMessageCitations(item.metadataJson)
+const chatUserName = computed(
+  () => auth.user?.nickname || auth.user?.username || auth.user?.email || '我',
+)
+
+const shareMode = ref(false)
+const selectedShareMessageIds = ref<number[]>([])
+const shareCreating = ref(false)
+const shareLinkDialogVisible = ref(false)
+const createdShareUrl = ref('')
+const feedbackDialogVisible = ref(false)
+const feedbackMessageId = ref(0)
+
+const chatListItems = computed(() =>
+  buildConversationListItems(
+    messages.value,
+    chatting.value,
+    {
+      enableRegenerate: true,
+      enableDelete: false,
+      enableFullActions: true,
+    },
+    {
+      userName: chatUserName.value,
+      agentName: selectedAgent.value?.name || 'Box AI',
+      userAvatarUrl: auth.user?.avatarUrl,
+    },
+  ),
+)
+
+function onShareMessage(messageIndex: number) {
+  if (!conversationId.value) return
+  shareMode.value = true
+  const ids = messages.value
+    .slice(0, messageIndex + 1)
+    .map((item) => item.id)
+    .filter((id) => id > 0)
+  selectedShareMessageIds.value = ids.length ? ids : []
+}
+
+function onToggleShareSelect(messageId: number, selected: boolean) {
+  const set = new Set(selectedShareMessageIds.value)
+  if (selected) {
+    set.add(messageId)
+  } else {
+    set.delete(messageId)
+  }
+  selectedShareMessageIds.value = [...set].sort((a, b) => a - b)
+}
+
+function cancelShareMode() {
+  shareMode.value = false
+  selectedShareMessageIds.value = []
+}
+
+async function createShareLink() {
+  const convId = conversationId.value
+  if (!convId) return
+  const messageIds = selectedShareMessageIds.value.filter((id) => id > 0)
+  if (!messageIds.length) {
+    MessagePlugin.warning('请至少选择一条消息')
+    return
+  }
+  shareCreating.value = true
+  try {
+    const { data } = await createConversationShare(convId, {
+      title: activeConversationTitle.value || undefined,
+      messageIds,
+    })
+    const path = data.data?.sharePath || `/share/${data.data?.token}`
+    createdShareUrl.value = `${window.location.origin}${path}`
+    shareLinkDialogVisible.value = true
+    shareMode.value = false
+    selectedShareMessageIds.value = []
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '创建分享失败'))
+  } finally {
+    shareCreating.value = false
+  }
+}
+
+async function onMessageFeedback(messageIndex: number, rating: 'good' | 'bad') {
+  const convId = conversationId.value
+  const message = messages.value[messageIndex]
+  if (!convId || !message?.id) return
+  if (rating === 'bad') {
+    feedbackMessageId.value = message.id
+    feedbackDialogVisible.value = true
+    return
+  }
+  try {
+    await submitMessageFeedback(convId, message.id, { rating: 'good' })
+    MessagePlugin.success('感谢反馈')
+  } catch (error) {
+    MessagePlugin.error(extractApiError(error, '提交失败'))
+  }
 }
 
 function applyStreamCitations(index: number, citations: KnowledgeCitation[]) {
   if (index < 0 || !citations.length) return
   messages.value[index].citations = citations
-}
-
-function displayContent(item: MessageVO, index: number) {
-  if (item.content) return item.content
-  if (chatting.value && index === messages.value.length - 1 && item.role === 'ASSISTANT') {
-    return '思考中…'
-  }
-  return ''
-}
-
-function userMessageParts(item: MessageVO, index: number) {
-  return parseUserContent(displayContent(item, index))
-}
-
-function isLoadingBubble(item: MessageVO, index: number) {
-  return chatting.value && index === messages.value.length - 1 && item.role === 'ASSISTANT' && !item.content
-}
-
-function canShowMessageActions(item: MessageVO, index: number) {
-  if (isLoadingBubble(item, index)) return false
-  return Boolean(item.content?.trim())
-}
-
-function canRegenerate(item: MessageVO, index: number) {
-  return item.role === 'ASSISTANT' && index === messages.value.length - 1 && !chatting.value
 }
 
 function formatTraceJson(raw: string) {
@@ -549,14 +570,10 @@ async function loadLatestTrace(convId: number, executionId?: number) {
   }
 }
 
-async function copyMessage(item: MessageVO) {
-  if (!item.content?.trim()) return
-  try {
-    await navigator.clipboard.writeText(item.content)
-    MessagePlugin.success('已复制')
-  } catch {
-    MessagePlugin.error('复制失败')
-  }
+async function onDeleteMessage(index: number) {
+  const item = messages.value[index]
+  if (!item) return
+  await removeMessage(item, index)
 }
 
 async function removeMessage(item: MessageVO, index: number) {
@@ -629,9 +646,7 @@ async function loadMessages(id: number) {
 
 async function scrollChatToBottom() {
   await nextTick()
-  if (chatListRef.value) {
-    chatListRef.value.scrollTop = chatListRef.value.scrollHeight
-  }
+  chatListRef.value?.scrollToBottom()
 }
 
 async function startNewChat(text: string) {
@@ -689,10 +704,8 @@ async function sendChat(id?: number, preset?: string) {
     sequenceNo: messages.value.length + 1,
     createdAt: new Date().toISOString(),
   })
-  if (!usedPreset) {
-    composerText.value = ''
-    clearComposerAttachments()
-  }
+  composerText.value = ''
+  clearComposerAttachments()
   await scrollChatToBottom()
 
   try {
@@ -817,9 +830,8 @@ async function regenerateReply(index: number) {
 
 function onComposerSend(value: string) {
   if (chatting.value) return
-  composerText.value = value
   if (conversationId.value) {
-    void sendChat()
+    void sendChat(undefined, buildComposerPayload(value))
   } else {
     void startNewChat(value)
   }
@@ -1415,39 +1427,32 @@ useReloadOnWorkspaceChange(async () => {
 }
 
 .chat-messages {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   padding: 24px 0 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   width: 100%;
   box-sizing: border-box;
 }
 
-.chat-messages--td {
-  gap: 20px;
-}
-
-.chat-message-wrap {
+.chat-share-bar {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
-.chat-message-td__actions {
-  display: inline-flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
 }
 
-.chat-message-td__actions .t-button:last-child {
-  margin-right: 0;
+.chat-share-bar__hint {
+  font-size: 13px;
+  color: var(--td-text-color-secondary);
 }
 
-.chat-message-td__actions .t-tooltip:last-of-type .t-button {
-  margin-right: 0;
+.chat-share-bar__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .chat-message {
@@ -1532,63 +1537,6 @@ useReloadOnWorkspaceChange(async () => {
   width: 168px;
   height: 168px;
   border-radius: 12px;
-}
-
-.chat-citations {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.chat-citations__label {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-}
-
-.chat-citations__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chat-citation-chip {
-  border: 1px solid var(--td-component-border);
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-primary);
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-citation-chip:hover {
-  border-color: var(--td-brand-color);
-  color: var(--td-brand-color);
-}
-
-.chat-citation-popup {
-  max-width: 360px;
-}
-
-.chat-citation-popup__title {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.chat-citation-popup__body {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--td-text-color-secondary);
-  white-space: pre-wrap;
-  max-height: 160px;
-  overflow: auto;
 }
 
 .chat-message__content--loading {

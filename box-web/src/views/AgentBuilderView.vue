@@ -424,55 +424,13 @@
             <h3>调试预览</h3>
             <t-button variant="text" size="small" @click="clearChat">清空</t-button>
           </div>
-          <div ref="chatListRef" class="preview-messages preview-messages--td">
-            <div v-if="!messages.length" class="preview-empty">
-              发送消息测试当前 Prompt 与模型配置
-            </div>
-            <div v-for="(item, index) in messages" :key="index" class="preview-message-wrap">
-              <ChatMessage
-                :role="toLocalChatUiRole(item.role)"
-                :content="toLocalChatUiContent(item, index, messages, chatting)"
-                :status="toLocalChatUiStatus(item, index, messages, chatting)"
-                :placement="item.role === 'user' ? 'right' : 'left'"
-                variant="text"
-                :animation="isLocalLoadingBubble(item, index, messages, chatting) ? 'gradient' : undefined"
-                class="chat-message-td"
-              >
-                <template v-if="canShowPreviewActions(item, index)" #actionbar>
-                  <div class="t-chat__actions chat-message-td__actions">
-                    <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
-                      <t-button theme="default" size="small" :disabled="chatting" @click="copyPreviewMessage(item)">
-                        <template #icon><t-icon name="file-copy" /></template>
-                      </t-button>
-                    </t-tooltip>
-                  </div>
-                </template>
-              </ChatMessage>
-              <div v-if="item.citations?.length" class="chat-citations">
-                <span class="chat-citations__label">引用来源</span>
-                <div class="chat-citations__list">
-                  <t-popup
-                    v-for="cite in item.citations"
-                    :key="cite.index"
-                    placement="top"
-                    trigger="hover"
-                    show-arrow
-                    destroy-on-close
-                  >
-                    <template #content>
-                      <div class="chat-citation-popup">
-                        <div class="chat-citation-popup__title">{{ cite.documentName }}</div>
-                        <div class="chat-citation-popup__body">{{ cite.content }}</div>
-                      </div>
-                    </template>
-                    <button type="button" class="chat-citation-chip">
-                      [{{ cite.index }}] {{ cite.documentName }}
-                    </button>
-                  </t-popup>
-                </div>
-              </div>
-            </div>
-          </div>
+          <box-chat-message-list
+            ref="chatListRef"
+            class="preview-messages"
+            :items="previewChatListItems"
+            :actions-disabled="chatting"
+            empty-text="发送消息测试当前 Prompt 与模型配置"
+          />
           <div class="preview-input">
             <box-chat-sender
               v-model="chatInput"
@@ -630,19 +588,14 @@ import {
   listPlatformModels,
   type PlatformModelVO,
 } from '@/api/platform'
-import type { ModelSource } from '@/api/agent'
-import { ChatMessage } from '@tdesign-vue-next/chat'
+import type { KnowledgeCitation, ModelSource } from '@/api/agent'
+import BoxChatMessageList from '@/components/BoxChatMessageList.vue'
 import BoxChatSender from '@/components/BoxChatSender.vue'
-import {
-  isLocalLoadingBubble,
-  toLocalChatUiContent,
-  toLocalChatUiRole,
-  toLocalChatUiStatus,
-  type LocalChatMessage,
-} from '@/utils/chatMessageAdapter'
+import { buildLocalListItems } from '@/utils/boxChatListItems'
+import type { LocalChatMessage } from '@/utils/chatMessageAdapter'
 
 interface BuilderPreviewMessage extends LocalChatMessage {
-  citations?: Array<{ index: number; documentName: string; content: string }>
+  citations?: KnowledgeCitation[]
 }
 
 const route = useRoute()
@@ -676,7 +629,22 @@ const savingModel = ref(false)
 const chatting = ref(false)
 const chatInput = ref('')
 const messages = ref<BuilderPreviewMessage[]>([])
-const chatListRef = ref<HTMLElement | null>(null)
+const chatListRef = ref<InstanceType<typeof BoxChatMessageList> | null>(null)
+const previewChatListItems = computed(() =>
+  buildLocalListItems(
+    messages.value,
+    chatting.value,
+    {
+      enableRegenerate: false,
+      enableDelete: false,
+      enableFullActions: true,
+    },
+    {
+      userName: '我',
+      agentName: headerTitle.value,
+    },
+  ),
+)
 
 const navItems = [
   { value: 'overview', label: '概览', icon: 'home' },
@@ -1504,9 +1472,7 @@ function clearChat() {
 
 async function scrollChatToBottom() {
   await nextTick()
-  if (chatListRef.value) {
-    chatListRef.value.scrollTop = chatListRef.value.scrollHeight
-  }
+  chatListRef.value?.scrollToBottom()
 }
 
 function buildServerHistory() {
@@ -1540,11 +1506,7 @@ async function sendChat(raw?: string) {
       }, history, {
         signal: controller.signal,
         onCitations: (citations) => {
-          messages.value[assistantIndex].citations = citations.map((item) => ({
-            index: item.index,
-            documentName: item.documentName,
-            content: item.content,
-          }))
+          messages.value[assistantIndex].citations = citations
         },
         onToolConfirm: async (payload) => {
           const confirmed = await promptToolConfirmation(agentId.value, payload)
@@ -1561,15 +1523,10 @@ async function sendChat(raw?: string) {
       }
     } else {
       const { data } = await chatAgent(agentId.value, text, history)
-      const citations = data.data?.citations?.map((item) => ({
-        index: item.index,
-        documentName: item.documentName,
-        content: item.content,
-      }))
       messages.value.push({
         role: 'assistant',
         content: data.data?.content || '（无回复）',
-        citations,
+        citations: data.data?.citations,
       })
       await scrollChatToBottom()
     }
@@ -1587,22 +1544,6 @@ async function sendChat(raw?: string) {
   } finally {
     chatting.value = false
     streamAbortController = null
-  }
-}
-
-function canShowPreviewActions(item: BuilderPreviewMessage, index: number) {
-  if (isLocalLoadingBubble(item, index, messages.value, chatting.value)) return false
-  return Boolean(item.content?.trim())
-}
-
-async function copyPreviewMessage(item: BuilderPreviewMessage) {
-  const text = item.content?.trim()
-  if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-    MessagePlugin.success('已复制')
-  } catch {
-    MessagePlugin.error('复制失败')
   }
 }
 
@@ -1827,75 +1768,7 @@ onMounted(loadAgent)
 }
 
 .preview-messages {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.preview-messages--td {
-  gap: 16px;
-}
-
-.preview-message-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
-.chat-message-td__actions {
-  display: inline-flex;
-  align-items: center;
-}
-
-.preview-empty {
-  margin: auto;
-  max-width: 220px;
-  text-align: center;
-  font: var(--td-font-body-small);
-  color: var(--box-muted);
-}
-
-.chat-citations {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.chat-citations__label {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-}
-
-.chat-citations__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chat-citation-chip {
-  border: 1px solid var(--td-component-border);
-  background: var(--td-bg-color-container);
-  color: var(--td-text-color-primary);
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-citation-chip:hover {
-  border-color: var(--td-brand-color);
-  color: var(--td-brand-color);
 }
 
 .chat-citation-popup {

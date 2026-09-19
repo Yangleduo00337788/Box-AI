@@ -8,7 +8,12 @@
       <p v-if="!apiKey" class="embed-hint">请在 URL 中提供 <code>apiKey</code> 参数</p>
     </header>
 
-    <div ref="messageListRef" class="embed-messages embed-messages--td">
+    <box-chat-message-list
+      ref="messageListRef"
+      class="embed-messages"
+      :items="chatListItems"
+      :actions-disabled="loading"
+    >
       <div v-if="!messages.length" class="embed-empty">
         <p v-if="embedConfig.welcomeMessage" class="embed-welcome">{{ embedConfig.welcomeMessage }}</p>
         <p v-else>开始与智能体对话</p>
@@ -25,28 +30,7 @@
           </button>
         </div>
       </div>
-      <div v-for="(item, index) in messages" :key="index" class="embed-message-wrap">
-        <ChatMessage
-          :role="toLocalChatUiRole(item.role)"
-          :content="toLocalChatUiContent(item, index, messages, loading)"
-          :status="toLocalChatUiStatus(item, index, messages, loading)"
-          :placement="item.role === 'user' ? 'right' : 'left'"
-          variant="text"
-          :animation="isLocalLoadingBubble(item, index, messages, loading) ? 'gradient' : undefined"
-          class="chat-message-td"
-        >
-          <template v-if="canShowEmbedActions(item, index)" #actionbar>
-            <div class="t-chat__actions chat-message-td__actions">
-              <t-tooltip content="复制" placement="top" theme="light" :show-arrow="false">
-                <t-button theme="default" size="small" :disabled="loading" @click="copyMessage(item)">
-                  <template #icon><t-icon name="file-copy" /></template>
-                </t-button>
-              </t-tooltip>
-            </div>
-          </template>
-        </ChatMessage>
-      </div>
-    </div>
+    </box-chat-message-list>
 
     <div class="embed-input">
       <box-chat-sender
@@ -69,20 +53,15 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
-import { ChatMessage } from '@tdesign-vue-next/chat'
+import BoxChatMessageList from '@/components/BoxChatMessageList.vue'
+import { buildLocalListItems } from '@/utils/boxChatListItems'
 import {
   chatPublishedAgentStream,
   getPublishedAgentEmbedConfig,
   type AgentEmbedConfigVO,
 } from '@/api/agent'
 import BoxChatSender from '@/components/BoxChatSender.vue'
-import {
-  isLocalLoadingBubble,
-  toLocalChatUiContent,
-  toLocalChatUiRole,
-  toLocalChatUiStatus,
-  type LocalChatMessage,
-} from '@/utils/chatMessageAdapter'
+import type { LocalChatMessage } from '@/utils/chatMessageAdapter'
 
 const route = useRoute()
 const agentId = ref<number>(Number(route.params.id) || 0)
@@ -95,11 +74,27 @@ const embedConfig = ref<AgentEmbedConfigVO>({
 const messages = ref<LocalChatMessage[]>([])
 const input = ref('')
 const loading = ref(false)
-const messageListRef = ref<HTMLElement | null>(null)
+const messageListRef = ref<InstanceType<typeof BoxChatMessageList> | null>(null)
 const streamAbortController = ref<AbortController | null>(null)
 
 const displayTitle = computed(
   () => queryTitle.value || embedConfig.value.agentName || 'Box Agent',
+)
+
+const chatListItems = computed(() =>
+  buildLocalListItems(
+    messages.value,
+    loading.value,
+    {
+      enableRegenerate: false,
+      enableDelete: false,
+      enableFullActions: true,
+    },
+    {
+      userName: '我',
+      agentName: displayTitle.value,
+    },
+  ),
 )
 const pageStyle = computed(() => ({
   '--embed-theme-color': embedConfig.value.themeColor || '#0052d9',
@@ -108,10 +103,7 @@ const canSend = computed(() => Boolean(input.value.trim()) && Boolean(apiKey.val
 
 async function scrollToBottom() {
   await nextTick()
-  const el = messageListRef.value
-  if (el) {
-    el.scrollTop = el.scrollHeight
-  }
+  messageListRef.value?.scrollToBottom()
 }
 
 function applyEmbed(data?: AgentEmbedConfigVO | null) {
@@ -124,22 +116,6 @@ function applyEmbed(data?: AgentEmbedConfigVO | null) {
     welcomeMessage: data.welcomeMessage,
     suggestedQuestions: data.suggestedQuestions || [],
     agentName: data.agentName,
-  }
-}
-
-function canShowEmbedActions(item: LocalChatMessage, index: number) {
-  if (isLocalLoadingBubble(item, index, messages.value, loading.value)) return false
-  return Boolean(item.content?.trim())
-}
-
-async function copyMessage(item: LocalChatMessage) {
-  const text = item.content?.trim()
-  if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-    MessagePlugin.success('已复制')
-  } catch {
-    MessagePlugin.error('复制失败')
   }
 }
 
@@ -268,26 +244,7 @@ onMounted(async () => {
 }
 
 .embed-messages {
-  flex: 1;
-  overflow: auto;
   padding: 16px 20px;
-}
-
-.embed-messages--td {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.embed-message-wrap {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.chat-message-td__actions {
-  display: inline-flex;
-  align-items: center;
 }
 
 .embed-empty {

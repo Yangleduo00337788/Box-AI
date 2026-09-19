@@ -2,7 +2,7 @@ import type { ComponentResolver } from 'unplugin-vue-components'
 
 const CHAT_EXPORTS = new Set([
   'Attachments',
-  'Chat',
+  'Chat', // alias of ChatList in @tdesign-vue-next/chat 0.7+
   'ChatActionbar',
   'ChatContent',
   'ChatInput',
