@@ -186,3 +186,40 @@ export async function regenerateMessageStream(
 export function deleteMessage(conversationId: number, messageId: number) {
   return http.delete<Result<void>>(`/conversations/${conversationId}/messages/${messageId}`)
 }
+
+export interface ConversationShareCreatedVO {
+  token: string
+  sharePath: string
+}
+
+export interface SharedMessageVO {
+  role: string
+  content: string
+}
+
+export interface SharedConversationVO {
+  title: string
+  sharedAt: string
+  userName: string
+  agentName: string
+  messages: SharedMessageVO[]
+}
+
+export function createConversationShare(
+  conversationId: number,
+  payload: { title?: string; messageIds: number[] },
+) {
+  return http.post<Result<ConversationShareCreatedVO>>(`/conversations/${conversationId}/shares`, payload)
+}
+
+export function getPublicConversationShare(token: string) {
+  return http.get<Result<SharedConversationVO>>(`/public/conversation-shares/${token}`)
+}
+
+export function submitMessageFeedback(
+  conversationId: number,
+  messageId: number,
+  payload: { rating: 'good' | 'bad'; content?: string },
+) {
+  return http.post<Result<void>>(`/conversations/${conversationId}/messages/${messageId}/feedback`, payload)
+}

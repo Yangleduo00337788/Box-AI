@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:share-mascot": "python scripts/build-share-mascot-gif.py"
   },
   "dependencies": {
     "@lobehub/icons-static-svg": "^1.95.0",

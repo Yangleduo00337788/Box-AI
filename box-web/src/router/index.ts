@@ -56,6 +56,11 @@ const router = createRouter({
       meta: { public: true, title: '接受邀请' },
     },
     {
+      path: '/share/:token',
+      component: () => import('@/views/ConversationShareView.vue'),
+      meta: { public: true, title: '分享对话' },
+    },
+    {
       path: '/',
       component: () => import('@/layouts/AppLayout.vue'),
       children: [

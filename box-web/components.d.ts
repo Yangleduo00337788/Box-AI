@@ -9,13 +9,18 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AuthAgreement: typeof import('./src/components/AuthAgreement.vue')['default']
+    BoxChatCitations: typeof import('./src/components/BoxChatCitations.vue')['default']
+    BoxChatMessageList: typeof import('./src/components/BoxChatMessageList.vue')['default']
     BoxChatSender: typeof import('./src/components/BoxChatSender.vue')['default']
     BrandWordmark: typeof import('./src/components/BrandWordmark.vue')['default']
     ChatAgentRail: typeof import('./src/components/ChatAgentRail.vue')['default']
     ChatBrandHero: typeof import('./src/components/ChatBrandHero.vue')['default']
     ChatComposerStack: typeof import('./src/components/ChatComposerStack.vue')['default']
     ChatMarkdown: typeof import('./src/components/ChatMarkdown.vue')['default']
+    ChatMessageFeedbackDialog: typeof import('./src/components/ChatMessageFeedbackDialog.vue')['default']
     ChatModelPicker: typeof import('./src/components/ChatModelPicker.vue')['default']
+    ChatShareDialog: typeof import('./src/components/ChatShareDialog.vue')['default']
+    ChatShareLinkDialog: typeof import('./src/components/ChatShareLinkDialog.vue')['default']
     ConsumerSidebarFooter: typeof import('./src/components/ConsumerSidebarFooter.vue')['default']
     ConsumerSidebarWorkspace: typeof import('./src/components/ConsumerSidebarWorkspace.vue')['default']
     CreateAgentDialog: typeof import('./src/components/CreateAgentDialog.vue')['default']
