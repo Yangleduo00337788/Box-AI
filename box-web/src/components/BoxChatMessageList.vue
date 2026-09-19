@@ -231,6 +231,14 @@ defineExpose({
   padding: 0;
 }
 
+.box-chat-message-list :deep(.t-chat__scroll-button) {
+  right: 20px;
+  left: auto;
+  bottom: 12px;
+  transform: none;
+  box-shadow: var(--box-shadow-soft);
+}
+
 .box-chat-message-list :deep(.t-chat-item) {
   max-width: 100%;
 }
