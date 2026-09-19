@@ -8,14 +8,22 @@
         :overlay-inner-style="{ padding: 0, maxHeight: 'none', overflow: 'visible' }"
       >
         <button type="button" class="user-pill">
-          <t-avatar
-            size="28px"
-            shape="circle"
-            class="user-pill__avatar"
-            :image="avatarUrl || undefined"
+          <t-badge
+            :count="unreadCount"
+            :max-count="99"
+            :show-zero="false"
+            size="small"
+            class="user-pill__avatar-badge"
           >
-            {{ avatarText }}
-          </t-avatar>
+            <t-avatar
+              size="28px"
+              shape="circle"
+              class="user-pill__avatar"
+              :image="avatarUrl || undefined"
+            >
+              {{ avatarText }}
+            </t-avatar>
+          </t-badge>
           <span v-if="!collapsed" class="user-pill__meta">
             <span class="user-pill__name">{{ userName }}</span>
             <span class="user-pill__workspace">{{ currentWorkspaceName }}</span>
@@ -116,7 +124,7 @@
                   <t-icon name="chevron-right" class="user-menu__chevron" />
                 </button>
                 <template #content>
-                  <notification-center :active="inboxHover" @unread-change="unreadCount = $event" />
+                  <notification-center :active="inboxHover" @unread-change="onUnreadChange" />
                 </template>
               </t-popup>
             </div>
@@ -200,7 +208,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
@@ -216,7 +224,7 @@ import HelpFeedbackDialog from '@/components/HelpFeedbackDialog.vue'
 import ImagePicker from '@/components/ImagePicker.vue'
 import NotificationCenter from '@/components/NotificationCenter.vue'
 import TeamView from '@/views/TeamView.vue'
-import { getUnreadNotificationCount } from '@/api/notification'
+import { useNotificationUnread } from '@/composables/useNotificationUnread'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionStore } from '@/stores/permission'
 
@@ -255,8 +263,12 @@ const overviewVisible = ref(false)
 const analyticsVisible = ref(false)
 const teamVisible = ref(false)
 const inboxHover = ref(false)
-const unreadCount = ref(0)
+const { unreadCount, refreshUnread } = useNotificationUnread()
 const analyticsPane = ref<'analytics' | 'executions'>('analytics')
+
+function onUnreadChange(count: number) {
+  unreadCount.value = count
+}
 
 function go(path: string) {
   menuVisible.value = false
@@ -368,20 +380,8 @@ function closeWorkspaceOverlays() {
   teamVisible.value = false
 }
 
-async function refreshUnread() {
-  const { data } = await getUnreadNotificationCount()
-  unreadCount.value = data.data?.count || 0
-}
-
-let unreadTimer: ReturnType<typeof setInterval> | undefined
-
 onMounted(() => {
-  refreshUnread()
-  unreadTimer = setInterval(refreshUnread, 60_000)
-})
-
-onUnmounted(() => {
-  if (unreadTimer) clearInterval(unreadTimer)
+  void refreshUnread()
 })
 </script>
 
@@ -419,6 +419,15 @@ onUnmounted(() => {
 
 .user-pill:hover {
   background: var(--box-hover);
+}
+
+.user-pill__avatar-badge {
+  flex-shrink: 0;
+}
+
+.user-pill__avatar-badge :deep(.t-badge--circle) {
+  top: 0;
+  right: 0;
 }
 
 .user-pill__avatar {

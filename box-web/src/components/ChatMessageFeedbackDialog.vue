@@ -57,6 +57,8 @@ async function onConfirm() {
       content: text,
     })
     MessagePlugin.success('感谢反馈')
+    content.value = ''
+    visible.value = false
     emit('submitted')
     return true
   } catch (error) {
