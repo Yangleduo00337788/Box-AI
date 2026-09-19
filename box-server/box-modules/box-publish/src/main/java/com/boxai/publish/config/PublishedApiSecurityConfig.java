@@ -1,6 +1,7 @@
 package com.boxai.publish.config;
 
 import com.boxai.publish.security.ApiKeyAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -24,6 +25,7 @@ public class PublishedApiSecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers("/api/v1/published/agents/*/embed-config").permitAll()
                         .requestMatchers("/api/v1/published/embed/resolve").permitAll()
                         .anyRequest().authenticated())

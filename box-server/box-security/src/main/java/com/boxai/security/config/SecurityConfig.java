@@ -4,6 +4,7 @@ import com.boxai.security.filter.JwtAuthenticationFilter;
 import com.boxai.security.jwt.JwtProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.boxai.common.result.Result;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -47,6 +48,8 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // SseEmitter async dispatch must not re-run JWT authorization (response already committed).
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(
                                 "/error",
                                 "/api/v1/auth/login",

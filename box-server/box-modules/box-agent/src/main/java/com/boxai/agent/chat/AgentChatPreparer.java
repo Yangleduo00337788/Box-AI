@@ -1,7 +1,9 @@
 package com.boxai.agent.chat;
 
 import com.boxai.ai.ChatTurn;
+import com.boxai.ai.ModelRuntimeConfig;
 import com.boxai.ai.ToolDefinition;
+import com.boxai.common.ai.PlatformModelClassifier;
 import com.boxai.common.constant.ModelSources;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
@@ -44,6 +46,7 @@ public class AgentChatPreparer {
     private final KnowledgeRetrievalService knowledgeRetrievalService;
     private final AgentToolRuntimeService agentToolRuntimeService;
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
+    private final ChatUserMessageImageEnricher chatUserMessageImageEnricher;
 
     public AgentChatPreparer(AgentRepository agentRepository,
                              AgentVersionRepository agentVersionRepository,
@@ -55,7 +58,8 @@ public class AgentChatPreparer {
                              SecretCipher secretCipher,
                              KnowledgeRetrievalService knowledgeRetrievalService,
                              AgentToolRuntimeService agentToolRuntimeService,
-                             AgentLongTermMemoryApplicationService longTermMemoryApplicationService) {
+                             AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
+                             ChatUserMessageImageEnricher chatUserMessageImageEnricher) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.modelDefinitionRepository = modelDefinitionRepository;
@@ -67,6 +71,7 @@ public class AgentChatPreparer {
         this.knowledgeRetrievalService = knowledgeRetrievalService;
         this.agentToolRuntimeService = agentToolRuntimeService;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
+        this.chatUserMessageImageEnricher = chatUserMessageImageEnricher;
     }
 
     public PreparedAgentChat prepare(Long agentId, List<ChatTurn> history, String userMessage) {
@@ -118,7 +123,35 @@ public class AgentChatPreparer {
                                                  String userMessage,
                                                  Long platformModelOverride,
                                                  KnowledgeRetrievalResult retrieval) {
-        List<ChatTurn> turns = buildTurns(agent.getId(), draft, history, userMessage, retrieval);
+        ResolvedAgentChatModel resolved = resolveAgentChatModel(draft, platformModelOverride);
+        List<ChatTurn> turns = buildTurns(
+                agent.getId(),
+                draft,
+                history,
+                userMessage,
+                retrieval,
+                resolved);
+        return buildPrepared(
+                agent.getId(),
+                resolved.runtimeConfig(),
+                turns,
+                draft,
+                resolved.credentialId(),
+                resolved.platformCredential(),
+                resolved.modelId(),
+                null);
+    }
+
+    private record ResolvedAgentChatModel(
+            ModelRuntimeConfig runtimeConfig,
+            Long credentialId,
+            boolean platformCredential,
+            Long modelId,
+            boolean sendImagesMultimodal
+    ) {
+    }
+
+    private ResolvedAgentChatModel resolveAgentChatModel(AgentVersion draft, Long platformModelOverride) {
         String modelSource = draft.getModelSource() == null ? ModelSources.PLATFORM : draft.getModelSource();
         if (ModelSources.AUTO.equals(modelSource)) {
             if (platformModelOverride != null) {
@@ -131,15 +164,14 @@ public class AgentChatPreparer {
                 throw new BusinessException(ErrorCode.PLATFORM_MODEL_NOT_FOUND, "没有可用于智能路由的平台模型");
             }
             ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(selectedModelId);
-            return buildPrepared(
-                    agent.getId(),
-                    resolved.runtimeConfig(),
-                    turns,
-                    draft,
+            ModelRuntimeConfig runtime = resolved.runtimeConfig();
+            boolean multimodal = PlatformModelClassifier.isOcrOrVisionModel(runtime.modelName(), null, null);
+            return new ResolvedAgentChatModel(
+                    runtime,
                     resolved.platformCredentialId(),
                     true,
                     resolved.platformModelId(),
-                    null);
+                    multimodal);
         }
         if (ModelSources.PLATFORM.equals(modelSource)) {
             Long platformModelId;
@@ -152,20 +184,18 @@ public class AgentChatPreparer {
                 platformModelId = platformModelApplicationService.requireRunnableModelId(draft.getPlatformModelId());
             }
             ResolvedPlatformModel resolved = platformModelApplicationService.resolveForChat(platformModelId);
-            return buildPrepared(
-                    agent.getId(),
-                    resolved.runtimeConfig(),
-                    turns,
-                    draft,
+            ModelRuntimeConfig runtime = resolved.runtimeConfig();
+            boolean multimodal = PlatformModelClassifier.isOcrOrVisionModel(runtime.modelName(), null, null);
+            return new ResolvedAgentChatModel(
+                    runtime,
                     resolved.platformCredentialId(),
                     true,
                     resolved.platformModelId(),
-                    null);
+                    multimodal);
         }
         if (platformModelOverride != null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "当前智能体使用自定义模型，不支持在对话中切换平台模型");
         }
-
         if (draft.getModelId() == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请先配置对话模型");
         }
@@ -176,15 +206,15 @@ public class AgentChatPreparer {
         ModelCredential credential = credentialRepository.findActiveByProvider(workspaceId(), provider.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CREDENTIAL_MISSING, "请先为该 Provider 配置 API Key"));
         String apiKey = secretCipher.decrypt(credential.getEncryptedApiKey());
-        return buildPrepared(
-                agent.getId(),
-                new com.boxai.ai.ModelRuntimeConfig(provider.getBaseUrl(), apiKey, model.getModelCode()),
-                turns,
-                draft,
+        boolean multimodal = Boolean.TRUE.equals(model.getSupportVision())
+                || PlatformModelClassifier.isOcrOrVisionModel(
+                model.getModelCode(), model.getModelName(), null);
+        return new ResolvedAgentChatModel(
+                new ModelRuntimeConfig(provider.getBaseUrl(), apiKey, model.getModelCode()),
                 credential.getId(),
                 false,
                 model.getId(),
-                null);
+                multimodal);
     }
 
     private PreparedAgentChat buildPrepared(Long agentId,
@@ -219,7 +249,10 @@ public class AgentChatPreparer {
                                       AgentVersion draft,
                                       List<ChatTurn> history,
                                       String userMessage,
-                                      KnowledgeRetrievalResult retrieval) {
+                                      KnowledgeRetrievalResult retrieval,
+                                      ResolvedAgentChatModel resolvedModel) {
+        boolean enrichImagesWithOcr = !resolvedModel.sendImagesMultimodal();
+        boolean sendImagesMultimodal = resolvedModel.sendImagesMultimodal();
         List<ChatTurn> turns = new ArrayList<>();
         String systemPrompt = draft.getSystemPrompt();
         if (Boolean.TRUE.equals(draft.getKnowledgeEnabled())) {
@@ -257,11 +290,21 @@ public class AgentChatPreparer {
                 }
                 String role = turn.role() == null ? "" : turn.role().toUpperCase();
                 if ("USER".equals(role) || "ASSISTANT".equals(role)) {
-                    turns.add(new ChatTurn(role, turn.content()));
+                    String content = turn.content();
+                    if ("USER".equals(role) && enrichImagesWithOcr) {
+                        content = chatUserMessageImageEnricher.enrichWithImageText(content);
+                    }
+                    turns.add(new ChatTurn(role, content));
                 }
             }
         }
-        turns.add(new ChatTurn("USER", PromptInjectionGuard.wrapUserMessage(userMessage)));
+        String userContent = enrichImagesWithOcr
+                ? chatUserMessageImageEnricher.enrichWithImageText(userMessage)
+                : userMessage;
+        String wrappedUserContent = sendImagesMultimodal && userContent.contains("[图片:")
+                ? PromptInjectionGuard.wrapUserMessageForVision(userContent)
+                : PromptInjectionGuard.wrapUserMessage(userContent);
+        turns.add(new ChatTurn("USER", wrappedUserContent));
         return turns;
     }
 

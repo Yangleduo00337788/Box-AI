@@ -7,8 +7,10 @@ import com.boxai.ai.ModelRuntimeConfig;
 import com.boxai.ai.ToolCall;
 import com.boxai.ai.ToolDefinition;
 import com.boxai.ai.ToolStreamObserver;
+import com.boxai.common.ai.PlatformModelClassifier;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.infrastructure.storage.PublicAssetImageLoader;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.AiMessage;
@@ -37,6 +39,15 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    private final PublicAssetImageLoader publicAssetImageLoader;
+    private final OpenAiCompatibleVisionChatHttpClient visionChatHttpClient;
+
+    public OpenAiCompatibleChatModelGateway(PublicAssetImageLoader publicAssetImageLoader,
+                                            OpenAiCompatibleVisionChatHttpClient visionChatHttpClient) {
+        this.publicAssetImageLoader = publicAssetImageLoader;
+        this.visionChatHttpClient = visionChatHttpClient;
+    }
+
     @Override
     public String chat(ModelRuntimeConfig config, String userMessage) {
         return chat(config, null, userMessage, null, null, null);
@@ -63,8 +74,11 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
                        Double temperature,
                        Double topP,
                        Integer maxTokens) {
+        if (visionChatHttpClient.shouldUseHttp(config, turns)) {
+            return visionChatHttpClient.chat(config, turns, temperature, topP, maxTokens);
+        }
         ChatModel model = buildChatModel(config, temperature, topP, maxTokens);
-        return model.chat(toMessages(turns)).aiMessage().text();
+        return model.chat(toMessages(config, turns)).aiMessage().text();
     }
 
     private static final Pattern TOOL_CALL_PATTERN = Pattern.compile("\\{[^{}]*\"tool\"\\s*:\\s*\"([^\"]+)\"[^{}]*\\}");
@@ -177,8 +191,12 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
                            Double topP,
                            Integer maxTokens,
                            ChatStreamHandler handler) {
+        if (visionChatHttpClient.shouldUseHttp(config, turns)) {
+            visionChatHttpClient.streamChat(config, turns, temperature, topP, maxTokens, handler);
+            return;
+        }
         StreamingChatModel model = buildStreamingModel(config, temperature, topP, maxTokens);
-        model.chat(toMessages(turns), new StreamingChatResponseHandler() {
+        model.chat(toMessages(config, turns), new StreamingChatResponseHandler() {
             @Override
             public void onPartialResponse(String partialResponse) {
                 handler.onPartial(partialResponse);
@@ -248,7 +266,9 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         handler.onComplete();
     }
 
-    private List<ChatMessage> toMessages(List<ChatTurn> turns) {
+    private List<ChatMessage> toMessages(ModelRuntimeConfig config, List<ChatTurn> turns) {
+        boolean multimodal = config != null && PlatformModelClassifier.isOcrOrVisionModel(
+                config.modelName(), null, null);
         List<ChatMessage> messages = new ArrayList<>();
         for (ChatTurn turn : turns) {
             if (turn.content() == null || turn.content().isBlank()) {
@@ -257,7 +277,9 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
             String role = turn.role() == null ? "" : turn.role().toUpperCase();
             switch (role) {
                 case "SYSTEM" -> messages.add(SystemMessage.from(turn.content()));
-                case "USER" -> messages.add(UserMessage.from(turn.content()));
+                case "USER" -> messages.add(multimodal
+                        ? ChatUserMessageMultimodalSupport.buildUserMessage(turn.content(), publicAssetImageLoader)
+                        : UserMessage.from(turn.content()));
                 case "ASSISTANT" -> messages.add(AiMessage.from(turn.content()));
                 default -> throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持的消息角色: " + turn.role());
             }
@@ -271,7 +293,7 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
     private ChatModel buildChatModel(ModelRuntimeConfig config, Double temperature, Double topP, Integer maxTokens) {
         OpenAiChatModel.OpenAiChatModelBuilder builder = OpenAiChatModel.builder()
                 .apiKey(config.apiKey())
-                .baseUrl(normalizeBaseUrl(config.baseUrl()))
+                .baseUrl(OpenAiCompatibleApiUrls.normalizeChatBaseUrl(config.baseUrl()))
                 .modelName(config.modelName())
                 .timeout(Duration.ofSeconds(60))
                 .logRequests(false)
@@ -286,7 +308,7 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
                                                    Integer maxTokens) {
         OpenAiStreamingChatModel.OpenAiStreamingChatModelBuilder builder = OpenAiStreamingChatModel.builder()
                 .apiKey(config.apiKey())
-                .baseUrl(normalizeBaseUrl(config.baseUrl()))
+                .baseUrl(OpenAiCompatibleApiUrls.normalizeChatBaseUrl(config.baseUrl()))
                 .modelName(config.modelName())
                 .timeout(Duration.ofSeconds(60))
                 .logRequests(false)
@@ -325,10 +347,4 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         }
     }
 
-    private String normalizeBaseUrl(String baseUrl) {
-        if (baseUrl == null || baseUrl.isBlank()) {
-            return "https://api.openai.com/v1";
-        }
-        return baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-    }
 }

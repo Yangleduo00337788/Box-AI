@@ -16,8 +16,11 @@ import com.boxai.tenant.application.QuotaApplicationService;
 import com.boxai.trace.application.ExecutionRecorder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import com.boxai.security.context.WorkspaceContext;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -162,7 +165,13 @@ public class AgentChatExecutor {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
         emitter.onTimeout(emitter::complete);
         StringBuilder contentBuilder = new StringBuilder();
+        WorkspaceContext workspaceContext = WorkspaceContext.get();
+        SecurityContext securityContext = SecurityContextHolder.getContext();
         CompletableFuture.runAsync(() -> {
+            if (workspaceContext != null) {
+                WorkspaceContext.set(workspaceContext);
+            }
+            SecurityContextHolder.setContext(securityContext);
             try {
                 if (citationsJson != null && !citationsJson.isBlank()) {
                     sendStreamEvent(emitter, ChatStreamEvent.citations(citationsJson));
@@ -215,6 +224,9 @@ public class AgentChatExecutor {
                 completeStreamWithError(emitter, e);
             } catch (Exception e) {
                 completeStreamWithError(emitter, new BusinessException(ErrorCode.EXECUTION_FAILED, "模型调用失败"));
+            } finally {
+                WorkspaceContext.clear();
+                SecurityContextHolder.clearContext();
             }
         }, STREAM_EXECUTOR);
         return emitter;
