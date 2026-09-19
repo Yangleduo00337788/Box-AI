@@ -16,6 +16,7 @@ public class KnowledgeBase {
     private String icon;
     private Long embeddingModelId;
     private Long rerankModelId;
+    private Long ocrModelId;
     private String chunkConfigJson;
     private String retrievalConfigJson;
     private Integer documentCount;

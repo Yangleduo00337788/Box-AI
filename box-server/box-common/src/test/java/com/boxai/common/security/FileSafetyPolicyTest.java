@@ -15,9 +15,10 @@ class FileSafetyPolicyTest {
     }
 
     @Test
-    void acceptsPlainText() {
+    void acceptsPlainTextAndLog() {
         byte[] bytes = "hello knowledge".getBytes();
         assertDoesNotThrow(() -> FileSafetyPolicy.validate("note.txt", "text/plain", bytes.length, bytes));
+        assertDoesNotThrow(() -> FileSafetyPolicy.validate("run.log", "text/plain", bytes.length, bytes));
     }
 
     @Test

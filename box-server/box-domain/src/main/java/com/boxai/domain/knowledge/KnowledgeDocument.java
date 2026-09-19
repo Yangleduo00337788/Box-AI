@@ -23,6 +23,7 @@ public class KnowledgeDocument {
     private Integer pageCount;
     private Integer chunkCount;
     private String status;
+    private Integer progress;
     private String errorMessage;
     private Long createdBy;
     private LocalDateTime createdAt;

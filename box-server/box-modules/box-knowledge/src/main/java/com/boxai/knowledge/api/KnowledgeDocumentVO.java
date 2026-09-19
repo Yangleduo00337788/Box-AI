@@ -11,6 +11,7 @@ public record KnowledgeDocumentVO(
         Long fileSize,
         Integer chunkCount,
         String status,
+        Integer progress,
         String errorMessage,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

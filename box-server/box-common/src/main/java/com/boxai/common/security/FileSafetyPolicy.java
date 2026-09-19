@@ -15,7 +15,8 @@ public final class FileSafetyPolicy {
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx",
-            "txt", "md", "csv", "json", "png", "jpg", "jpeg", "svg");
+            "txt", "md", "csv", "json", "log", "png", "jpg", "jpeg", "svg");
+    // Keep in sync with box-web/src/constants/knowledgeDocumentUpload.ts
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("png", "jpg", "jpeg", "svg");
     private static final int MAX_INLINE_SVG_CHARS = 65536;
     private static final Pattern SVG_EVENT_ATTR = Pattern.compile("on[a-z]+\\s*=", Pattern.CASE_INSENSITIVE);

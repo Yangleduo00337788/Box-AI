@@ -79,6 +79,7 @@ public class KnowledgeDocumentRepositoryImpl implements KnowledgeDocumentReposit
         doc.setPageCount(row.getPageCount());
         doc.setChunkCount(row.getChunkCount());
         doc.setStatus(row.getStatus());
+        doc.setProgress(row.getProgress());
         doc.setErrorMessage(row.getErrorMessage());
         doc.setCreatedBy(row.getCreatedBy());
         doc.setCreatedAt(row.getCreatedAt());
@@ -101,7 +102,8 @@ public class KnowledgeDocumentRepositoryImpl implements KnowledgeDocumentReposit
         row.setPageCount(doc.getPageCount());
         row.setChunkCount(doc.getChunkCount());
         row.setStatus(doc.getStatus());
-        row.setErrorMessage(doc.getErrorMessage());
+        row.setProgress(doc.getProgress());
+        row.setErrorMessage(doc.getErrorMessage() == null ? "" : doc.getErrorMessage());
         row.setCreatedBy(doc.getCreatedBy());
         return row;
     }

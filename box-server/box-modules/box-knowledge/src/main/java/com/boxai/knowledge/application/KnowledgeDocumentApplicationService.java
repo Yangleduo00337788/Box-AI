@@ -12,29 +12,22 @@ import com.boxai.domain.knowledge.KnowledgeDocumentRepository;
 import com.boxai.domain.storage.ObjectStorage;
 import com.boxai.knowledge.api.KnowledgeChunkVO;
 import com.boxai.knowledge.api.KnowledgeDocumentVO;
-import com.boxai.knowledge.support.DocumentTextExtractor;
+import com.boxai.knowledge.support.KnowledgeDocumentProgress;
 import com.boxai.common.security.FileSafetyPolicy;
 import com.boxai.security.context.WorkspaceContext;
-import com.boxai.security.notification.NotificationPublisher;
 import com.boxai.security.permission.WorkspacePermissionService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 @Service
 public class KnowledgeDocumentApplicationService {
-
-    private static final int CHUNK_SIZE = 800;
-    private static final int CHUNK_OVERLAP = 100;
 
     private final KnowledgeBaseApplicationService knowledgeBaseApplicationService;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
@@ -42,30 +35,24 @@ public class KnowledgeDocumentApplicationService {
     private final KnowledgeChunkRepository knowledgeChunkRepository;
     private final ObjectStorage objectStorage;
     private final String storageBucket;
-    private final KnowledgeChunkIndexingService chunkIndexingService;
-    private final DocumentTextExtractor documentTextExtractor;
+    private final KnowledgeDocumentProcessingService knowledgeDocumentProcessingService;
     private final WorkspacePermissionService workspacePermissionService;
-    private final NotificationPublisher notificationPublisher;
 
     public KnowledgeDocumentApplicationService(KnowledgeBaseApplicationService knowledgeBaseApplicationService,
                                                KnowledgeBaseRepository knowledgeBaseRepository,
                                                KnowledgeDocumentRepository knowledgeDocumentRepository,
                                                KnowledgeChunkRepository knowledgeChunkRepository,
                                                ObjectStorage objectStorage,
-                                               KnowledgeChunkIndexingService chunkIndexingService,
-                                               DocumentTextExtractor documentTextExtractor,
+                                               KnowledgeDocumentProcessingService knowledgeDocumentProcessingService,
                                                WorkspacePermissionService workspacePermissionService,
-                                               NotificationPublisher notificationPublisher,
                                                @Value("${box.minio.bucket:box}") String storageBucket) {
         this.knowledgeBaseApplicationService = knowledgeBaseApplicationService;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
         this.knowledgeChunkRepository = knowledgeChunkRepository;
         this.objectStorage = objectStorage;
-        this.chunkIndexingService = chunkIndexingService;
-        this.documentTextExtractor = documentTextExtractor;
+        this.knowledgeDocumentProcessingService = knowledgeDocumentProcessingService;
         this.workspacePermissionService = workspacePermissionService;
-        this.notificationPublisher = notificationPublisher;
         this.storageBucket = storageBucket;
     }
 
@@ -116,6 +103,7 @@ public class KnowledgeDocumentApplicationService {
         document.setStorageBucket(storageBucket);
         document.setChunkCount(0);
         document.setStatus("UPLOADING");
+        document.setProgress(KnowledgeDocumentProgress.UPLOADING);
         document.setCreatedBy(userId);
         knowledgeDocumentRepository.save(document);
 
@@ -125,18 +113,17 @@ public class KnowledgeDocumentApplicationService {
             document.setMd5(md5(bytes));
             objectStorage.put(storageBucket, storageKey, new java.io.ByteArrayInputStream(bytes), bytes.length, file.getContentType());
             document.setStatus("PARSING");
-            knowledgeDocumentRepository.update(document);
-            String text = documentTextExtractor.extract(bytes, originalName);
-            processDocument(kb, document, text);
+            document.setProgress(KnowledgeDocumentProgress.QUEUED);
             knowledgeDocumentRepository.update(document);
             refreshKnowledgeBaseCounts(kb);
+            knowledgeDocumentProcessingService.enqueue(document.getId());
             return toVO(document);
         } catch (BusinessException e) {
             markFailed(document, e.getMessage());
             throw e;
         } catch (Exception e) {
-            markFailed(document, "文档处理失败");
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "文档处理失败");
+            markFailed(document, "文档上传失败");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "文档上传失败");
         }
     }
 
@@ -170,6 +157,7 @@ public class KnowledgeDocumentApplicationService {
         document.setStorageBucket(storageBucket);
         document.setChunkCount(0);
         document.setStatus("PARSING");
+        document.setProgress(KnowledgeDocumentProgress.QUEUED);
         document.setCreatedBy(userId);
         knowledgeDocumentRepository.save(document);
         String storageKey = "knowledge/" + kb.getId() + "/" + document.getId() + "/" + originalName;
@@ -177,17 +165,16 @@ public class KnowledgeDocumentApplicationService {
         try {
             document.setMd5(md5(bytes));
             objectStorage.put(storageBucket, storageKey, new java.io.ByteArrayInputStream(bytes), bytes.length, "text/html");
-            String text = documentTextExtractor.extract(bytes, originalName);
-            processDocument(kb, document, text);
             knowledgeDocumentRepository.update(document);
             refreshKnowledgeBaseCounts(kb);
+            knowledgeDocumentProcessingService.enqueue(document.getId());
             return toVO(document);
         } catch (BusinessException e) {
             markFailed(document, e.getMessage());
             throw e;
         } catch (Exception e) {
-            markFailed(document, "网页处理失败");
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "网页处理失败");
+            markFailed(document, "网页导入失败");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "网页导入失败");
         }
     }
 
@@ -202,26 +189,15 @@ public class KnowledgeDocumentApplicationService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "文档存储信息缺失，无法重试");
         }
         KnowledgeBase kb = knowledgeBaseApplicationService.requireKnowledgeBase(document.getKnowledgeBaseId());
-        chunkIndexingService.deleteDocumentIndex(document.getId());
+        knowledgeDocumentProcessingService.deleteDocumentIndex(document.getId());
         knowledgeChunkRepository.deleteByDocument(document.getId());
-        document.setErrorMessage(null);
+        document.setErrorMessage("");
         document.setChunkCount(0);
         document.setStatus("PARSING");
+        document.setProgress(KnowledgeDocumentProgress.QUEUED);
         knowledgeDocumentRepository.update(document);
-        try (var input = objectStorage.get(document.getStorageBucket(), document.getStorageKey())) {
-            byte[] bytes = input.readAllBytes();
-            String text = documentTextExtractor.extract(bytes, document.getFileName());
-            processDocument(kb, document, text);
-            knowledgeDocumentRepository.update(document);
-            refreshKnowledgeBaseCounts(kb);
-            return toVO(document);
-        } catch (BusinessException e) {
-            markFailed(document, e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            markFailed(document, "文档重试失败");
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "文档重试失败");
-        }
+        knowledgeDocumentProcessingService.enqueue(document.getId());
+        return toVO(document);
     }
 
     @Transactional
@@ -229,7 +205,7 @@ public class KnowledgeDocumentApplicationService {
         workspacePermissionService.requirePermission(PermissionCodes.KNOWLEDGE_DELETE);
         KnowledgeDocument document = requireDocument(documentId);
         KnowledgeBase kb = knowledgeBaseApplicationService.requireKnowledgeBase(document.getKnowledgeBaseId());
-        chunkIndexingService.deleteDocumentIndex(document.getId());
+        knowledgeDocumentProcessingService.deleteDocumentIndex(document.getId());
         knowledgeChunkRepository.deleteByDocument(document.getId());
         if (document.getStorageBucket() != null && document.getStorageKey() != null) {
             try {
@@ -242,39 +218,6 @@ public class KnowledgeDocumentApplicationService {
         refreshKnowledgeBaseCounts(kb);
     }
 
-    private void processDocument(KnowledgeBase kb, KnowledgeDocument document, String content) {
-        document.setStatus("CHUNKING");
-        knowledgeDocumentRepository.update(document);
-
-        List<String> parts = splitText(content);
-        List<KnowledgeChunk> chunks = new ArrayList<>();
-        for (int i = 0; i < parts.size(); i++) {
-            String part = parts.get(i);
-            if (part.isBlank()) {
-                continue;
-            }
-            KnowledgeChunk chunk = new KnowledgeChunk();
-            chunk.setWorkspaceId(document.getWorkspaceId());
-            chunk.setKnowledgeBaseId(document.getKnowledgeBaseId());
-            chunk.setDocumentId(document.getId());
-            chunk.setChunkIndex(i);
-            chunk.setContent(part);
-            chunk.setTokenCount(part.length());
-            chunk.setEsDocumentId(UUID.randomUUID().toString().replace("-", ""));
-            chunk.setStatus("INDEXED");
-            chunks.add(chunk);
-        }
-        knowledgeChunkRepository.saveBatch(chunks);
-        document.setStatus("EMBEDDING");
-        knowledgeDocumentRepository.update(document);
-        document.setStatus("INDEXING");
-        knowledgeDocumentRepository.update(document);
-        chunkIndexingService.indexChunks(kb, chunks);
-        document.setChunkCount(chunks.size());
-        document.setStatus("READY");
-        notifyDocumentProcessed(document, true, null);
-    }
-
     private void refreshKnowledgeBaseCounts(KnowledgeBase kb) {
         List<KnowledgeDocument> docs = knowledgeDocumentRepository.listByKnowledgeBase(kb.getId());
         kb.setDocumentCount(docs.size());
@@ -284,27 +227,11 @@ public class KnowledgeDocumentApplicationService {
 
     private void markFailed(KnowledgeDocument document, String message) {
         document.setStatus("FAILED");
+        if (document.getProgress() == null) {
+            document.setProgress(0);
+        }
         document.setErrorMessage(message);
         knowledgeDocumentRepository.update(document);
-        notifyDocumentProcessed(document, false, message);
-    }
-
-    private void notifyDocumentProcessed(KnowledgeDocument document, boolean success, String errorMessage) {
-        Long userId = document.getCreatedBy();
-        if (userId == null) {
-            userId = WorkspaceContext.require().userId();
-        }
-        String title = success ? "知识库文档处理完成" : "知识库文档处理失败";
-        String content = success
-                ? "文档「" + document.getName() + "」已索引完成，可用于检索。"
-                : "文档「" + document.getName() + "」处理失败：" + (errorMessage == null ? "未知错误" : errorMessage);
-        notificationPublisher.publish(
-                userId,
-                document.getWorkspaceId(),
-                title,
-                content,
-                "KNOWLEDGE",
-                "/knowledge");
     }
 
     KnowledgeDocument requireDocument(Long documentId) {
@@ -335,26 +262,10 @@ public class KnowledgeDocumentApplicationService {
                 document.getFileSize(),
                 document.getChunkCount(),
                 document.getStatus(),
+                document.getProgress(),
                 document.getErrorMessage(),
                 document.getCreatedAt(),
                 document.getUpdatedAt());
-    }
-
-    private List<String> splitText(String content) {
-        List<String> parts = new ArrayList<>();
-        if (content == null || content.isBlank()) {
-            return parts;
-        }
-        int start = 0;
-        while (start < content.length()) {
-            int end = Math.min(content.length(), start + CHUNK_SIZE);
-            parts.add(content.substring(start, end));
-            if (end >= content.length()) {
-                break;
-            }
-            start = Math.max(end - CHUNK_OVERLAP, start + 1);
-        }
-        return parts;
     }
 
     private String resolveFileType(String fileName) {

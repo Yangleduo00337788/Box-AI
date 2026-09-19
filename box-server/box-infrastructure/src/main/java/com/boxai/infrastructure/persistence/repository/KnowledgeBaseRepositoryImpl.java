@@ -112,6 +112,7 @@ public class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
         kb.setIcon(row.getIcon());
         kb.setEmbeddingModelId(row.getEmbeddingModelId());
         kb.setRerankModelId(row.getRerankModelId());
+        kb.setOcrModelId(row.getOcrModelId());
         kb.setChunkConfigJson(row.getChunkConfig());
         kb.setRetrievalConfigJson(row.getRetrievalConfig());
         kb.setDocumentCount(row.getDocumentCount());
@@ -131,6 +132,7 @@ public class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
         row.setIcon(kb.getIcon());
         row.setEmbeddingModelId(kb.getEmbeddingModelId());
         row.setRerankModelId(kb.getRerankModelId());
+        row.setOcrModelId(kb.getOcrModelId());
         row.setChunkConfig(kb.getChunkConfigJson());
         row.setRetrievalConfig(kb.getRetrievalConfigJson());
         row.setDocumentCount(kb.getDocumentCount());

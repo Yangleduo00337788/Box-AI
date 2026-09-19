@@ -37,6 +37,7 @@ public class KnowledgeDocumentDO {
     @Column("chunk_count")
     private Integer chunkCount;
     private String status;
+    private Integer progress;
     @Column("error_message")
     private String errorMessage;
     @Column("created_by")

@@ -23,6 +23,8 @@ public class KnowledgeBaseDO {
     private Long embeddingModelId;
     @Column("rerank_model_id")
     private Long rerankModelId;
+    @Column("ocr_model_id")
+    private Long ocrModelId;
     @Column("chunk_config")
     private String chunkConfig;
     @Column("retrieval_config")

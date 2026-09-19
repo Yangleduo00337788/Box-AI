@@ -26,6 +26,7 @@ import com.boxai.model.api.platform.PlatformProviderVO;
 import com.boxai.model.api.platform.UpdatePlatformModelRequest;
 import com.boxai.model.api.platform.UpdatePlatformProviderRequest;
 import com.boxai.model.api.platform.UpstreamModelVO;
+import com.boxai.common.ai.PlatformModelClassifier;
 import com.boxai.model.platform.ResolvedPlatformModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -366,6 +367,24 @@ public class PlatformModelApplicationService {
 
     public Optional<Long> findFirstRunnableModelId() {
         return listModelsForConsumer().stream()
+                .map(PlatformModelVO::id)
+                .filter(this::isRunnable)
+                .findFirst();
+    }
+
+    public Optional<Long> findFirstRunnableOcrModelId() {
+        return listModelsForConsumer().stream()
+                .filter(model -> PlatformModelClassifier.isOcrModel(
+                        model.modelCode(), model.modelName(), model.description()))
+                .map(PlatformModelVO::id)
+                .filter(this::isRunnable)
+                .findFirst();
+    }
+
+    public Optional<Long> findFirstRunnableVisionModelId() {
+        return listModelsForConsumer().stream()
+                .filter(model -> PlatformModelClassifier.isVisionModel(
+                        model.modelCode(), model.modelName(), model.description()))
                 .map(PlatformModelVO::id)
                 .filter(this::isRunnable)
                 .findFirst();

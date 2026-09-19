@@ -10,8 +10,11 @@ import com.boxai.model.api.platform.PlatformModelVO;
 import com.boxai.model.api.platform.PlatformProviderVO;
 import com.boxai.model.api.platform.UpdatePlatformModelRequest;
 import com.boxai.model.api.platform.UpdatePlatformProviderRequest;
+import com.boxai.model.api.platform.PlatformOcrDefaultVO;
+import com.boxai.model.api.platform.UpdatePlatformOcrDefaultRequest;
 import com.boxai.model.api.platform.UpstreamModelVO;
 import com.boxai.model.application.PlatformModelApplicationService;
+import com.boxai.model.application.PlatformOcrSettingsApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,9 +33,12 @@ import java.util.List;
 public class AdminPlatformModelController {
 
     private final PlatformModelApplicationService platformModelApplicationService;
+    private final PlatformOcrSettingsApplicationService platformOcrSettingsApplicationService;
 
-    public AdminPlatformModelController(PlatformModelApplicationService platformModelApplicationService) {
+    public AdminPlatformModelController(PlatformModelApplicationService platformModelApplicationService,
+                                        PlatformOcrSettingsApplicationService platformOcrSettingsApplicationService) {
         this.platformModelApplicationService = platformModelApplicationService;
+        this.platformOcrSettingsApplicationService = platformOcrSettingsApplicationService;
     }
 
     @GetMapping("/providers")
@@ -109,5 +115,15 @@ public class AdminPlatformModelController {
     public Result<Void> deleteCredential(@PathVariable Long id) {
         platformModelApplicationService.deleteCredential(id);
         return Result.success(null);
+    }
+
+    @GetMapping("/ocr-default")
+    public Result<PlatformOcrDefaultVO> getOcrDefault() {
+        return Result.success(platformOcrSettingsApplicationService.getSettings());
+    }
+
+    @PutMapping("/ocr-default")
+    public Result<PlatformOcrDefaultVO> updateOcrDefault(@Valid @RequestBody UpdatePlatformOcrDefaultRequest request) {
+        return Result.success(platformOcrSettingsApplicationService.update(request));
     }
 }
