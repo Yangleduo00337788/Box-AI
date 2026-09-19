@@ -23,6 +23,7 @@ declare module 'vue' {
     ChatShareDialog: typeof import('./src/components/ChatShareDialog.vue')['default']
     ChatShareLinkDialog: typeof import('./src/components/ChatShareLinkDialog.vue')['default']
     ConsumerSidebarFooter: typeof import('./src/components/ConsumerSidebarFooter.vue')['default']
+    ConsumerSidebarQuota: typeof import('./src/components/ConsumerSidebarQuota.vue')['default']
     ConsumerSidebarWorkspace: typeof import('./src/components/ConsumerSidebarWorkspace.vue')['default']
     CreateAgentDialog: typeof import('./src/components/CreateAgentDialog.vue')['default']
     CreateWorkspaceDialog: typeof import('./src/components/CreateWorkspaceDialog.vue')['default']

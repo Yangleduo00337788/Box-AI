@@ -7,6 +7,7 @@ import {
   isDependencyConflict,
   isTenantDisabled,
   isUnauthorized,
+  isQuotaExceeded,
   QUOTA_EXCEEDED_CODE,
   rememberTraceId,
   resolveErrorMessage,
@@ -14,6 +15,7 @@ import {
   TOO_MANY_REQUESTS_CODE,
   UNAUTHORIZED_CODE,
 } from './apiError'
+import { requestQuotaRefresh } from '@/composables/quotaRefresh'
 
 export interface Result<T> {
   code: number
@@ -53,6 +55,9 @@ function forceLogout() {
 
 function handleBusinessError(payload: Result<unknown>) {
   const message = resolveErrorMessage(payload)
+  if (isQuotaExceeded(payload)) {
+    requestQuotaRefresh()
+  }
   if (isTenantDisabled(payload)) {
     MessagePlugin.error(message || '租户已停用')
     forceLogout()

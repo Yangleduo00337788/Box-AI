@@ -6,11 +6,23 @@ const POLL_MS = 20_000
 
 let pollTimer: ReturnType<typeof setInterval> | undefined
 let subscriberCount = 0
+let fetchGeneration = 0
+
 const unreadCount = ref(0)
 
 async function fetchUnread() {
+  const token = localStorage.getItem('box.token')
+  if (!token) {
+    unreadCount.value = 0
+    return
+  }
+
+  const generation = ++fetchGeneration
   try {
     const { data } = await getUnreadNotificationCount()
+    if (generation !== fetchGeneration) {
+      return
+    }
     unreadCount.value = data.data?.count || 0
   } catch {
     /* 未登录或网络异常时忽略 */
@@ -47,7 +59,7 @@ function onVisibilityChange() {
   }
 }
 
-/** C 端站内信未读数（轮询 + 聚焦刷新，非实时推送） */
+/** C 端站内信未读数（轮询 + 聚焦刷新，全站单一 ref） */
 export function useNotificationUnread(): { unreadCount: Ref<number>; refreshUnread: () => Promise<void> } {
   onMounted(startPolling)
   onUnmounted(stopPolling)

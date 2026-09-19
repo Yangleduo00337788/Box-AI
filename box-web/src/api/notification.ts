@@ -6,8 +6,13 @@ export interface NotificationVO {
   content: string
   category: string
   linkUrl?: string
-  read: boolean
+  /** 未读为 false；缺字段时按已读处理，避免 Jackson 省略 false 导致误判 */
+  read?: boolean
   createdAt: string
+}
+
+export function isNotificationUnread(item: NotificationVO) {
+  return item.read === false
 }
 
 export function listNotifications(limit = 20) {

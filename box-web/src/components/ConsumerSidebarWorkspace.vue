@@ -119,7 +119,7 @@
             </span>
             <t-tooltip content="创建项目" placement="top" theme="light" :show-arrow="false" attach="body">
               <button type="button" class="sidebar-task-panel__tool" aria-label="创建项目" @click.stop="openCreateProject">
-                <t-icon name="add" />
+                <t-icon name="add-circle" />
               </button>
             </t-tooltip>
           </div>

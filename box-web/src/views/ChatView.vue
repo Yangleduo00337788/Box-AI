@@ -141,6 +141,7 @@
           @file-change="onFileSelected"
         />
       </chat-composer-stack>
+
       </div>
 
       <aside v-if="tracePanelOpen" class="chat-trace-panel">
@@ -193,6 +194,7 @@ import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceCh
 import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSuggestions'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
 import { useConversationNav } from '@/composables/useConversationNav'
+import { requestQuotaRefresh } from '@/composables/quotaRefresh'
 import { useActiveProject } from '@/composables/useActiveProject'
 import { useAuthStore } from '@/stores/auth'
 import { getAvatarColor } from '@/utils/format'
@@ -725,6 +727,7 @@ async function sendChat(id?: number, preset?: string) {
       platformModelId,
       onCitations: (citations) => applyStreamCitations(assistantIndex, citations),
       onDone: (executionId) => {
+        requestQuotaRefresh()
         if (tracePanelOpen.value) {
           loadLatestTrace(targetId, executionId)
         }
@@ -793,6 +796,7 @@ async function regenerateReply(index: number) {
         messages.value[index].citations = citations
       },
       onDone: (executionId) => {
+        requestQuotaRefresh()
         if (tracePanelOpen.value) {
           loadLatestTrace(targetId, executionId)
         }
@@ -1034,6 +1038,7 @@ useReloadOnWorkspaceChange(async () => {
 }
 
 .chat-stage--active {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;

@@ -18,7 +18,7 @@
           :key="item.id"
           type="button"
           class="notification-item"
-          :class="{ 'notification-item--unread': !item.read }"
+          :class="{ 'notification-item--unread': isNotificationUnread(item) }"
           @click="openItem(item)"
         >
           <div class="notification-item__main">
@@ -26,70 +26,72 @@
             <div class="notification-item__content">{{ item.content }}</div>
             <div class="notification-item__time">{{ item.createdAt }}</div>
           </div>
-          <span v-if="!item.read" class="notification-item__dot" aria-label="未读" />
+          <span v-if="isNotificationUnread(item)" class="notification-item__dot" aria-label="未读" />
         </button>
       </div>
-          <p v-else-if="!loading" class="notification-center__empty">暂无站内信</p>
+      <p v-else-if="!loading" class="notification-center__empty">暂无站内信</p>
     </t-loading>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  getUnreadNotificationCount,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  isNotificationUnread,
   type NotificationVO,
 } from '@/api/notification'
+import { useNotificationUnread } from '@/composables/useNotificationUnread'
 
 const props = defineProps<{
   active?: boolean
 }>()
 
-const emit = defineEmits<{
-  'unread-change': [count: number]
-}>()
-
 const router = useRouter()
+const { refreshUnread } = useNotificationUnread()
 const loading = ref(false)
-const unreadCount = ref(0)
 const items = ref<NotificationVO[]>([])
-
-async function refreshUnread() {
-  const { data } = await getUnreadNotificationCount()
-  unreadCount.value = data.data?.count || 0
-  emit('unread-change', unreadCount.value)
-}
 
 async function loadItems() {
   loading.value = true
   try {
     const { data } = await listNotifications(30)
     items.value = data.data || []
+  } catch {
+    items.value = []
   } finally {
     loading.value = false
   }
+}
+
+async function refreshPanel() {
+  await Promise.all([loadItems(), refreshUnread()])
 }
 
 watch(
   () => props.active,
   (open) => {
     if (open) {
-      void Promise.all([loadItems(), refreshUnread()])
+      void refreshPanel()
     }
   },
   { immediate: true },
 )
 
+onMounted(() => {
+  if (props.active) {
+    void refreshPanel()
+  }
+})
+
 async function openItem(item: NotificationVO) {
-  if (!item.read) {
+  if (isNotificationUnread(item)) {
     await markNotificationRead(item.id)
     item.read = true
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
-    emit('unread-change', unreadCount.value)
+    await refreshUnread()
   }
   if (item.linkUrl) {
     router.push(item.linkUrl)
@@ -99,8 +101,7 @@ async function openItem(item: NotificationVO) {
 async function markAllRead() {
   await markAllNotificationsRead()
   items.value = items.value.map((item) => ({ ...item, read: true }))
-  unreadCount.value = 0
-  emit('unread-change', 0)
+  await refreshUnread()
 }
 </script>
 

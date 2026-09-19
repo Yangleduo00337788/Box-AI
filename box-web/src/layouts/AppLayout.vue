@@ -48,12 +48,15 @@ import { CONSUMER_MENU_GROUPS } from '@/constants/menu'
 import { loadAppPreferencesFromServer } from '@/composables/useAppPreferences'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionStore } from '@/stores/permission'
+import { requestQuotaRefresh } from '@/composables/quotaRefresh'
+import { useNotificationUnread } from '@/composables/useNotificationUnread'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const permissionStore = usePermissionStore()
 const searchVisible = ref(false)
+const { refreshUnread: refreshNotificationUnread } = useNotificationUnread()
 const { refresh: refreshAgents } = useAgentSelection()
 
 async function onAgentCreated() {
@@ -128,6 +131,8 @@ watch(
     }
     void permissionStore.load(true)
     void refreshAgents()
+    requestQuotaRefresh()
+    void refreshNotificationUnread()
     const path = route.path
     if (/^\/chat\/\d+/.test(path)) {
       void router.replace('/chat')

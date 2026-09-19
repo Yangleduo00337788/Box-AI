@@ -1,6 +1,7 @@
 <template>
   <div class="consumer-footer" :class="{ 'consumer-footer--collapsed': collapsed }">
     <div class="consumer-footer__user">
+      <div class="user-pill-wrap">
       <t-popup
         v-model:visible="menuVisible"
         placement="top-left"
@@ -8,22 +9,14 @@
         :overlay-inner-style="{ padding: 0, maxHeight: 'none', overflow: 'visible' }"
       >
         <button type="button" class="user-pill">
-          <t-badge
-            :count="unreadCount"
-            :max-count="99"
-            :show-zero="false"
-            size="small"
-            class="user-pill__avatar-badge"
+          <t-avatar
+            size="24px"
+            shape="circle"
+            class="user-pill__avatar"
+            :image="avatarUrl || undefined"
           >
-            <t-avatar
-              size="28px"
-              shape="circle"
-              class="user-pill__avatar"
-              :image="avatarUrl || undefined"
-            >
-              {{ avatarText }}
-            </t-avatar>
-          </t-badge>
+            {{ avatarText }}
+          </t-avatar>
           <span v-if="!collapsed" class="user-pill__meta">
             <span class="user-pill__name">{{ userName }}</span>
             <span class="user-pill__workspace">{{ currentWorkspaceName }}</span>
@@ -115,16 +108,11 @@
                 <button type="button" class="user-menu__item">
                   <t-icon name="mail" />
                   <span>站内信</span>
-                  <t-badge
-                    v-if="unreadCount"
-                    :count="unreadCount"
-                    :max-count="99"
-                    class="user-menu__badge"
-                  />
+                  <span v-if="unreadCount > 0" class="user-menu__badge">{{ unreadBadgeText }}</span>
                   <t-icon name="chevron-right" class="user-menu__chevron" />
                 </button>
                 <template #content>
-                  <notification-center :active="inboxHover" @unread-change="onUnreadChange" />
+                  <notification-center :active="inboxHover" />
                 </template>
               </t-popup>
             </div>
@@ -146,6 +134,20 @@
           </div>
         </template>
       </t-popup>
+      <span v-if="unreadCount > 0" class="user-pill__unread">{{ unreadBadgeText }}</span>
+      </div>
+      <div class="consumer-footer__actions">
+        <consumer-sidebar-quota />
+        <button
+          type="button"
+          class="consumer-footer__icon-btn"
+          aria-label="设置"
+          title="设置"
+          @click="goSettings"
+        >
+          <t-icon name="setting" />
+        </button>
+      </div>
     </div>
 
     <create-workspace-dialog
@@ -208,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
@@ -216,6 +218,7 @@ import type { WorkspaceVO } from '@/api/auth'
 import { deleteWorkspace } from '@/api/workspace'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { useWorkspacePins } from '@/composables/useWorkspacePins'
+import ConsumerSidebarQuota from '@/components/ConsumerSidebarQuota.vue'
 import AnalyticsView from '@/views/AnalyticsView.vue'
 import CreateWorkspaceDialog from '@/components/CreateWorkspaceDialog.vue'
 import DashboardView from '@/views/DashboardView.vue'
@@ -266,13 +269,31 @@ const inboxHover = ref(false)
 const { unreadCount, refreshUnread } = useNotificationUnread()
 const analyticsPane = ref<'analytics' | 'executions'>('analytics')
 
-function onUnreadChange(count: number) {
-  unreadCount.value = count
-}
+const unreadBadgeText = computed(() => (unreadCount.value > 99 ? '99+' : String(unreadCount.value)))
+
+watch(menuVisible, (open) => {
+  if (open) {
+    void refreshUnread()
+  }
+})
+
+watch(
+  () => auth.currentWorkspaceId,
+  (workspaceId, previousId) => {
+    if (!workspaceId || workspaceId === previousId) {
+      return
+    }
+    void refreshUnread()
+  },
+)
 
 function go(path: string) {
   menuVisible.value = false
   router.push(path)
+}
+
+function goSettings() {
+  go('/settings/profile')
 }
 
 function openDialog(name: 'overview' | 'analytics' | 'team') {
@@ -396,6 +417,11 @@ onMounted(() => {
   align-items: center;
 }
 
+.consumer-footer--collapsed .user-pill-wrap {
+  flex: 0;
+  width: 24px;
+}
+
 .consumer-footer__user {
   display: flex;
   align-items: center;
@@ -403,13 +429,57 @@ onMounted(() => {
   width: 100%;
 }
 
+.consumer-footer--collapsed .consumer-footer__user {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.consumer-footer__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0;
+}
+
+.consumer-footer :deep(.consumer-footer__icon-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--box-muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.consumer-footer :deep(.consumer-footer__icon-btn:hover) {
+  background: var(--box-hover);
+  color: var(--box-ink);
+}
+
+.consumer-footer :deep(.consumer-footer__icon-btn--warn) {
+  color: var(--td-warning-color);
+}
+
+.consumer-footer :deep(.consumer-footer__icon-btn--danger) {
+  color: var(--td-error-color);
+}
+
+.consumer-footer :deep(.consumer-footer__icon-btn .t-icon) {
+  font-size: 16px;
+}
+
 .user-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
+  gap: 6px;
+  width: 100%;
   min-width: 0;
-  padding: 4px 8px 4px 4px;
+  padding: 2px 4px 2px 2px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -421,13 +491,29 @@ onMounted(() => {
   background: var(--box-hover);
 }
 
-.user-pill__avatar-badge {
-  flex-shrink: 0;
+.user-pill-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
-.user-pill__avatar-badge :deep(.t-badge--circle) {
+.user-pill__unread {
+  position: absolute;
   top: 0;
-  right: 0;
+  left: 16px;
+  z-index: 2;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--td-error-color);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 
 .user-pill__avatar {
@@ -630,6 +716,17 @@ onMounted(() => {
 
 .user-menu__badge {
   margin-left: auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--td-error-color);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .user-menu__badge + .user-menu__chevron {
