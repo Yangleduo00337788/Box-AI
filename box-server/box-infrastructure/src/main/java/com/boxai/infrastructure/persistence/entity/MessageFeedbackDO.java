@@ -24,6 +24,13 @@ public class MessageFeedbackDO {
     private Long userId;
     private String rating;
     private String content;
+    private String status;
+    @Column("admin_reply")
+    private String adminReply;
+    @Column("admin_reply_by")
+    private Long adminReplyBy;
+    @Column("admin_replied_at")
+    private LocalDateTime adminRepliedAt;
     @Column("created_at")
     private LocalDateTime createdAt;
 }

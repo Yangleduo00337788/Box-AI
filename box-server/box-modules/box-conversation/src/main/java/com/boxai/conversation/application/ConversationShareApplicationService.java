@@ -146,6 +146,11 @@ public class ConversationShareApplicationService {
         feedback.setUserId(ctx.userId());
         feedback.setRating(request.rating());
         feedback.setContent(request.content());
+        if ("bad".equalsIgnoreCase(request.rating())) {
+            feedback.setStatus("PENDING");
+        } else if ("good".equalsIgnoreCase(request.rating())) {
+            feedback.setStatus("RECORDED");
+        }
         messageFeedbackRepository.save(feedback);
     }
 

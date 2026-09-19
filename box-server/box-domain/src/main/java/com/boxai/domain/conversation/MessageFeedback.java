@@ -13,5 +13,10 @@ public class MessageFeedback {
     private Long userId;
     private String rating;
     private String content;
+    /** PENDING | REPLIED，点踩待处理 */
+    private String status;
+    private String adminReply;
+    private Long adminReplyBy;
+    private LocalDateTime adminRepliedAt;
     private LocalDateTime createdAt;
 }
