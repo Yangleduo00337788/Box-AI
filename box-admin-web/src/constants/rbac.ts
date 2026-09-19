@@ -31,6 +31,7 @@ export const ADMIN_ROUTE_ROLES: Record<string, PlatformAdminRole[]> = {
   '/platform-tools': [PLATFORM_ADMIN_ROLES.SUPER_ADMIN, PLATFORM_ADMIN_ROLES.OPS, PLATFORM_ADMIN_ROLES.CONTENT],
   '/platform-mcp': [PLATFORM_ADMIN_ROLES.SUPER_ADMIN, PLATFORM_ADMIN_ROLES.OPS, PLATFORM_ADMIN_ROLES.CONTENT],
   '/system-config': [PLATFORM_ADMIN_ROLES.SUPER_ADMIN],
+  '/platform-ocr': [PLATFORM_ADMIN_ROLES.SUPER_ADMIN, PLATFORM_ADMIN_ROLES.OPS],
 }
 
 export function normalizePlatformRole(role?: string | null): PlatformAdminRole {

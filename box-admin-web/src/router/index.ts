@@ -96,6 +96,11 @@ const router = createRouter({
           meta: { title: '系统配置' },
         },
         {
+          path: 'platform-ocr',
+          component: () => import('@/views/PlatformOcrSettingsView.vue'),
+          meta: { title: 'OCR 默认模型' },
+        },
+        {
           path: 'forbidden',
           component: () => import('@/views/ForbiddenView.vue'),
           meta: { title: '无权限' },

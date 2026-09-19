@@ -117,6 +117,25 @@ export function fetchPlatformCredentials(providerId: number) {
   return http.get<Result<PlatformCredentialVO[]>>(`/platform/providers/${providerId}/credentials`)
 }
 
+export interface PlatformOcrDefaultVO {
+  configuredPlatformModelId?: number | null
+  platformModelId?: number | null
+  modelCode?: string
+  modelName?: string
+  providerName?: string
+  runnable: boolean
+  resolutionMode: string
+  resolutionHint: string
+}
+
+export function fetchPlatformOcrDefault() {
+  return http.get<Result<PlatformOcrDefaultVO>>('/platform/ocr-default')
+}
+
+export function updatePlatformOcrDefault(platformModelId?: number | null) {
+  return http.put<Result<PlatformOcrDefaultVO>>('/platform/ocr-default', { platformModelId })
+}
+
 export function createPlatformCredential(payload: {
   providerId: number
   credentialName: string
