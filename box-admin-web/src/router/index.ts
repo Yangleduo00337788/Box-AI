@@ -81,6 +81,11 @@ const router = createRouter({
           meta: { title: '官方 MCP', catalogCategory: 'mcp' },
         },
         {
+          path: 'message-feedbacks',
+          component: () => import('@/views/MessageFeedbacksView.vue'),
+          meta: { title: '消息反馈' },
+        },
+        {
           path: 'audit-logs',
           component: () => import('@/views/AuditLogsView.vue'),
           meta: { title: '审计日志' },
