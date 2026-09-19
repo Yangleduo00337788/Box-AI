@@ -19,6 +19,7 @@
         <template #op="{ row }">
           <t-space>
             <t-button variant="text" theme="primary" @click="openDetail(row)">文档</t-button>
+            <t-button v-if="can(PermissionCodes.KNOWLEDGE_UPDATE)" variant="text" @click="openEdit(row)">编辑</t-button>
             <t-button v-if="can(PermissionCodes.KNOWLEDGE_DELETE)" variant="text" theme="danger" @click="remove(row)">删除</t-button>
           </t-space>
         </template>
@@ -26,48 +27,75 @@
       <resource-manage-empty v-else category="knowledge" @create="openCreate" />
     </t-loading>
 
-    <t-dialog v-model:visible="createVisible" header="新建知识库" :footer="false" width="480px">
-      <t-form :data="form" label-align="top" @submit="submitCreate">
+    <t-dialog
+      v-model:visible="formVisible"
+      :header="editingKb ? '编辑知识库' : '新建知识库'"
+      :footer="false"
+      width="480px"
+    >
+      <t-form :data="form" label-align="top" @submit="submitForm">
         <t-form-item label="名称"><t-input v-model="form.name" maxlength="128" /></t-form-item>
         <t-form-item label="描述"><t-textarea v-model="form.description" :autosize="{ minRows: 2, maxRows: 4 }" /></t-form-item>
-        <t-form-item><t-button theme="primary" type="submit" :loading="saving">创建</t-button></t-form-item>
+        <t-form-item>
+          <t-button theme="primary" type="submit" :loading="saving">
+            {{ editingKb ? '保存' : '创建' }}
+          </t-button>
+        </t-form-item>
       </t-form>
     </t-dialog>
 
     <t-drawer v-model:visible="detailVisible" :header="activeKb?.name || '文档'" size="720px">
-      <div class="toolbar">
+      <div v-if="canUpload" class="toolbar">
         <input
           ref="fileRef"
           type="file"
           class="hidden-input"
-          accept=".txt,.md,.json,.csv,.log,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          multiple
+          :accept="KNOWLEDGE_DOCUMENT_ACCEPT"
           @change="onUpload"
         />
-        <t-button theme="primary" :loading="uploading" @click="fileRef?.click()">上传文档</t-button>
+        <t-button theme="primary" :loading="uploadingCount > 0" @click="fileRef?.click()">
+          {{ uploadingCount > 0 ? `上传中 (${uploadingCount})` : '上传文档' }}
+        </t-button>
         <t-button variant="outline" @click="urlVisible = true">从 URL 导入</t-button>
-        <span class="upload-hint">支持 TXT、MD、PDF、DOCX 或网页 URL</span>
+        <span class="upload-hint">{{ KNOWLEDGE_DOCUMENT_UPLOAD_HINT }}</span>
       </div>
-      <t-table row-key="id" :data="documents" :columns="docColumns" size="small" :bordered="true" stripe>
+      <t-table row-key="rowKey" :data="documentRows" :columns="docColumns" size="small" :bordered="true" stripe>
         <template #empty><t-empty description="暂无文档" /></template>
         <template #docStatus="{ row }">
-          <t-tag :theme="statusTheme(row.status)" variant="light" size="small">
+          <div v-if="row.isPending || PROCESSING_STATUSES.has(row.status)" class="doc-status-progress">
+            <t-progress :percentage="rowDisplayProgress(row)" size="small" :label="false" />
+            <span class="doc-status-label">
+              {{ statusLabel(row.status) }} · {{ rowDisplayProgress(row) }}%
+            </span>
+          </div>
+          <t-tag v-else :theme="statusTheme(row.status)" variant="light" size="small">
             {{ statusLabel(row.status) }}
           </t-tag>
         </template>
         <template #docError="{ row }">
-          <span v-if="row.errorMessage" class="doc-error">{{ row.errorMessage }}</span>
+          <span v-if="row.status === 'FAILED' && row.errorMessage" class="doc-error">{{ row.errorMessage }}</span>
         </template>
         <template #docOp="{ row }">
-          <t-space size="small">
+          <t-space v-if="!row.isPending" size="small">
             <t-button variant="text" theme="primary" @click="openChunks(row)">查看分块</t-button>
             <t-button
-              v-if="row.status === 'FAILED'"
+              v-if="canUpload && row.status === 'FAILED'"
               variant="text"
               theme="warning"
               :loading="retryingId === row.id"
               @click="retryDocument(row.id)"
             >
               重试
+            </t-button>
+            <t-button
+              v-if="canDeleteDocument"
+              variant="text"
+              theme="danger"
+              :loading="deletingDocId === row.id"
+              @click="removeDocument(row)"
+            >
+              删除
             </t-button>
           </t-space>
         </template>
@@ -138,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
@@ -150,6 +178,7 @@ import { PermissionCodes } from '@/constants/permissions'
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,
+  deleteKnowledgeDocument,
   listKnowledgeBases,
   listDocumentChunks,
   listKnowledgeDocuments,
@@ -157,26 +186,44 @@ import {
   retryKnowledgeDocument,
   searchKnowledge,
   testKnowledgeAnswer,
+  updateKnowledgeBase,
   uploadKnowledgeDocument,
   type KnowledgeBaseVO,
   type KnowledgeChunkVO,
   type KnowledgeDocumentVO,
   type KnowledgeSearchHit,
 } from '@/api/knowledge'
+import {
+  KNOWLEDGE_DOCUMENT_ACCEPT,
+  KNOWLEDGE_DOCUMENT_UPLOAD_HINT,
+} from '@/constants/knowledgeDocumentUpload'
 
 const { backTo, backLabel } = useResourceManageBack('knowledge')
 const { can } = usePermission()
 
+const canUpload = computed(() => can(PermissionCodes.KNOWLEDGE_UPLOAD))
+const canDeleteDocument = computed(() => can(PermissionCodes.KNOWLEDGE_DELETE))
+
+const UPLOAD_CONCURRENCY = 3
+
+type DocumentRow = KnowledgeDocumentVO & {
+  rowKey: string
+  isPending?: boolean
+  uploadProgress?: number
+}
+
 const loading = ref(false)
 const saving = ref(false)
-const uploading = ref(false)
+const uploadingCount = ref(0)
+const pendingUploads = ref<Record<string, { fileName: string; progress: number }>>({})
 const urlVisible = ref(false)
 const urlImporting = ref(false)
 const importUrl = ref('')
 const importCron = ref('')
 const items = ref<KnowledgeBaseVO[]>([])
 const documents = ref<KnowledgeDocumentVO[]>([])
-const createVisible = ref(false)
+const formVisible = ref(false)
+const editingKb = ref<KnowledgeBaseVO | null>(null)
 const detailVisible = ref(false)
 const activeKb = ref<KnowledgeBaseVO | null>(null)
 const fileRef = ref<HTMLInputElement | null>(null)
@@ -186,6 +233,7 @@ const ragTopK = ref(5)
 const searching = ref(false)
 const answering = ref(false)
 const retryingId = ref<number | null>(null)
+const deletingDocId = ref<number | null>(null)
 const searchHits = ref<KnowledgeSearchHit[]>([])
 const testAnswer = ref('')
 const chunkVisible = ref(false)
@@ -198,16 +246,40 @@ const columns = [
   { colKey: 'documentCount', title: '文档', width: 80 },
   { colKey: 'chunkCount', title: '分块', width: 80 },
   { colKey: 'status', title: '状态', width: 100 },
-  { colKey: 'op', title: '操作', width: 160 },
+  { colKey: 'op', title: '操作', width: 220 },
 ]
 
 const docColumns = [
   { colKey: 'fileName', title: '文件名' },
   { colKey: 'chunkCount', title: '分块', width: 80 },
-  { colKey: 'docStatus', title: '状态', width: 110 },
+  { colKey: 'docStatus', title: '进度', width: 180 },
   { colKey: 'docError', title: '失败原因', ellipsis: true },
-  { colKey: 'docOp', title: '操作', width: 160 },
+  { colKey: 'docOp', title: '操作', width: 220 },
 ]
+
+const documentRows = computed<DocumentRow[]>(() => {
+  const pending = Object.entries(pendingUploads.value).map(([key, item]) => ({
+    rowKey: key,
+    isPending: true,
+    id: 0,
+    knowledgeBaseId: activeKb.value?.id ?? 0,
+    name: item.fileName,
+    fileName: item.fileName,
+    fileType: '',
+    fileSize: 0,
+    chunkCount: 0,
+    status: 'UPLOADING',
+    uploadProgress: item.progress,
+    createdAt: '',
+    updatedAt: '',
+  }))
+  const saved = documents.value.map((doc) => ({
+    ...doc,
+    rowKey: String(doc.id),
+    isPending: false,
+  }))
+  return [...pending, ...saved]
+})
 
 const chunkColumns = [
   { colKey: 'chunkIndex', title: '#', width: 56 },
@@ -232,29 +304,90 @@ async function load() {
 }
 
 function openCreate() {
+  editingKb.value = null
   form.value = { name: '', description: '' }
-  createVisible.value = true
+  formVisible.value = true
 }
 
-async function submitCreate() {
+function openEdit(row: KnowledgeBaseVO) {
+  editingKb.value = row
+  form.value = { name: row.name, description: row.description || '' }
+  formVisible.value = true
+}
+
+async function submitForm() {
   if (!form.value.name.trim()) return
   saving.value = true
   try {
-    await createKnowledgeBase({ name: form.value.name.trim(), description: form.value.description.trim() || undefined })
-    createVisible.value = false
-    MessagePlugin.success('知识库已创建')
+    const name = form.value.name.trim()
+    const description = form.value.description.trim() || undefined
+    if (editingKb.value) {
+      const { data } = await updateKnowledgeBase(editingKb.value.id, {
+        name,
+        description,
+        icon: editingKb.value.icon,
+        embeddingModelId: editingKb.value.embeddingModelId,
+        rerankModelId: editingKb.value.rerankModelId,
+      })
+      formVisible.value = false
+      MessagePlugin.success('知识库已更新')
+      if (activeKb.value?.id === editingKb.value.id && data.data) {
+        activeKb.value = data.data
+      }
+      editingKb.value = null
+    } else {
+      await createKnowledgeBase({ name, description })
+      formVisible.value = false
+      MessagePlugin.success('知识库已创建')
+    }
     await load()
   } finally {
     saving.value = false
   }
 }
 
-const PROCESSING_STATUSES = new Set(['UPLOADING', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING'])
+const PROCESSING_STATUSES = new Set(['UPLOADING', 'PARSING', 'OCR', 'CHUNKING', 'EMBEDDING', 'INDEXING'])
+
+let documentPollTimer: ReturnType<typeof setInterval> | null = null
+
+function hasProcessingDocuments() {
+  return Object.keys(pendingUploads.value).length > 0
+    || documents.value.some((doc) => PROCESSING_STATUSES.has(doc.status))
+}
+
+function stopDocumentPolling() {
+  if (documentPollTimer) {
+    clearInterval(documentPollTimer)
+    documentPollTimer = null
+  }
+}
+
+function syncDocumentPolling() {
+  if (!detailVisible.value) {
+    stopDocumentPolling()
+    return
+  }
+  if (!hasProcessingDocuments()) {
+    stopDocumentPolling()
+    return
+  }
+  if (documentPollTimer) {
+    return
+  }
+  documentPollTimer = setInterval(async () => {
+    await refreshDocuments()
+    if (!hasProcessingDocuments()) {
+      stopDocumentPolling()
+      await load()
+    }
+  }, 2000)
+}
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     UPLOADING: '上传中',
     PARSING: '解析中',
+    OCR: 'OCR 识别中',
     CHUNKING: '分块中',
     EMBEDDING: '向量化',
     INDEXING: '索引中',
@@ -271,10 +404,30 @@ function statusTheme(status: string) {
   return 'default'
 }
 
+const STATUS_PROGRESS_FALLBACK: Record<string, number> = {
+  UPLOADING: 5,
+  PARSING: 20,
+  OCR: 45,
+  CHUNKING: 60,
+  EMBEDDING: 75,
+  INDEXING: 90,
+  READY: 100,
+  FAILED: 0,
+}
+
+function rowDisplayProgress(row: DocumentRow) {
+  if (row.isPending) {
+    return Math.max(1, Math.min(8, Math.round((row.uploadProgress ?? 0) * 0.08)))
+  }
+  if (row.status === 'READY') return 100
+  return row.progress ?? STATUS_PROGRESS_FALLBACK[row.status] ?? 0
+}
+
 async function refreshDocuments() {
   if (!activeKb.value) return
   const { data } = await listKnowledgeDocuments(activeKb.value.id)
   documents.value = data.data || []
+  syncDocumentPolling()
 }
 
 async function openDetail(row: KnowledgeBaseVO) {
@@ -284,6 +437,7 @@ async function openDetail(row: KnowledgeBaseVO) {
   searchHits.value = []
   testAnswer.value = ''
   await refreshDocuments()
+  syncDocumentPolling()
 }
 
 async function runRagTest() {
@@ -318,12 +472,38 @@ async function runTestAnswer() {
   }
 }
 
+function removeDocument(doc: KnowledgeDocumentVO) {
+  void confirmResourceDelete({
+    header: '确认删除',
+    body: `确定删除文档「${doc.fileName}」吗？分块与索引将一并移除。`,
+    resourceLabel: '文档',
+    onDelete: async () => {
+      deletingDocId.value = doc.id
+      try {
+        await deleteKnowledgeDocument(doc.id)
+      } finally {
+        deletingDocId.value = null
+      }
+    },
+    onSuccess: async () => {
+      MessagePlugin.success('文档已删除')
+      if (activeDoc.value?.id === doc.id) {
+        chunkVisible.value = false
+        activeDoc.value = null
+      }
+      await refreshDocuments()
+      await load()
+    },
+  })
+}
+
 async function retryDocument(documentId: number) {
   retryingId.value = documentId
   try {
     await retryKnowledgeDocument(documentId)
-    MessagePlugin.success('已重新处理文档')
+    MessagePlugin.success('已重新提交处理')
     await refreshDocuments()
+    syncDocumentPolling()
   } catch {
     MessagePlugin.error('重试失败')
     await refreshDocuments()
@@ -347,17 +527,62 @@ async function openChunks(doc: KnowledgeDocumentVO) {
 
 async function onUpload(e: Event) {
   const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file || !activeKb.value) return
-  uploading.value = true
-  try {
-    await uploadKnowledgeDocument(activeKb.value.id, file)
-    MessagePlugin.success('文档已上传并开始索引')
-    await refreshDocuments()
-    await load()
-  } finally {
-    uploading.value = false
-    input.value = ''
+  const files = Array.from(input.files || [])
+  if (!files.length || !activeKb.value) return
+  input.value = ''
+
+  const kbId = activeKb.value.id
+  let successCount = 0
+  let failCount = 0
+  uploadingCount.value += files.length
+
+  const uploadOne = async (file: File) => {
+    const key = `pending-${crypto.randomUUID()}`
+    pendingUploads.value = {
+      ...pendingUploads.value,
+      [key]: { fileName: file.name, progress: 0 },
+    }
+    try {
+      await uploadKnowledgeDocument(kbId, file, (percent) => {
+        const current = pendingUploads.value[key]
+        if (current) {
+          pendingUploads.value = {
+            ...pendingUploads.value,
+            [key]: { ...current, progress: percent },
+          }
+        }
+      })
+      successCount++
+    } catch {
+      failCount++
+      MessagePlugin.error(`「${file.name}」上传失败`)
+    } finally {
+      const next = { ...pendingUploads.value }
+      delete next[key]
+      pendingUploads.value = next
+      uploadingCount.value--
+    }
+  }
+
+  const queue = [...files]
+  const workers = Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, async () => {
+    while (queue.length) {
+      const file = queue.shift()
+      if (!file) break
+      await uploadOne(file)
+    }
+  })
+  await Promise.all(workers)
+
+  await refreshDocuments()
+  await load()
+  syncDocumentPolling()
+
+  if (successCount > 0) {
+    const message = failCount > 0
+      ? `已成功提交 ${successCount} 个文档，${failCount} 个失败`
+      : `已成功提交 ${successCount} 个文档，正在后台处理`
+    MessagePlugin.success(message)
   }
 }
 
@@ -375,6 +600,7 @@ async function submitUrlImport() {
     importCron.value = ''
     await refreshDocuments()
     await load()
+    syncDocumentPolling()
   } finally {
     urlImporting.value = false
   }
@@ -398,6 +624,16 @@ function remove(item: KnowledgeBaseVO) {
 
 load()
 useReloadOnWorkspaceChange(load)
+
+watch(detailVisible, (visible) => {
+  if (!visible) {
+    stopDocumentPolling()
+  } else {
+    syncDocumentPolling()
+  }
+})
+
+onUnmounted(stopDocumentPolling)
 </script>
 
 <style scoped>
@@ -425,6 +661,19 @@ useReloadOnWorkspaceChange(load)
 .doc-error {
   color: var(--td-error-color);
   font-size: 12px;
+}
+
+.doc-status-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.doc-status-label {
+  font-size: 12px;
+  color: var(--box-muted);
+  line-height: 1.4;
 }
 
 .rag-answer {

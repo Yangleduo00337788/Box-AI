@@ -1,0 +1,25 @@
+{
+  "product": "Box AI",
+  "vendor": "星云科技有限公司",
+  "support": {
+    "email": "support@xingyun-tech.com",
+    "phone": "400-880-2024"
+  },
+  "plans": {
+    "free": {
+      "max_agents": 3
+    },
+    "pro": {
+      "knowledge_storage_gb": 50
+    },
+    "enterprise": {
+      "annual_price_cny": 9999
+    }
+  },
+  "policy": {
+    "refund_within_days": 7
+  },
+  "sla": {
+    "monthly_uptime_percent": "99.9%"
+  }
+}
