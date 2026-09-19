@@ -19,6 +19,7 @@ import com.boxai.security.permission.WorkspacePermissionService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.MessageDigest;
@@ -37,6 +38,7 @@ public class KnowledgeDocumentApplicationService {
     private final String storageBucket;
     private final KnowledgeDocumentProcessingService knowledgeDocumentProcessingService;
     private final WorkspacePermissionService workspacePermissionService;
+    private final TransactionTemplate transactionTemplate;
 
     public KnowledgeDocumentApplicationService(KnowledgeBaseApplicationService knowledgeBaseApplicationService,
                                                KnowledgeBaseRepository knowledgeBaseRepository,
@@ -45,6 +47,7 @@ public class KnowledgeDocumentApplicationService {
                                                ObjectStorage objectStorage,
                                                KnowledgeDocumentProcessingService knowledgeDocumentProcessingService,
                                                WorkspacePermissionService workspacePermissionService,
+                                               TransactionTemplate transactionTemplate,
                                                @Value("${box.minio.bucket:box}") String storageBucket) {
         this.knowledgeBaseApplicationService = knowledgeBaseApplicationService;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
@@ -53,6 +56,7 @@ public class KnowledgeDocumentApplicationService {
         this.objectStorage = objectStorage;
         this.knowledgeDocumentProcessingService = knowledgeDocumentProcessingService;
         this.workspacePermissionService = workspacePermissionService;
+        this.transactionTemplate = transactionTemplate;
         this.storageBucket = storageBucket;
     }
 
@@ -73,7 +77,6 @@ public class KnowledgeDocumentApplicationService {
         return knowledgeChunkRepository.listByDocument(documentId).stream().map(this::toChunkVO).toList();
     }
 
-    @Transactional
     public KnowledgeDocumentVO upload(Long knowledgeBaseId, MultipartFile file) {
         workspacePermissionService.requirePermission(PermissionCodes.KNOWLEDGE_UPLOAD);
         if (file == null || file.isEmpty()) {
@@ -105,29 +108,30 @@ public class KnowledgeDocumentApplicationService {
         document.setStatus("UPLOADING");
         document.setProgress(KnowledgeDocumentProgress.UPLOADING);
         document.setCreatedBy(userId);
-        knowledgeDocumentRepository.save(document);
+        transactionTemplate.executeWithoutResult(status -> knowledgeDocumentRepository.save(document));
 
         String storageKey = "knowledge/" + kb.getId() + "/" + document.getId() + "/" + originalName;
         document.setStorageKey(storageKey);
         try {
             document.setMd5(md5(bytes));
             objectStorage.put(storageBucket, storageKey, new java.io.ByteArrayInputStream(bytes), bytes.length, file.getContentType());
-            document.setStatus("PARSING");
-            document.setProgress(KnowledgeDocumentProgress.QUEUED);
-            knowledgeDocumentRepository.update(document);
-            refreshKnowledgeBaseCounts(kb);
-            knowledgeDocumentProcessingService.enqueue(document.getId());
-            return toVO(document);
+            transactionTemplate.executeWithoutResult(status -> {
+                document.setStatus("QUEUED");
+                document.setProgress(KnowledgeDocumentProgress.QUEUED);
+                knowledgeDocumentRepository.update(document);
+                refreshKnowledgeBaseCounts(kb);
+            });
         } catch (BusinessException e) {
-            markFailed(document, e.getMessage());
+            transactionTemplate.executeWithoutResult(status -> markFailed(document, e.getMessage()));
             throw e;
         } catch (Exception e) {
-            markFailed(document, "文档上传失败");
+            transactionTemplate.executeWithoutResult(status -> markFailed(document, "文档上传失败"));
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "文档上传失败");
         }
+        knowledgeDocumentProcessingService.enqueue(document.getId());
+        return toVO(document);
     }
 
-    @Transactional
     public KnowledgeDocumentVO importFromUrl(Long knowledgeBaseId, String url, String syncCron) {
         workspacePermissionService.requirePermission(PermissionCodes.KNOWLEDGE_UPLOAD);
         if (url == null || url.isBlank()) {
@@ -156,46 +160,51 @@ public class KnowledgeDocumentApplicationService {
         document.setFileSize((long) bytes.length);
         document.setStorageBucket(storageBucket);
         document.setChunkCount(0);
-        document.setStatus("PARSING");
-        document.setProgress(KnowledgeDocumentProgress.QUEUED);
+        document.setStatus("UPLOADING");
+        document.setProgress(KnowledgeDocumentProgress.UPLOADING);
         document.setCreatedBy(userId);
-        knowledgeDocumentRepository.save(document);
+        transactionTemplate.executeWithoutResult(status -> knowledgeDocumentRepository.save(document));
         String storageKey = "knowledge/" + kb.getId() + "/" + document.getId() + "/" + originalName;
         document.setStorageKey(storageKey);
         try {
             document.setMd5(md5(bytes));
             objectStorage.put(storageBucket, storageKey, new java.io.ByteArrayInputStream(bytes), bytes.length, "text/html");
-            knowledgeDocumentRepository.update(document);
-            refreshKnowledgeBaseCounts(kb);
-            knowledgeDocumentProcessingService.enqueue(document.getId());
-            return toVO(document);
+            transactionTemplate.executeWithoutResult(status -> {
+                document.setStatus("QUEUED");
+                document.setProgress(KnowledgeDocumentProgress.QUEUED);
+                knowledgeDocumentRepository.update(document);
+                refreshKnowledgeBaseCounts(kb);
+            });
         } catch (BusinessException e) {
-            markFailed(document, e.getMessage());
+            transactionTemplate.executeWithoutResult(status -> markFailed(document, e.getMessage()));
             throw e;
         } catch (Exception e) {
-            markFailed(document, "网页导入失败");
+            transactionTemplate.executeWithoutResult(status -> markFailed(document, "网页导入失败"));
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "网页导入失败");
         }
+        knowledgeDocumentProcessingService.enqueue(document.getId());
+        return toVO(document);
     }
 
-    @Transactional
     public KnowledgeDocumentVO retry(Long documentId) {
         workspacePermissionService.requirePermission(PermissionCodes.KNOWLEDGE_UPLOAD);
         KnowledgeDocument document = requireDocument(documentId);
-        if (!"FAILED".equals(document.getStatus())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅失败文档可重试");
+        if ("READY".equals(document.getStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "文档已处理完成，无需重试");
         }
         if (document.getStorageBucket() == null || document.getStorageKey() == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "文档存储信息缺失，无法重试");
         }
-        KnowledgeBase kb = knowledgeBaseApplicationService.requireKnowledgeBase(document.getKnowledgeBaseId());
+        knowledgeBaseApplicationService.requireKnowledgeBase(document.getKnowledgeBaseId());
         knowledgeDocumentProcessingService.deleteDocumentIndex(document.getId());
-        knowledgeChunkRepository.deleteByDocument(document.getId());
-        document.setErrorMessage("");
-        document.setChunkCount(0);
-        document.setStatus("PARSING");
-        document.setProgress(KnowledgeDocumentProgress.QUEUED);
-        knowledgeDocumentRepository.update(document);
+        transactionTemplate.executeWithoutResult(status -> {
+            knowledgeChunkRepository.deleteByDocument(document.getId());
+            document.setErrorMessage("");
+            document.setChunkCount(0);
+            document.setStatus("QUEUED");
+            document.setProgress(KnowledgeDocumentProgress.QUEUED);
+            knowledgeDocumentRepository.update(document);
+        });
         knowledgeDocumentProcessingService.enqueue(document.getId());
         return toVO(document);
     }

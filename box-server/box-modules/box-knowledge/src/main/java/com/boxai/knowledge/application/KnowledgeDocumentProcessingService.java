@@ -10,11 +10,16 @@ import com.boxai.domain.storage.ObjectStorage;
 import com.boxai.knowledge.support.DocumentTextExtractor;
 import com.boxai.knowledge.support.ExtractedTextValidator;
 import com.boxai.knowledge.support.KnowledgeDocumentProgress;
+import com.boxai.security.context.WorkspaceContext;
 import com.boxai.security.notification.NotificationPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
@@ -68,14 +73,38 @@ public class KnowledgeDocumentProcessingService {
     }
 
     public void enqueue(Long documentId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    submit(documentId);
+                }
+            });
+            log.info("Knowledge document {} will be processed after commit", documentId);
+            return;
+        }
+        submit(documentId);
+    }
+
+    private void submit(Long documentId) {
+        WorkspaceContext workspaceContext = WorkspaceContext.get();
+        SecurityContext securityContext = SecurityContextHolder.getContext();
         log.info("Knowledge document {} queued for processing", documentId);
         knowledgeDocumentExecutor.execute(() -> {
+            if (workspaceContext != null) {
+                WorkspaceContext.set(workspaceContext);
+            }
+            SecurityContextHolder.setContext(securityContext);
             Object lock = documentProcessingLocks.computeIfAbsent(documentId, ignored -> new Object());
             synchronized (lock) {
                 try {
+                    log.info("Knowledge document {} processing started on {}", documentId, Thread.currentThread().getName());
                     processSafely(documentId);
                 } finally {
                     documentProcessingLocks.remove(documentId, lock);
+                    WorkspaceContext.clear();
+                    SecurityContextHolder.clearContext();
                 }
             }
         });
@@ -90,7 +119,7 @@ public class KnowledgeDocumentProcessingService {
             process(documentId);
         } catch (Exception e) {
             if (e.getMessage() != null && e.getMessage().startsWith("document not found:")) {
-                log.debug("Skip processing for deleted document {}: {}", documentId, e.getMessage());
+                log.warn("Skip processing for missing document {}: {}", documentId, e.getMessage());
                 return;
             }
             log.warn("Knowledge document {} processing failed: {}", documentId, e.getMessage());
@@ -104,8 +133,10 @@ public class KnowledgeDocumentProcessingService {
     }
 
     public void process(Long documentId) {
-        KnowledgeDocument document = knowledgeDocumentRepository.findById(documentId)
-                .orElseThrow(() -> new IllegalStateException("document not found: " + documentId));
+        KnowledgeDocument document = requireDocumentForProcessing(documentId);
+        if ("READY".equals(document.getStatus())) {
+            return;
+        }
         KnowledgeBase knowledgeBase = knowledgeBaseRepository.findById(document.getKnowledgeBaseId())
                 .orElseThrow(() -> new IllegalStateException("knowledge base not found"));
         if (document.getStorageBucket() == null || document.getStorageKey() == null) {
@@ -198,6 +229,22 @@ public class KnowledgeDocumentProcessingService {
             knowledgeDocumentRepository.update(row);
             notifyDocumentProcessed(row, true, null);
         });
+    }
+
+    private KnowledgeDocument requireDocumentForProcessing(Long documentId) {
+        for (int attempt = 1; attempt <= 8; attempt++) {
+            KnowledgeDocument document = knowledgeDocumentRepository.findById(documentId).orElse(null);
+            if (document != null) {
+                return document;
+            }
+            try {
+                Thread.sleep(50L * attempt);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        throw new IllegalStateException("document not found: " + documentId);
     }
 
     private void updateStatus(Long documentId, String status, int progress) {

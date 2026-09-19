@@ -80,7 +80,7 @@
           <t-space v-if="!row.isPending" size="small">
             <t-button variant="text" theme="primary" @click="openChunks(row)">查看分块</t-button>
             <t-button
-              v-if="canUpload && row.status === 'FAILED'"
+              v-if="canUpload && (row.status === 'FAILED' || row.status === 'QUEUED' || row.status === 'PARSING')"
               variant="text"
               theme="warning"
               :loading="retryingId === row.id"
@@ -346,7 +346,7 @@ async function submitForm() {
   }
 }
 
-const PROCESSING_STATUSES = new Set(['UPLOADING', 'PARSING', 'OCR', 'CHUNKING', 'EMBEDDING', 'INDEXING'])
+const PROCESSING_STATUSES = new Set(['UPLOADING', 'QUEUED', 'PARSING', 'OCR', 'CHUNKING', 'EMBEDDING', 'INDEXING'])
 
 let documentPollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -386,6 +386,7 @@ function syncDocumentPolling() {
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     UPLOADING: '上传中',
+    QUEUED: '排队处理中',
     PARSING: '解析中',
     OCR: 'OCR 识别中',
     CHUNKING: '分块中',
@@ -406,6 +407,7 @@ function statusTheme(status: string) {
 
 const STATUS_PROGRESS_FALLBACK: Record<string, number> = {
   UPLOADING: 5,
+  QUEUED: 10,
   PARSING: 20,
   OCR: 45,
   CHUNKING: 60,
