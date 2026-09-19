@@ -47,6 +47,9 @@ public class KnowledgeChunkIndexingService {
         ModelRuntimeConfig embeddingConfig = resolveEmbeddingConfig(knowledgeBase);
         if (embeddingConfig == null) {
             log.info("Skip vector indexing for knowledge base {}: embedding config unavailable", knowledgeBase.getId());
+            for (KnowledgeChunk chunk : chunks) {
+                searchIndex.indexChunk(chunk, null);
+            }
             return;
         }
         List<String> texts = chunks.stream().map(KnowledgeChunk::getContent).toList();
@@ -58,14 +61,15 @@ public class KnowledgeChunkIndexingService {
             quotaApplicationService.consumeEmbeddingUsage(
                     knowledgeBase.getWorkspaceId(), Math.max(estimatedTokens, 1L));
         } catch (Exception e) {
-            log.warn("Embedding failed for knowledge base {}: {}", knowledgeBase.getId(), e.getMessage());
+            log.warn("Embedding failed for knowledge base {}: {}, index content only", knowledgeBase.getId(), e.getMessage());
+            for (KnowledgeChunk chunk : chunks) {
+                searchIndex.indexChunk(chunk, null);
+            }
             return;
         }
         for (int i = 0; i < chunks.size(); i++) {
             float[] vector = i < vectors.size() ? vectors.get(i) : null;
-            if (vector != null && vector.length > 0) {
-                searchIndex.indexChunk(chunks.get(i), vector);
-            }
+            searchIndex.indexChunk(chunks.get(i), vector);
         }
     }
 

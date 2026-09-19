@@ -34,7 +34,7 @@ public class KnowledgeRetrievalService {
     }
 
     public KnowledgeRetrievalResult retrieve(Long versionId, String userMessage) {
-        if (userMessage == null || userMessage.isBlank()) {
+        if (userMessage == null || userMessage.isBlank() || userMessage.contains("[图片:")) {
             return KnowledgeRetrievalResult.empty();
         }
         List<AgentKnowledge> bindings = agentKnowledgeRepository.listByVersionId(versionId);

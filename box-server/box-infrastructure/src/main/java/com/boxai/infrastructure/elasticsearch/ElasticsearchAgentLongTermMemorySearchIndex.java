@@ -9,12 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,13 +21,14 @@ public class ElasticsearchAgentLongTermMemorySearchIndex implements AgentLongTer
     private static final int VECTOR_DIMS = 1536;
 
     private final ElasticsearchProperties properties;
+    private final ElasticsearchHttpClient elasticsearchHttpClient;
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .build();
 
-    public ElasticsearchAgentLongTermMemorySearchIndex(ElasticsearchProperties properties, ObjectMapper objectMapper) {
+    public ElasticsearchAgentLongTermMemorySearchIndex(ElasticsearchProperties properties,
+                                                       ElasticsearchHttpClient elasticsearchHttpClient,
+                                                       ObjectMapper objectMapper) {
         this.properties = properties;
+        this.elasticsearchHttpClient = elasticsearchHttpClient;
         this.objectMapper = objectMapper;
     }
 
@@ -153,21 +149,6 @@ public class ElasticsearchAgentLongTermMemorySearchIndex implements AgentLongTer
     }
 
     private HttpResponse<String> send(String method, String path, String body) throws Exception {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl() + path))
-                .timeout(Duration.ofSeconds(10))
-                .header("Content-Type", "application/json");
-        if ("HEAD".equals(method)) {
-            builder.method("HEAD", HttpRequest.BodyPublishers.noBody());
-        } else if (body == null) {
-            builder.method(method, HttpRequest.BodyPublishers.noBody());
-        } else {
-            builder.method(method, HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
-        }
-        return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
-    }
-
-    private String baseUrl() {
-        return "http://" + properties.getHost() + ":" + properties.getPort();
+        return elasticsearchHttpClient.send(method, path, body);
     }
 }

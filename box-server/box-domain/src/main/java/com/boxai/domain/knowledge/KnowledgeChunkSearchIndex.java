@@ -14,5 +14,5 @@ public interface KnowledgeChunkSearchIndex {
 
     List<Long> searchByVector(Long knowledgeBaseId, float[] queryEmbedding, int topK);
 
-    List<Long> searchByKeyword(Long knowledgeBaseId, String keyword, int topK);
+    List<Long> searchByKeyword(Long knowledgeBaseId, String keyword, List<String> terms, int topK);
 }

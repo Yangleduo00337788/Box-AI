@@ -12,6 +12,7 @@ import com.boxai.domain.knowledge.KnowledgeChunkSearchIndex;
 import com.boxai.knowledge.api.KnowledgeSearchHitVO;
 import com.boxai.knowledge.api.KnowledgeSearchRequest;
 import com.boxai.security.permission.WorkspacePermissionService;
+import com.boxai.knowledge.support.KnowledgeQueryTerms;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -137,6 +138,7 @@ public class KnowledgeSearchService {
         knowledgeBaseApplicationService.requireKnowledgeBase(knowledgeBaseId);
         int limit = topK < 1 ? 5 : topK;
         String trimmedQuery = query.trim();
+        List<String> searchTerms = KnowledgeQueryTerms.extract(trimmedQuery);
         KnowledgeBase knowledgeBase = knowledgeBaseRepository.findById(knowledgeBaseId).orElse(null);
         if (knowledgeBase == null) {
             return List.of();
@@ -150,7 +152,7 @@ public class KnowledgeSearchService {
             accumulateRrf(fusedScores, vectorIds);
         }
         if (!"VECTOR".equals(mode)) {
-            List<Long> keywordIds = searchIndex.searchByKeyword(knowledgeBaseId, trimmedQuery, limit);
+            List<Long> keywordIds = searchIndex.searchByKeyword(knowledgeBaseId, trimmedQuery, searchTerms, limit);
             accumulateRrf(fusedScores, keywordIds);
         }
 
@@ -176,9 +178,32 @@ public class KnowledgeSearchService {
             }
         }
 
-        return knowledgeChunkRepository.searchByKeyword(knowledgeBaseId, trimmedQuery, limit).stream()
-                .map(chunk -> new ScoredChunk(chunk, keywordScore(chunk.getContent(), trimmedQuery)))
+        return searchByDatabaseTerms(knowledgeBaseId, searchTerms, limit);
+    }
+
+    private List<ScoredChunk> searchByDatabaseTerms(Long knowledgeBaseId, List<String> terms, int limit) {
+        if (terms == null || terms.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, ScoredChunk> ranked = new LinkedHashMap<>();
+        for (String term : terms) {
+            if (term == null || term.isBlank()) {
+                continue;
+            }
+            for (KnowledgeChunk chunk : knowledgeChunkRepository.searchByKeyword(knowledgeBaseId, term, limit * 3)) {
+                double score = KnowledgeQueryTerms.scoreContent(chunk.getContent(), terms);
+                if (score <= 0D) {
+                    continue;
+                }
+                ScoredChunk existing = ranked.get(chunk.getId());
+                if (existing == null || score > existing.score()) {
+                    ranked.put(chunk.getId(), new ScoredChunk(chunk, score));
+                }
+            }
+        }
+        return ranked.values().stream()
                 .sorted(Comparator.comparingDouble(ScoredChunk::score).reversed())
+                .limit(limit)
                 .toList();
     }
 
@@ -190,24 +215,6 @@ public class KnowledgeSearchService {
             }
             fusedScores.merge(chunkId, 1.0D / (RRF_K + index + 1), Double::sum);
         }
-    }
-
-    private double keywordScore(String content, String query) {
-        if (content == null || query == null || query.isBlank()) {
-            return 0D;
-        }
-        String lowerContent = content.toLowerCase();
-        String lowerQuery = query.toLowerCase();
-        int occurrences = 0;
-        int index = 0;
-        while ((index = lowerContent.indexOf(lowerQuery, index)) >= 0) {
-            occurrences++;
-            index += lowerQuery.length();
-        }
-        if (occurrences > 0) {
-            return occurrences;
-        }
-        return lowerContent.contains(lowerQuery) ? 1D : 0D;
     }
 
     private record ScoredChunk(KnowledgeChunk chunk, double score) {
