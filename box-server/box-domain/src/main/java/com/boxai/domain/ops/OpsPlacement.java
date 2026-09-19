@@ -10,6 +10,8 @@ import java.time.LocalDateTime;
 public class OpsPlacement {
 
     private Long id;
+    /** C=消费者端，B=管理后台 */
+    private String audience;
     private String slot;
     private String kind;
     private String title;

@@ -60,6 +60,13 @@ public class MessageFeedbackRepositoryImpl implements MessageFeedbackRepository 
     }
 
     @Override
+    public long countByRatingAndStatus(String rating, String status) {
+        return mapper.selectCountByQuery(QueryWrapper.create()
+                .eq("rating", rating)
+                .eq("status", status));
+    }
+
+    @Override
     public void updateReply(MessageFeedback feedback) {
         MessageFeedbackDO row = new MessageFeedbackDO();
         row.setId(feedback.getId());

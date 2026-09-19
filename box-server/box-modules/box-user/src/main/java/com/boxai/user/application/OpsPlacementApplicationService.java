@@ -20,7 +20,9 @@ import java.util.Set;
 @Service
 public class OpsPlacementApplicationService {
 
-    private static final Set<String> SLOTS = Set.of("CHAT_HOME", "GLOBAL_ALERT", "CHAT_BANNER", "CHAT_AD");
+    private static final Set<String> C_SLOTS = Set.of("CHAT_HOME", "GLOBAL_ALERT", "CHAT_BANNER", "CHAT_AD");
+    private static final Set<String> B_SLOTS = Set.of("ADMIN_HEADER", "ADMIN_BANNER");
+    private static final Set<String> AUDIENCES = Set.of("C", "B");
     private static final Set<String> KINDS = Set.of("ANNOUNCEMENT", "PROMO", "BANNER", "AD");
     private static final Set<String> THEMES = Set.of("info", "success", "warning", "error");
     private static final Set<String> STATUSES = Set.of("LISTED", "UNLISTED");
@@ -45,14 +47,19 @@ public class OpsPlacementApplicationService {
     }
 
     public List<OpsPlacementVO> listActive(String slot) {
+        return listActiveForAudience(slot, "C");
+    }
+
+    public List<OpsPlacementVO> listActiveForAudience(String slot, String audience) {
+        String normalizedAudience = normalizeAudience(audience);
         String normalized = trimToNull(slot);
         if (normalized != null) {
             normalized = normalized.toUpperCase(Locale.ROOT);
-            if (!SLOTS.contains(normalized)) {
+            if (!slotsForAudience(normalizedAudience).contains(normalized)) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "投放位置无效");
             }
         }
-        return opsPlacementRepository.listActive(normalized, LocalDateTime.now()).stream()
+        return opsPlacementRepository.listActive(normalized, normalizedAudience, LocalDateTime.now()).stream()
                 .map(this::toVo)
                 .toList();
     }
@@ -60,7 +67,8 @@ public class OpsPlacementApplicationService {
     @Transactional
     public OpsPlacementVO create(CreateOpsPlacementRequest request) {
         OpsPlacement placement = new OpsPlacement();
-        applySlotKind(placement, request.slot(), request.kind());
+        placement.setAudience(normalizeAudience(request.audience()));
+        applySlotKind(placement, placement.getAudience(), request.slot(), request.kind());
         placement.setTitle(request.title().trim());
         placement.setBody(trimToNull(request.body()));
         placement.setLinkUrl(normalizeLink(request.linkUrl()));
@@ -85,9 +93,12 @@ public class OpsPlacementApplicationService {
     public OpsPlacementVO update(Long id, UpdateOpsPlacementRequest request) {
         OpsPlacement placement = opsPlacementRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "运营位不存在"));
+        if (request.audience() != null) {
+            placement.setAudience(normalizeAudience(request.audience()));
+        }
         String slot = request.slot() == null ? placement.getSlot() : request.slot();
         String kind = request.kind() == null ? placement.getKind() : request.kind();
-        applySlotKind(placement, slot, kind);
+        applySlotKind(placement, placement.getAudience(), slot, kind);
         if (request.title() != null) {
             placement.setTitle(request.title().trim());
         }
@@ -147,13 +158,14 @@ public class OpsPlacementApplicationService {
         opsPlacementRepository.delete(id);
     }
 
-    private void applySlotKind(OpsPlacement placement, String slotRaw, String kindRaw) {
+    private void applySlotKind(OpsPlacement placement, String audience, String slotRaw, String kindRaw) {
+        String normalizedAudience = normalizeAudience(audience);
         String slot = slotRaw == null ? "" : slotRaw.trim().toUpperCase(Locale.ROOT);
         String kind = kindRaw == null ? "" : kindRaw.trim().toUpperCase(Locale.ROOT);
-        if (!SLOTS.contains(slot)) {
+        if (!slotsForAudience(normalizedAudience).contains(slot)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "投放位置无效");
         }
-        if ("CHAT_BANNER".equals(slot)) {
+        if ("CHAT_BANNER".equals(slot) || "ADMIN_BANNER".equals(slot)) {
             kind = "BANNER";
         } else if ("CHAT_AD".equals(slot)) {
             kind = "AD";
@@ -223,7 +235,9 @@ public class OpsPlacementApplicationService {
     }
 
     private void requireCreativeImage(OpsPlacement placement) {
-        if (("CHAT_BANNER".equals(placement.getSlot()) || "CHAT_AD".equals(placement.getSlot()))
+        if (("CHAT_BANNER".equals(placement.getSlot())
+                || "CHAT_AD".equals(placement.getSlot())
+                || "ADMIN_BANNER".equals(placement.getSlot()))
                 && trimToNull(placement.getImageUrl()) == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请上传投放图片");
         }
@@ -243,6 +257,7 @@ public class OpsPlacementApplicationService {
         int[] values = metrics.getOrDefault(placement.getId(), new int[] {0, 0});
         return new OpsPlacementVO(
                 placement.getId(),
+                placement.getAudience() == null ? "C" : placement.getAudience(),
                 placement.getSlot(),
                 placement.getKind(),
                 placement.getTitle(),
@@ -274,5 +289,17 @@ public class OpsPlacementApplicationService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeAudience(String audience) {
+        String value = audience == null || audience.isBlank() ? "C" : audience.trim().toUpperCase(Locale.ROOT);
+        if (!AUDIENCES.contains(value)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "投放端无效");
+        }
+        return value;
+    }
+
+    private Set<String> slotsForAudience(String audience) {
+        return "B".equals(audience) ? B_SLOTS : C_SLOTS;
     }
 }

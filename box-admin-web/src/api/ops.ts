@@ -1,11 +1,15 @@
 import http, { type Result } from './http'
 
+export type OpsAudience = 'C' | 'B'
 export type OpsSlot = 'CHAT_HOME' | 'GLOBAL_ALERT' | 'CHAT_BANNER' | 'CHAT_AD'
+export type AdminOpsSlot = 'ADMIN_HEADER' | 'ADMIN_BANNER'
+export type OpsSlotAny = OpsSlot | AdminOpsSlot
 export type OpsKind = 'ANNOUNCEMENT' | 'PROMO' | 'BANNER' | 'AD'
 
 export interface OpsPlacementVO {
   id: number
-  slot: OpsSlot
+  audience: OpsAudience
+  slot: OpsSlotAny
   kind: OpsKind
   title: string
   body?: string
@@ -30,8 +34,15 @@ export function fetchOpsPlacements() {
   return http.get<Result<OpsPlacementVO[]>>('/ops/placements')
 }
 
+export function fetchActiveOpsPlacements(audience: OpsAudience = 'B', slot?: AdminOpsSlot | OpsSlot) {
+  const params: Record<string, string> = { audience }
+  if (slot) params.slot = slot
+  return http.get<Result<OpsPlacementVO[]>>('/ops/placements/active', { params })
+}
+
 export function createOpsPlacement(payload: {
-  slot: OpsSlot
+  audience?: OpsAudience
+  slot: OpsSlotAny
   kind: OpsKind
   title: string
   body?: string
@@ -53,7 +64,8 @@ export function createOpsPlacement(payload: {
 export function updateOpsPlacement(
   id: number,
   payload: Partial<{
-    slot: OpsSlot
+    audience: OpsAudience
+    slot: OpsSlotAny
     kind: OpsKind
     title: string
     body: string

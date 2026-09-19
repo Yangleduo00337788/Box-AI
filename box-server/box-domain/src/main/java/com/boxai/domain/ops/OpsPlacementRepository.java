@@ -10,7 +10,7 @@ public interface OpsPlacementRepository {
 
     List<OpsPlacement> listAllForAdmin();
 
-    List<OpsPlacement> listActive(String slot, LocalDateTime now);
+    List<OpsPlacement> listActive(String slot, String audience, LocalDateTime now);
 
     OpsPlacement save(OpsPlacement placement);
 

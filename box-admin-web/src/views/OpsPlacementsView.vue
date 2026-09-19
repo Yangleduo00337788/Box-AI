@@ -2,7 +2,7 @@
   <div class="ops-placements-page admin-page">
     <page-header
       title="运营位"
-      desc="C 端仅两个展示面：顶栏文字公告（全站公告 + 顶栏公告）、右下角图片轮播（Banner + 广告）。"
+      desc="按投放端区分：C 端顶栏公告与右下角轮播；B 端管理后台顶栏公告与首页 Banner。消息通知会汇总待办与 B 端公告。"
     >
       <template #actions>
         <t-button theme="primary" @click="openCreate">新建运营位</t-button>
@@ -11,7 +11,8 @@
 
     <t-card :bordered="false" class="admin-card">
       <div class="admin-toolbar">
-        <t-select v-model="slotFilter" :options="slotOptions" placeholder="投放位置" clearable style="width: 180px" />
+        <t-select v-model="audienceFilter" :options="audienceOptions" placeholder="投放端" clearable style="width: 120px" />
+        <t-select v-model="slotFilter" :options="slotFilterOptions" placeholder="投放位置" clearable style="width: 180px" />
         <t-select v-model="kindFilter" :options="kindOptions" placeholder="类型" clearable style="width: 140px" />
       </div>
       <t-table row-key="id" :data="filteredItems" :columns="columns" :loading="loading" hover>
@@ -29,8 +30,14 @@
       @confirm="onSave"
     >
       <t-form ref="formRef" :data="form" :rules="rules" label-width="108px">
+        <t-form-item label="投放端" name="audience">
+          <t-radio-group v-model="form.audience">
+            <t-radio value="C">C 端（用户）</t-radio>
+            <t-radio value="B">B 端（管理后台）</t-radio>
+          </t-radio-group>
+        </t-form-item>
         <t-form-item label="投放位置" name="slot">
-          <t-select v-model="form.slot" :options="slotOptions" />
+          <t-select v-model="form.slot" :options="formSlotOptions" />
         </t-form-item>
         <t-form-item label="类型" name="kind">
           <t-select v-model="form.kind" :options="kindOptions" :disabled="isCreativeSlot" />
@@ -105,7 +112,11 @@
             </div>
           </div>
         </t-form-item>
-        <t-form-item v-if="form.slot !== 'CHAT_BANNER'" label="正文" name="body">
+        <t-form-item
+          v-if="form.slot !== 'CHAT_BANNER' && form.slot !== 'ADMIN_BANNER'"
+          label="正文"
+          name="body"
+        >
           <t-textarea v-model="form.body" :autosize="{ minRows: 2, maxRows: 4 }" />
         </t-form-item>
         <t-form-item label="跳转链接" name="linkUrl">
@@ -168,14 +179,16 @@ import {
   deleteOpsPlacement,
   fetchOpsPlacements,
   updateOpsPlacement,
+  type OpsAudience,
   type OpsKind,
   type OpsPlacementVO,
-  type OpsSlot,
+  type OpsSlotAny,
 } from '@/api/ops'
 
 const loading = ref(false)
 const items = ref<OpsPlacementVO[]>([])
-const slotFilter = ref<OpsSlot | ''>('')
+const audienceFilter = ref<OpsAudience | ''>('')
+const slotFilter = ref<OpsSlotAny | ''>('')
 const kindFilter = ref<OpsKind | ''>('')
 const dialogVisible = ref(false)
 const saving = ref(false)
@@ -201,12 +214,22 @@ const iconPresets = [
   'flag',
 ]
 
-const slotOptions = [
+const audienceOptions = [
+  { label: 'C 端', value: 'C' },
+  { label: 'B 端', value: 'B' },
+]
+const cSlotOptions = [
   { label: '顶栏公告', value: 'CHAT_HOME' },
   { label: '全站顶栏', value: 'GLOBAL_ALERT' },
   { label: '右下角 Banner', value: 'CHAT_BANNER' },
   { label: '右下角广告', value: 'CHAT_AD' },
 ]
+const bSlotOptions = [
+  { label: '管理后台顶栏', value: 'ADMIN_HEADER' },
+  { label: '管理后台 Banner', value: 'ADMIN_BANNER' },
+]
+const formSlotOptions = computed(() => (form.audience === 'B' ? bSlotOptions : cSlotOptions))
+const slotFilterOptions = computed(() => [...cSlotOptions, ...bSlotOptions])
 const kindOptions = [
   { label: '公告', value: 'ANNOUNCEMENT' },
   { label: '推荐', value: 'PROMO' },
@@ -219,11 +242,14 @@ const themeOptions = [
   { label: '警告', value: 'warning' },
   { label: '错误', value: 'error' },
 ]
+const audienceLabel: Record<string, string> = { C: 'C 端', B: 'B 端' }
 const slotLabel: Record<string, string> = {
   CHAT_HOME: '顶栏公告',
   GLOBAL_ALERT: '全站顶栏',
   CHAT_BANNER: '右下角 Banner',
   CHAT_AD: '右下角广告',
+  ADMIN_HEADER: '管理后台顶栏',
+  ADMIN_BANNER: '管理后台 Banner',
 }
 const kindLabel: Record<string, string> = {
   ANNOUNCEMENT: '公告',
@@ -233,7 +259,8 @@ const kindLabel: Record<string, string> = {
 }
 
 const form = reactive({
-  slot: 'CHAT_HOME' as OpsSlot,
+  audience: 'C' as OpsAudience,
+  slot: 'CHAT_HOME' as OpsSlotAny,
   kind: 'ANNOUNCEMENT' as OpsKind,
   title: '',
   body: '',
@@ -251,7 +278,9 @@ const form = reactive({
   endsAt: '' as string,
 })
 
-const isCreativeSlot = computed(() => form.slot === 'CHAT_BANNER' || form.slot === 'CHAT_AD')
+const isCreativeSlot = computed(
+  () => form.slot === 'CHAT_BANNER' || form.slot === 'CHAT_AD' || form.slot === 'ADMIN_BANNER',
+)
 
 const slotHint = computed(() => {
   if (form.slot === 'GLOBAL_ALERT') {
@@ -263,6 +292,12 @@ const slotHint = computed(() => {
   if (form.slot === 'CHAT_AD') {
     return '与「右下角 Banner」合并为右下角小卡片轮播。类型固定为广告，需上传图片。'
   }
+  if (form.slot === 'ADMIN_HEADER') {
+    return '展示在 B 端管理后台顶栏下方，并进入消息通知；多条可切换。'
+  }
+  if (form.slot === 'ADMIN_BANNER') {
+    return 'B 端首页区域图片 Banner，需上传图片。'
+  }
   return '与「全站顶栏」一起在 C 端顶栏展示；公告 / 推荐样式与可关闭行为同顶栏规则。'
 })
 
@@ -273,17 +308,33 @@ const rules: FormProps['rules'] = {
   imageUrl: [
     {
       validator: () => {
-        if (!isCreativeSlot.value) return true
-        return Boolean(form.imageUrl.trim()) || '请上传投放图片'
+        if (!isCreativeSlot.value) return { result: true as const }
+        return form.imageUrl.trim()
+          ? { result: true as const }
+          : { result: false as const, message: '请上传投放图片', type: 'error' as const }
       },
     },
   ],
 }
 
 watch(
+  () => form.audience,
+  (audience) => {
+    if (audience === 'B' && !bSlotOptions.some((opt) => opt.value === form.slot)) {
+      form.slot = 'ADMIN_HEADER'
+      form.kind = 'ANNOUNCEMENT'
+    }
+    if (audience === 'C' && !cSlotOptions.some((opt) => opt.value === form.slot)) {
+      form.slot = 'CHAT_HOME'
+      form.kind = 'ANNOUNCEMENT'
+    }
+  },
+)
+
+watch(
   () => form.slot,
   (slot) => {
-    if (slot === 'CHAT_BANNER') {
+    if (slot === 'CHAT_BANNER' || slot === 'ADMIN_BANNER') {
       form.kind = 'BANNER'
       form.iconName = ''
       form.iconUrl = ''
@@ -307,6 +358,7 @@ watch(
 
 const filteredItems = computed(() =>
   items.value.filter((item) => {
+    if (audienceFilter.value && item.audience !== audienceFilter.value) return false
     if (slotFilter.value && item.slot !== slotFilter.value) return false
     if (kindFilter.value && item.kind !== kindFilter.value) return false
     return true
@@ -315,6 +367,12 @@ const filteredItems = computed(() =>
 
 const columns: PrimaryTableCol<OpsPlacementVO>[] = [
   { colKey: 'title', title: '标题', minWidth: 160 },
+  {
+    colKey: 'audience',
+    title: '端',
+    width: 72,
+    cell: (_, { row }) => audienceLabel[row.audience] || row.audience,
+  },
   {
     colKey: 'slot',
     title: '位置',
@@ -362,6 +420,7 @@ const columns: PrimaryTableCol<OpsPlacementVO>[] = [
 
 function resetForm() {
   Object.assign(form, {
+    audience: 'C',
     slot: 'CHAT_HOME',
     kind: 'ANNOUNCEMENT',
     title: '',
@@ -402,6 +461,7 @@ function openEdit(row: OpsPlacementVO) {
   editing.value = true
   editingId.value = row.id
   Object.assign(form, {
+    audience: row.audience || 'C',
     slot: row.slot,
     kind: row.kind,
     title: row.title,
@@ -489,6 +549,7 @@ async function onSave() {
   saving.value = true
   try {
     const payload = {
+      audience: form.audience,
       slot: form.slot,
       kind: form.kind,
       title: form.title.trim(),

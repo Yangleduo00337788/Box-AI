@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 public record OpsPlacementVO(
         Long id,
+        String audience,
         String slot,
         String kind,
         String title,

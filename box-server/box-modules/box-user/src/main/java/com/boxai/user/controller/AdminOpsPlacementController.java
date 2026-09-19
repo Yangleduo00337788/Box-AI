@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -30,6 +31,12 @@ public class AdminOpsPlacementController {
     @GetMapping
     public Result<List<OpsPlacementVO>> list() {
         return Result.success(opsPlacementApplicationService.listForAdmin());
+    }
+
+    @GetMapping("/active")
+    public Result<List<OpsPlacementVO>> listActive(@RequestParam(defaultValue = "B") String audience,
+                                                   @RequestParam(required = false) String slot) {
+        return Result.success(opsPlacementApplicationService.listActiveForAudience(slot, audience));
     }
 
     @PostMapping

@@ -32,6 +32,7 @@ public final class PlatformAdminAccess {
                     PlatformAdminRoles.SUPER_ADMIN, PlatformAdminRoles.OPS, PlatformAdminRoles.FINANCE)),
             new Rule("/api/v1/admin/message-feedbacks", null, Set.of(
                     PlatformAdminRoles.SUPER_ADMIN, PlatformAdminRoles.OPS, PlatformAdminRoles.CONTENT)),
+            new Rule("/api/v1/admin/notifications", null, ALL_ROLES),
             new Rule("/api/v1/admin/platform", null, Set.of(PlatformAdminRoles.SUPER_ADMIN, PlatformAdminRoles.OPS)),
             new Rule("/api/v1/admin/ops", null, Set.of(
                     PlatformAdminRoles.SUPER_ADMIN, PlatformAdminRoles.OPS, PlatformAdminRoles.CONTENT)),

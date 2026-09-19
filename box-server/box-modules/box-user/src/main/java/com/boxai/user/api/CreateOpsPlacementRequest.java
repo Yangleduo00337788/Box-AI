@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 public record CreateOpsPlacementRequest(
+        @Size(max = 1) String audience,
         @NotBlank @Size(max = 32) String slot,
         @NotBlank @Size(max = 32) String kind,
         @NotBlank @Size(max = 128) String title,

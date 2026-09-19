@@ -37,9 +37,11 @@ public class OpsPlacementRepositoryImpl implements OpsPlacementRepository {
     }
 
     @Override
-    public List<OpsPlacement> listActive(String slot, LocalDateTime now) {
+    public List<OpsPlacement> listActive(String slot, String audience, LocalDateTime now) {
+        String normalizedAudience = audience == null || audience.isBlank() ? "C" : audience.trim().toUpperCase();
         QueryWrapper query = QueryWrapper.create()
                 .eq("status", "LISTED")
+                .eq("audience", normalizedAudience)
                 .orderBy("sort_order", false)
                 .orderBy("id", true);
         if (slot != null && !slot.isBlank()) {
@@ -75,6 +77,7 @@ public class OpsPlacementRepositoryImpl implements OpsPlacementRepository {
     public void update(OpsPlacement placement) {
         LocalDateTime now = LocalDateTime.now();
         UpdateChain<OpsPlacementDO> chain = UpdateChain.of(OpsPlacementDO.class)
+                .set("audience", placement.getAudience())
                 .set("slot", placement.getSlot())
                 .set("kind", placement.getKind())
                 .set("title", placement.getTitle())
@@ -103,6 +106,7 @@ public class OpsPlacementRepositoryImpl implements OpsPlacementRepository {
 
     private OpsPlacementDO toDo(OpsPlacement placement) {
         OpsPlacementDO row = new OpsPlacementDO();
+        row.setAudience(placement.getAudience() == null ? "C" : placement.getAudience());
         row.setSlot(placement.getSlot());
         row.setKind(placement.getKind());
         row.setTitle(placement.getTitle());
@@ -125,6 +129,7 @@ public class OpsPlacementRepositoryImpl implements OpsPlacementRepository {
     private OpsPlacement toDomain(OpsPlacementDO row) {
         OpsPlacement placement = new OpsPlacement();
         placement.setId(row.getId());
+        placement.setAudience(row.getAudience() == null ? "C" : row.getAudience());
         placement.setSlot(row.getSlot());
         placement.setKind(row.getKind());
         placement.setTitle(row.getTitle());

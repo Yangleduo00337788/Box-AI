@@ -53,6 +53,7 @@
           <t-breadcrumb-item>{{ currentTitle }}</t-breadcrumb-item>
         </t-breadcrumb>
         <t-space class="admin-header__ops" align="center" :size="4">
+          <admin-notification-center />
           <t-tooltip content="主题配置" theme="light" :show-arrow="false">
             <t-button variant="text" shape="square" aria-label="主题配置" @click="themeVisible = true">
               <template #icon>
@@ -69,6 +70,7 @@
           </t-dropdown>
         </t-space>
       </t-header>
+      <admin-ops-header-alert />
       <t-content class="admin-content">
         <router-view />
       </t-content>
@@ -85,6 +87,8 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption, MenuValue } from 'tdesign-vue-next'
 import logoWordmark from '@/assets/logo.png'
 import logoCollapsed from '@/assets/logo-collapsed.png'
+import AdminNotificationCenter from '@/components/AdminNotificationCenter.vue'
+import AdminOpsHeaderAlert from '@/components/AdminOpsHeaderAlert.vue'
 import ThemeSettingDrawer from '@/components/ThemeSettingDrawer.vue'
 import { ADMIN_MENU_GROUPS } from '@/constants/menu'
 import { canAccessAdminRoute } from '@/constants/rbac'

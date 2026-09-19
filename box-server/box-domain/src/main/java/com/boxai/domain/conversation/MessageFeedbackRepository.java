@@ -13,4 +13,6 @@ public interface MessageFeedbackRepository {
     PageResult<MessageFeedback> page(MessageFeedbackQuery query);
 
     void updateReply(MessageFeedback feedback);
+
+    long countByRatingAndStatus(String rating, String status);
 }
