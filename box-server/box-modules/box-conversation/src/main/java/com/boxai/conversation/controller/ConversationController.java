@@ -9,7 +9,11 @@ import com.boxai.conversation.api.RegenerateMessageRequest;
 import com.boxai.conversation.api.RenameConversationRequest;
 import com.boxai.conversation.api.SendMessageRequest;
 import com.boxai.conversation.api.SendMessageVO;
+import com.boxai.conversation.api.ConversationShareCreatedVO;
+import com.boxai.conversation.api.CreateConversationShareRequest;
+import com.boxai.conversation.api.MessageFeedbackRequest;
 import com.boxai.conversation.application.ConversationApplicationService;
+import com.boxai.conversation.application.ConversationShareApplicationService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,9 +34,12 @@ import java.util.List;
 public class ConversationController {
 
     private final ConversationApplicationService conversationApplicationService;
+    private final ConversationShareApplicationService conversationShareApplicationService;
 
-    public ConversationController(ConversationApplicationService conversationApplicationService) {
+    public ConversationController(ConversationApplicationService conversationApplicationService,
+                                    ConversationShareApplicationService conversationShareApplicationService) {
         this.conversationApplicationService = conversationApplicationService;
+        this.conversationShareApplicationService = conversationShareApplicationService;
     }
 
     @PostMapping
@@ -94,6 +101,20 @@ public class ConversationController {
     @DeleteMapping("/{id}/messages/{messageId}")
     public Result<Void> deleteMessage(@PathVariable Long id, @PathVariable Long messageId) {
         conversationApplicationService.deleteMessage(id, messageId);
+        return Result.success();
+    }
+
+    @PostMapping("/{id}/shares")
+    public Result<ConversationShareCreatedVO> createShare(@PathVariable Long id,
+                                                          @Valid @RequestBody CreateConversationShareRequest request) {
+        return Result.success(conversationShareApplicationService.createShare(id, request));
+    }
+
+    @PostMapping("/{id}/messages/{messageId}/feedback")
+    public Result<Void> submitFeedback(@PathVariable Long id,
+                                       @PathVariable Long messageId,
+                                       @Valid @RequestBody MessageFeedbackRequest request) {
+        conversationShareApplicationService.submitFeedback(id, messageId, request);
         return Result.success();
     }
 }

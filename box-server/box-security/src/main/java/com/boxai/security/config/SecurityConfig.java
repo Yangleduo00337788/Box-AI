@@ -67,6 +67,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/public/invitations/**")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/public/conversation-shares/**")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, e) ->
                         write(response, objectMapper, 401, Result.failure(401, "未登录"))))
