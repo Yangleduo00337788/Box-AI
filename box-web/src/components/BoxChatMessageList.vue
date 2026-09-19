@@ -49,11 +49,15 @@
               >
                 AI
               </t-tag>
+              <span v-if="item.sentTimeLabel" class="box-chat-message-list__time-meta">
+                <span class="box-chat-message-list__time-dot" aria-hidden="true" />
+                <time class="box-chat-message-list__time" :datetime="item.sentAt">{{ item.sentTimeLabel }}</time>
+              </span>
             </span>
           </template>
           <template #avatar>
             <t-avatar
-              size="36px"
+              size="28px"
               shape="circle"
               :image="item.avatarUrl"
               :style="{ background: item.avatarColor }"
@@ -62,11 +66,17 @@
             </t-avatar>
           </template>
           <template #content>
-            <div class="box-chat-bubble" :class="`box-chat-bubble--${item.uiRole}`">
+            <box-chat-thinking-status v-if="item.thinkingActive" />
+            <div
+              v-else
+              class="box-chat-bubble"
+              :class="`box-chat-bubble--${item.uiRole}`"
+            >
               <ChatThinking
                 v-if="item.reasoning"
                 status="complete"
-                layout="block"
+                animation="gradient"
+                layout="border"
                 :collapsed="true"
                 class="box-chat-message-list__thinking"
               >
@@ -103,7 +113,7 @@
           class="box-chat-message-list__actions"
         >
           <ChatActionbar
-            :content="item.plainText"
+            :content="item.copyText"
             :disabled="actionsDisabled"
             :action-bar="item.actionBar"
             :comment="feedbackMap[String(item.key)] || ''"
@@ -128,6 +138,7 @@ import {
 } from '@tdesign-vue-next/chat'
 import type { BoxChatListItem } from '@/utils/boxChatListItems'
 import BoxChatCitations from '@/components/BoxChatCitations.vue'
+import BoxChatThinkingStatus from '@/components/BoxChatThinkingStatus.vue'
 import '@/styles/box-chat-bubble.css'
 
 const props = withDefaults(
@@ -224,6 +235,19 @@ defineExpose({
   max-width: 100%;
 }
 
+.box-chat-message-list :deep(.t-chat-item__inner) {
+  align-items: flex-start;
+}
+
+.box-chat-message-list :deep(.t-chat-item__avatar) {
+  align-self: flex-start;
+  margin-top: 1px;
+}
+
+.box-chat-message-list :deep(.t-chat-item__avatar .t-avatar) {
+  font-size: 12px;
+}
+
 .box-chat-message-list :deep(.t-chat-item__content) {
   background: transparent !important;
   padding: 0 !important;
@@ -252,7 +276,7 @@ defineExpose({
 
 .box-chat-message-list--share .box-chat-message-list__row {
   padding: 4px 0;
-  border-radius: 12px;
+  border-radius: var(--box-radius-md);
 }
 
 .box-chat-message-list--share .box-chat-message-list__row--selectable:hover {
@@ -261,7 +285,7 @@ defineExpose({
 
 .box-chat-message-list__checkbox {
   flex-shrink: 0;
-  padding-top: 36px;
+  padding-top: 28px;
 }
 
 .box-chat-message-list__message {
@@ -273,6 +297,7 @@ defineExpose({
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 22px;
 }
 
 .box-chat-message-list__name {
@@ -285,12 +310,48 @@ defineExpose({
   flex-shrink: 0;
 }
 
+.box-chat-message-list__ai-tag :deep(.t-tag) {
+  border-radius: var(--box-radius-md);
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+}
+
+.box-chat-message-list__time-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--td-text-color-placeholder);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.box-chat-message-list__row:hover .box-chat-message-list__time-meta,
+.box-chat-message-list__row:focus-within .box-chat-message-list__time-meta {
+  opacity: 1;
+}
+
+.box-chat-message-list__time-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.box-chat-message-list__time {
+  font-variant-numeric: tabular-nums;
+}
+
 .box-chat-message-list__actions {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  margin-top: 28px;
+  margin-top: 22px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -347,6 +408,6 @@ defineExpose({
 .box-chat-message-list__image :deep(.t-image) {
   width: 168px;
   height: 168px;
-  border-radius: 12px;
+  border-radius: var(--box-radius-md);
 }
 </style>

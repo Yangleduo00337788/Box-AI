@@ -20,6 +20,16 @@ export function formatRelativeTime(value?: string) {
   return `${months} 个月`
 }
 
+/** 消息行悬停展示的发送时间（如 14:39） */
+export function formatChatMessageTime(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
 export function getAvatarColor(seed: string) {
   let hash = 0
   for (let i = 0; i < seed.length; i += 1) {

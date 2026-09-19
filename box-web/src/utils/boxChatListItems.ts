@@ -14,7 +14,7 @@ import {
   type ChatUiStatus,
   type LocalChatMessage,
 } from '@/utils/chatMessageAdapter'
-import { getAvatarColor } from '@/utils/format'
+import { formatChatMessageTime, getAvatarColor } from '@/utils/format'
 import { parseMessageReasoning } from '@/utils/messageMetadata'
 import type { SharedConversationVO } from '@/api/conversation'
 
@@ -33,7 +33,11 @@ export interface BoxChatListItem {
   uiStatus: ChatUiStatus
   animation?: 'gradient'
   plainText: string
+  /** 复制操作栏使用的纯文本 */
+  copyText: string
   displayName: string
+  sentTimeLabel?: string
+  sentAt?: string
   avatarUrl?: string
   avatarText: string
   avatarColor?: string
@@ -41,6 +45,8 @@ export interface BoxChatListItem {
   userText?: string
   citations: KnowledgeCitation[]
   reasoning?: string
+  /** 等待首包 / 无正文时展示「思考中」渐变动画 */
+  thinkingActive?: boolean
   replyQuote?: BoxChatReplyQuote
   showActions: boolean
   actionBar: BoxChatActionBarItem[]
@@ -67,7 +73,7 @@ function excerptChatText(content: string, maxLen = 120): string {
   return normalized.length > maxLen ? `${normalized.slice(0, maxLen)}…` : normalized
 }
 
-function buildActionBar(showReplay: boolean, full: boolean): BoxChatActionBarItem[] {
+function buildAssistantActionBar(showReplay: boolean, full: boolean): BoxChatActionBarItem[] {
   if (!full) {
     return ['copy']
   }
@@ -75,6 +81,17 @@ function buildActionBar(showReplay: boolean, full: boolean): BoxChatActionBarIte
   if (showReplay) bar.push('replay')
   bar.push('good', 'bad', 'share')
   return bar
+}
+
+function buildUserActionBar(full: boolean): BoxChatActionBarItem[] {
+  if (!full) return ['copy']
+  return ['copy', 'share']
+}
+
+function messageHasBody(isUser: boolean, content: string, userText?: string, imageCount = 0) {
+  if (imageCount > 0) return true
+  if (isUser) return Boolean(userText?.trim())
+  return Boolean(content?.trim())
 }
 
 function userIdentity(ctx: BoxChatIdentityContext) {
@@ -145,8 +162,13 @@ export function buildConversationListItems(
   const agent = agentIdentity(identity)
 
   return messages.map((item, index) => {
-    const loading =
-      chatting && index === messages.length - 1 && item.role === 'ASSISTANT' && !item.content
+    const thinkingActive =
+      chatting && index === messages.length - 1 && item.role === 'ASSISTANT' && !item.content?.trim()
+    const streaming =
+      chatting &&
+      index === messages.length - 1 &&
+      item.role === 'ASSISTANT' &&
+      Boolean(item.content?.trim())
     const citations = item.citations?.length ? item.citations : parseMessageCitations(item.metadataJson)
     const reasoning = parseMessageReasoning(item.metadataJson)
     const isUser = item.role === 'USER'
@@ -157,26 +179,41 @@ export function buildConversationListItems(
       index === messages.length - 1 &&
       !chatting
     const id = isUser ? user : agent
+    const userImages = isUser ? parseUserContent(item.content || '').images : []
+    const hasBody = messageHasBody(isUser, item.content || '', parts?.text, userImages.length)
+    const sentAt = item.createdAt || undefined
+    const sentTimeLabel = formatChatMessageTime(sentAt) || undefined
+    const copyText = isUser ? (parts?.text || item.content || '') : item.content || ''
 
     return {
       key: item.id ?? index,
       messageId: item.id > 0 ? item.id : undefined,
       uiRole: toChatUiRole(item.role),
       uiContent: toChatUiContent(item, index, messages, chatting),
-      uiStatus: toChatUiStatus(item, index, messages, chatting),
-      animation: loading ? 'gradient' : undefined,
+      uiStatus: thinkingActive
+        ? 'complete'
+        : streaming
+          ? 'streaming'
+          : toChatUiStatus(item, index, messages, chatting),
+      animation: undefined,
       plainText: item.content || '',
+      copyText,
       displayName: id.displayName,
+      sentTimeLabel,
+      sentAt,
       avatarText: id.avatarText,
-      avatarUrl: id.avatarUrl,
+      avatarUrl: isUser ? user.avatarUrl : undefined,
       avatarColor: id.avatarColor,
-      userImages: isUser ? parseUserContent(item.content || '').images : [],
+      userImages,
       userText: parts?.text,
       citations,
       reasoning,
+      thinkingActive,
       replyQuote: isUser ? undefined : findConversationReplyQuote(messages, index, user.displayName),
-      showActions: !isUser && !loading && Boolean(item.content?.trim()),
-      actionBar: buildActionBar(showReplay, enableFullActions),
+      showActions: !thinkingActive && hasBody,
+      actionBar: isUser
+        ? buildUserActionBar(enableFullActions)
+        : buildAssistantActionBar(showReplay, enableFullActions),
       showDelete: enableDelete,
     }
   })
@@ -184,6 +221,7 @@ export function buildConversationListItems(
 
 export interface LocalChatListMessage extends LocalChatMessage {
   citations?: KnowledgeCitation[]
+  createdAt?: string
 }
 
 export function buildLocalListItems(
@@ -197,32 +235,50 @@ export function buildLocalListItems(
   const agent = agentIdentity(identity)
 
   return messages.map((item, index) => {
-    const loading = isLocalLoadingBubble(item, index, messages, chatting)
+    const thinkingActive = isLocalLoadingBubble(item, index, messages, chatting)
+    const streaming =
+      chatting &&
+      index === messages.length - 1 &&
+      item.role === 'assistant' &&
+      Boolean(item.content?.trim())
     const isUser = item.role === 'user'
     const id = isUser ? user : agent
+    const hasBody = messageHasBody(isUser, item.content || '', isUser ? item.content : undefined, 0)
+    const sentAt = item.createdAt || undefined
+    const sentTimeLabel = formatChatMessageTime(sentAt) || undefined
+    const copyText = item.content || ''
 
     return {
       key: index,
       uiRole: toLocalChatUiRole(item.role),
       uiContent: toLocalChatUiContent(item, index, messages, chatting),
-      uiStatus: toLocalChatUiStatus(item, index, messages, chatting),
-      animation: loading ? 'gradient' : undefined,
+      uiStatus: thinkingActive
+        ? 'complete'
+        : streaming
+          ? 'streaming'
+          : toLocalChatUiStatus(item, index, messages, chatting),
+      animation: undefined,
       plainText: item.content || '',
+      copyText,
       displayName: id.displayName,
+      sentTimeLabel,
+      sentAt,
       avatarText: id.avatarText,
-      avatarUrl: isUser ? id.avatarUrl : undefined,
+      avatarUrl: isUser ? user.avatarUrl : undefined,
       avatarColor: id.avatarColor,
       userImages: [],
       userText: isUser ? item.content : undefined,
       citations: item.citations || [],
       reasoning: undefined,
+      thinkingActive,
       replyQuote: isUser ? undefined : findLocalReplyQuote(messages, index, user.displayName),
-      showActions:
-        !isUser && !loading && Boolean(item.content?.trim()),
-      actionBar: buildActionBar(
-        enableRegenerate && item.role === 'assistant' && index === messages.length - 1 && !chatting,
-        enableFullActions,
-      ),
+      showActions: !thinkingActive && hasBody,
+      actionBar: isUser
+        ? buildUserActionBar(enableFullActions)
+        : buildAssistantActionBar(
+            enableRegenerate && item.role === 'assistant' && index === messages.length - 1 && !chatting,
+            enableFullActions,
+          ),
       showDelete: enableDelete,
     }
   })

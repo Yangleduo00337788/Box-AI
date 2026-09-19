@@ -12,6 +12,7 @@ declare module 'vue' {
     BoxChatCitations: typeof import('./src/components/BoxChatCitations.vue')['default']
     BoxChatMessageList: typeof import('./src/components/BoxChatMessageList.vue')['default']
     BoxChatSender: typeof import('./src/components/BoxChatSender.vue')['default']
+    BoxChatThinkingStatus: typeof import('./src/components/BoxChatThinkingStatus.vue')['default']
     BrandWordmark: typeof import('./src/components/BrandWordmark.vue')['default']
     ChatAgentRail: typeof import('./src/components/ChatAgentRail.vue')['default']
     ChatBrandHero: typeof import('./src/components/ChatBrandHero.vue')['default']

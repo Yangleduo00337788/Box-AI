@@ -1,13 +1,25 @@
 <template>
-  <div class="chat-composer-stack">
+  <div class="chat-composer-stack" :class="{ 'chat-composer-stack--solo': !showAgentRail }">
     <div class="chat-composer-stack__panel">
       <slot />
     </div>
-    <div class="chat-composer-stack__agent-rail">
+    <div v-if="showAgentRail" class="chat-composer-stack__agent-rail">
       <slot name="agent" />
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+withDefaults(
+  defineProps<{
+    /** 新建对话页展示 Agent/项目底栏；进行中对话可关闭 */
+    showAgentRail?: boolean
+  }>(),
+  {
+    showAgentRail: true,
+  },
+)
+</script>
 
 <style scoped>
 .chat-composer-stack {
@@ -47,6 +59,14 @@
   min-height: 72px;
   font-size: 15px;
   line-height: 1.6;
+}
+
+.chat-composer-stack--solo .chat-composer-stack__panel :deep(.box-chat-sender) {
+  margin-bottom: 0;
+}
+
+.chat-composer-stack--solo {
+  margin-bottom: 16px;
 }
 
 /* 灰条：左右内缩、上移叠在白框下，只露出底部一条 */

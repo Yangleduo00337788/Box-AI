@@ -121,7 +121,7 @@
         :message-id="feedbackMessageId"
       />
 
-      <chat-composer-stack v-if="!shareMode" class="chat-active__composer">
+      <chat-composer-stack v-if="!shareMode" class="chat-active__composer" :show-agent-rail="false">
         <box-chat-sender
           v-model="composerText"
           data-testid="chat-composer-input"
@@ -140,9 +140,6 @@
           @remove-attachment="removeComposerAttachment"
           @file-change="onFileSelected"
         />
-        <template #agent>
-          <chat-agent-rail />
-        </template>
       </chat-composer-stack>
       </div>
 
@@ -1030,8 +1027,8 @@ useReloadOnWorkspaceChange(async () => {
 .chat-stage {
   display: flex;
   flex-direction: column;
-  width: min(720px, 100%);
-  max-width: 720px;
+  width: min(var(--box-chat-column-width), 100%);
+  max-width: var(--box-chat-column-width);
   margin: 0 auto;
   flex-shrink: 0;
 }
@@ -1041,17 +1038,21 @@ useReloadOnWorkspaceChange(async () => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  width: min(720px, 100%);
-  max-width: 720px;
+  width: min(var(--box-chat-column-width), 100%);
+  max-width: var(--box-chat-column-width);
   margin: 0 auto;
-  padding: 0;
+  padding: 0 8px;
   box-sizing: border-box;
 }
 
 .chat-new__composer,
 .chat-active__composer {
-  width: 100%;
+  width: min(var(--box-chat-column-width), 100%);
+  max-width: var(--box-chat-column-width);
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .suggestions-loading,
