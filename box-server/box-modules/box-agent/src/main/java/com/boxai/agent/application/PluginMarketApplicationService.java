@@ -50,8 +50,8 @@ public class PluginMarketApplicationService {
         Map<Long, WorkspacePluginInstall> installMap = workspacePluginInstallRepository.listByWorkspace(workspaceId)
                 .stream()
                 .collect(Collectors.toMap(WorkspacePluginInstall::getPluginId, Function.identity(), (left, right) -> left));
-        return pluginCatalogRepository.listByCategory(category).stream()
-                .filter(plugin -> marketRolloutResolver.isVisible(
+        return pluginCatalogRepository.listByCategory(workspaceId, category).stream()
+                .filter(plugin -> "USER".equals(plugin.getSourceType()) || marketRolloutResolver.isVisible(
                         plugin.getId(),
                         plugin.getVisibility(),
                         plugin.getTenantIdsJson(),
@@ -99,6 +99,13 @@ public class PluginMarketApplicationService {
     private PluginCatalog requireListedPlugin(Long pluginId) {
         PluginCatalog plugin = pluginCatalogRepository.findById(pluginId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在"));
+        Long workspaceId = WorkspaceContext.require().workspaceId();
+        if ("USER".equals(plugin.getSourceType())) {
+            if (!workspaceId.equals(plugin.getSubmittedWorkspaceId()) || !"LISTED".equals(plugin.getStatus())) {
+                throw new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在");
+            }
+            return plugin;
+        }
         if (!MarketReviewStatuses.visibleToConsumers(plugin.getStatus(), plugin.getReviewStatus())) {
             throw new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件未上架、未通过审核或已下架");
         }
@@ -126,17 +133,32 @@ public class PluginMarketApplicationService {
                 installed,
                 resourceType,
                 resourceId,
-                resolveTargetPath(resourceType, resourceId));
+                resolveTargetPath(plugin.getCategory(), resourceType, resourceId),
+                plugin.getSourceType() == null ? "ADMIN" : plugin.getSourceType(),
+                plugin.getStatus(),
+                plugin.getReviewStatus());
     }
 
-    private String resolveTargetPath(String resourceType, Long resourceId) {
-        if (resourceType == null || resourceId == null) {
-            return null;
+    private String resolveTargetPath(String category, String resourceType, Long resourceId) {
+        String cat = category == null ? "" : category.trim().toLowerCase();
+        if ("workflows".equals(cat) || "workflow".equals(cat)) {
+            if (resourceId != null) {
+                return "/workflows/" + resourceId + "/editor";
+            }
+            return "/workflows";
         }
-        return switch (resourceType) {
-            case "tool" -> "/tools";
-            case "knowledge" -> "/knowledge";
-            case "workflow" -> "/workflows/" + resourceId + "/editor";
+        if (resourceType != null && resourceId != null) {
+            return switch (resourceType) {
+                case "tool" -> "/tools";
+                case "knowledge" -> "/knowledge";
+                case "workflow" -> "/workflows/" + resourceId + "/editor";
+                case "mcp" -> "/mcp";
+                default -> null;
+            };
+        }
+        return switch (cat) {
+            case "tools" -> "/tools";
+            case "knowledge", "skills" -> "/knowledge";
             case "mcp" -> "/mcp";
             default -> null;
         };

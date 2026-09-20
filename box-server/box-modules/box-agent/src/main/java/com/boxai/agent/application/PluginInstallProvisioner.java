@@ -65,7 +65,7 @@ public class PluginInstallProvisioner {
     }
 
     public ProvisionResult provision(PluginCatalog plugin, Long workspaceId, Long userId) {
-        String category = plugin.getCategory() == null ? "" : plugin.getCategory().trim().toLowerCase();
+        String category = normalizeCategory(plugin.getCategory());
         JsonNode manifest = PluginManifest.parse(plugin.getManifestJson(), objectMapper);
         if ("tools".equals(category)) {
             return provisionTool(plugin, manifest, workspaceId, userId);
@@ -154,7 +154,8 @@ public class PluginInstallProvisioner {
         version.setWorkspaceId(workspaceId);
         version.setVersionNo(1);
         version.setStatus("DRAFT");
-        version.setDefinitionJson(PluginManifest.text(manifest, "definitionJson", DEFAULT_WORKFLOW_DEFINITION));
+        version.setDefinitionJson(
+                PluginManifest.resolveWorkflowDefinition(manifest, objectMapper, DEFAULT_WORKFLOW_DEFINITION));
         version.setCreatedBy(userId);
         workflowVersionRepository.save(version);
 
@@ -196,5 +197,16 @@ public class PluginInstallProvisioner {
     private void deprovisionWorkflow(Long workflowId) {
         workflowVersionRepository.deleteByWorkflowId(workflowId);
         workflowRepository.delete(workflowId);
+    }
+
+    private static String normalizeCategory(String category) {
+        if (category == null) {
+            return "";
+        }
+        String key = category.trim().toLowerCase();
+        if ("workflow".equals(key)) {
+            return "workflows";
+        }
+        return key;
     }
 }

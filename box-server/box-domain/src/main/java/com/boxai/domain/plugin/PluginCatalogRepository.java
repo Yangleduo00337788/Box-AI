@@ -9,11 +9,11 @@ public interface PluginCatalogRepository {
 
     Optional<PluginCatalog> findByCode(String pluginCode);
 
-    List<PluginCatalog> listByCategory(String category);
+    List<PluginCatalog> listByCategory(Long workspaceId, String category);
 
     List<PluginCatalog> listAllForAdmin();
 
-    List<PluginCatalog> searchByTitle(String keyword, int limit);
+    List<PluginCatalog> searchByTitle(Long workspaceId, String keyword, int limit);
 
     long countByCategory(String category);
 

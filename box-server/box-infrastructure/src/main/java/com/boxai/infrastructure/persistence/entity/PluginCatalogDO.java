@@ -24,6 +24,12 @@ public class PluginCatalogDO {
     private String status;
     @Column("review_status")
     private String reviewStatus;
+    @Column("source_type")
+    private String sourceType;
+    @Column("submitted_by")
+    private Long submittedBy;
+    @Column("submitted_workspace_id")
+    private Long submittedWorkspaceId;
     private String visibility;
     @Column("tenant_ids_json")
     private String tenantIdsJson;

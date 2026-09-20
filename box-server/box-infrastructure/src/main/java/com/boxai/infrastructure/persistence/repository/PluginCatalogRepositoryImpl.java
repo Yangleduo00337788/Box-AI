@@ -36,10 +36,8 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
     }
 
     @Override
-    public List<PluginCatalog> listByCategory(String category) {
-        QueryWrapper query = QueryWrapper.create()
-                .eq("status", "LISTED")
-                .eq("review_status", "APPROVED")
+    public List<PluginCatalog> listByCategory(Long workspaceId, String category) {
+        QueryWrapper query = consumerVisibleQuery(workspaceId)
                 .orderBy("sort_order", false)
                 .orderBy("id", true);
         if (category != null && !category.isBlank()) {
@@ -59,13 +57,11 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
     }
 
     @Override
-    public List<PluginCatalog> searchByTitle(String keyword, int limit) {
+    public List<PluginCatalog> searchByTitle(Long workspaceId, String keyword, int limit) {
         if (keyword == null || keyword.isBlank()) {
             return List.of();
         }
-        return mapper.selectListByQuery(QueryWrapper.create()
-                        .eq("status", "LISTED")
-                        .eq("review_status", "APPROVED")
+        return mapper.selectListByQuery(consumerVisibleQuery(workspaceId)
                         .and("(title LIKE ? OR description LIKE ?)", "%" + keyword.trim() + "%", "%" + keyword.trim() + "%")
                         .orderBy("sort_order", false)
                         .orderBy("id", true)
@@ -129,6 +125,16 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         mapper.deleteById(id);
     }
 
+    private QueryWrapper consumerVisibleQuery(Long workspaceId) {
+        long workspace = workspaceId == null ? -1L : workspaceId;
+        return QueryWrapper.create()
+                .eq("status", "LISTED")
+                .and(
+                        "( (IFNULL(source_type, 'ADMIN') = 'ADMIN' AND review_status = 'APPROVED')"
+                                + " OR (source_type = 'USER' AND submitted_workspace_id = ?) )",
+                        workspace);
+    }
+
     private PluginCatalogDO toDo(PluginCatalog plugin) {
         PluginCatalogDO row = new PluginCatalogDO();
         row.setId(plugin.getId());
@@ -139,6 +145,9 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         row.setManifestJson(plugin.getManifestJson());
         row.setStatus(plugin.getStatus());
         row.setReviewStatus(plugin.getReviewStatus() == null ? "PENDING_REVIEW" : plugin.getReviewStatus());
+        row.setSourceType(plugin.getSourceType() == null ? "ADMIN" : plugin.getSourceType());
+        row.setSubmittedBy(plugin.getSubmittedBy());
+        row.setSubmittedWorkspaceId(plugin.getSubmittedWorkspaceId());
         row.setVisibility(plugin.getVisibility() == null ? "GLOBAL" : plugin.getVisibility());
         row.setTenantIdsJson(plugin.getTenantIdsJson());
         row.setRolloutPercent(plugin.getRolloutPercent() == null ? 100 : plugin.getRolloutPercent());
@@ -157,6 +166,9 @@ public class PluginCatalogRepositoryImpl implements PluginCatalogRepository {
         plugin.setManifestJson(row.getManifestJson());
         plugin.setStatus(row.getStatus());
         plugin.setReviewStatus(row.getReviewStatus());
+        plugin.setSourceType(row.getSourceType() == null ? "ADMIN" : row.getSourceType());
+        plugin.setSubmittedBy(row.getSubmittedBy());
+        plugin.setSubmittedWorkspaceId(row.getSubmittedWorkspaceId());
         plugin.setVisibility(row.getVisibility());
         plugin.setTenantIdsJson(row.getTenantIdsJson());
         plugin.setRolloutPercent(row.getRolloutPercent());

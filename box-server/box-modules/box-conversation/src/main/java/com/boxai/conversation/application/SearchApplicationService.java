@@ -67,7 +67,7 @@ public class SearchApplicationService {
         List<Workflow> workflows = workflowRepository.searchByName(workspaceId, q, perTypeLimit);
         List<KnowledgeBase> knowledgeBases = knowledgeBaseRepository.searchByName(workspaceId, q, perTypeLimit);
         List<Tool> tools = toolRepository.searchByName(workspaceId, q, perTypeLimit);
-        List<PluginCatalog> plugins = pluginCatalogRepository.searchByTitle(q, perTypeLimit);
+        List<PluginCatalog> plugins = pluginCatalogRepository.searchByTitle(workspaceId, q, perTypeLimit);
         Map<Long, String> agentNames = agentRepository.listByWorkspace(workspaceId).stream()
                 .collect(Collectors.toMap(Agent::getId, Agent::getName, (a, b) -> a));
 

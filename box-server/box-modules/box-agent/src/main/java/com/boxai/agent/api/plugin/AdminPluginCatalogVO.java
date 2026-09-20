@@ -9,6 +9,7 @@ public record AdminPluginCatalogVO(
         String manifestJson,
         String status,
         String reviewStatus,
+        String sourceType,
         String visibility,
         String tenantIdsJson,
         Integer rolloutPercent,

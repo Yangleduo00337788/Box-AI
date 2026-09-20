@@ -10,5 +10,8 @@ public record PluginCatalogVO(
         Boolean installed,
         String resourceType,
         Long resourceId,
-        String targetPath
+        String targetPath,
+        String sourceType,
+        String status,
+        String reviewStatus
 ) {}

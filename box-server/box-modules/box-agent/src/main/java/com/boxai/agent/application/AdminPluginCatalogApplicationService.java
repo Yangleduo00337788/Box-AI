@@ -12,19 +12,15 @@ import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.plugin.PluginCatalog;
 import com.boxai.domain.plugin.PluginCatalogRepository;
 import com.boxai.domain.plugin.WorkspacePluginInstallRepository;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 @Service
 public class AdminPluginCatalogApplicationService {
-
-    private static final Set<String> RESOURCE_CATEGORIES = Set.of("tools", "workflows", "knowledge", "mcp", "skills");
 
     private final PluginCatalogRepository pluginCatalogRepository;
     private final PluginCategoryApplicationService pluginCategoryApplicationService;
@@ -54,7 +50,7 @@ public class AdminPluginCatalogApplicationService {
         if (pluginCatalogRepository.findByCode(request.pluginCode()).isPresent()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "插件编码已存在");
         }
-        String manifestJson = normalizeAndValidateManifest(request.category(), request.manifestJson());
+        String manifestJson = PluginManifest.normalizeAndValidate(request.category(), request.manifestJson(), objectMapper);
         PluginCatalog plugin = new PluginCatalog();
         plugin.setPluginCode(request.pluginCode().trim());
         plugin.setCategory(request.category().trim());
@@ -63,6 +59,7 @@ public class AdminPluginCatalogApplicationService {
         plugin.setManifestJson(manifestJson);
         plugin.setStatus("LISTED");
         plugin.setReviewStatus(MarketReviewStatuses.PENDING_REVIEW);
+        plugin.setSourceType("ADMIN");
         plugin.setVisibility("GLOBAL");
         plugin.setRolloutPercent(100);
         plugin.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
@@ -86,7 +83,7 @@ public class AdminPluginCatalogApplicationService {
             plugin.setDescription(request.description());
         }
         if (request.manifestJson() != null) {
-            plugin.setManifestJson(normalizeAndValidateManifest(plugin.getCategory(), request.manifestJson()));
+            plugin.setManifestJson(PluginManifest.normalizeAndValidate(plugin.getCategory(), request.manifestJson(), objectMapper));
         }
         if (request.sortOrder() != null) {
             plugin.setSortOrder(request.sortOrder());
@@ -152,25 +149,6 @@ public class AdminPluginCatalogApplicationService {
         pluginCatalogRepository.delete(id);
     }
 
-    private String normalizeAndValidateManifest(String category, String manifestJson) {
-        String normalized = PluginManifest.normalize(manifestJson, objectMapper);
-        JsonNode node = PluginManifest.parse(normalized, objectMapper);
-        String key = category == null ? "" : category.trim().toLowerCase(Locale.ROOT);
-        if (!RESOURCE_CATEGORIES.contains(key)) {
-            return normalized;
-        }
-        if ("tools".equals(key) && PluginManifest.text(node, "url", null) == null) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "工具插件需填写请求地址");
-        }
-        if ("mcp".equals(key) && PluginManifest.text(node, "endpointUrl", null) == null) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "MCP 插件需填写服务地址");
-        }
-        if ("skills".equals(key) && PluginManifest.text(node, "instructions", null) == null) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "Skill 插件需填写技能说明");
-        }
-        return normalized;
-    }
-
     private AdminPluginCatalogVO toVO(PluginCatalog plugin) {
         return new AdminPluginCatalogVO(
                 plugin.getId(),
@@ -181,6 +159,7 @@ public class AdminPluginCatalogApplicationService {
                 plugin.getManifestJson(),
                 plugin.getStatus(),
                 plugin.getReviewStatus(),
+                plugin.getSourceType(),
                 plugin.getVisibility(),
                 plugin.getTenantIdsJson(),
                 plugin.getRolloutPercent(),

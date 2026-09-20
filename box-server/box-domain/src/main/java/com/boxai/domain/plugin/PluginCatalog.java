@@ -17,6 +17,9 @@ public class PluginCatalog {
     private String manifestJson;
     private String status;
     private String reviewStatus;
+    private String sourceType;
+    private Long submittedBy;
+    private Long submittedWorkspaceId;
     private String visibility;
     private String tenantIdsJson;
     private Integer rolloutPercent;
