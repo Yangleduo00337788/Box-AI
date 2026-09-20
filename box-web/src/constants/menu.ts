@@ -1,8 +1,7 @@
 import type { MenuGroup } from '@box/ui/types/menu'
 
 /**
- * C 端侧栏固定入口。知识库 / 工具 / MCP / 工作流 / 市场不在侧栏，
- * 从插件市场分类「管理我的…」或全局搜索进入。
+ * C 端侧栏固定入口。知识库 / 工具 / MCP / 工作流从插件市场「我的」进入。
  */
 export const CONSUMER_MENU_GROUPS: MenuGroup[] = [
   {

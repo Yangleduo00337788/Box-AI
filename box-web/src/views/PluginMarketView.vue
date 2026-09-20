@@ -15,17 +15,6 @@
             </t-button>
           </t-dropdown>
           <t-button variant="outline" @click="router.push('/market')">智能体市场</t-button>
-          <t-dropdown
-            v-if="manageOptions.length"
-            :options="manageOptions"
-            trigger="click"
-            @click="onManageSelect"
-          >
-            <t-button variant="outline">
-              管理
-              <template #suffix><t-icon name="chevron-down" /></template>
-            </t-button>
-          </t-dropdown>
         </t-space>
       </template>
     </page-header>
@@ -85,18 +74,27 @@
           <em>{{ installedCount }}</em>
         </button>
         <button
+          v-for="item in mineNavItems"
+          :key="item.value"
           type="button"
           class="plugin-market__nav-item"
-          :class="{ 'is-active': isNavActive('workspace') }"
-          @click="selectWorkspace"
+          :class="{ 'is-active': isNavActive(`mine-${item.value}`) }"
+          @click="selectMine(item.value)"
         >
-          <t-icon name="root-list" />
-          <span>工作空间</span>
-          <em>{{ workspaceCount }}</em>
+          <t-icon :name="item.icon" />
+          <span>我的{{ item.label }}</span>
+          <em>{{ mineCountOf(item.value) }}</em>
         </button>
       </aside>
 
       <div class="plugin-market__main">
+        <template v-if="mineCategory">
+          <WorkflowsView v-if="mineCategory === 'workflows'" />
+          <KnowledgeView v-else-if="mineCategory === 'knowledge'" />
+          <ToolsView v-else-if="mineCategory === 'tools'" />
+          <McpView v-else-if="mineCategory === 'mcp'" />
+        </template>
+        <template v-else>
         <div class="plugin-market__toolbar">
           <t-input
             v-model="keyword"
@@ -128,31 +126,25 @@
               <p v-if="section.desc" class="plugin-market__section-desc">{{ section.desc }}</p>
             </div>
             <div v-if="section.items.length" class="plugin-market__list">
-              <article
+              <resource-item-card
                 v-for="item in section.items"
                 :key="`${section.key}-${item.id}`"
-                class="plugin-card"
-                :class="{ 'is-installed': item.installed }"
+                :title="item.title"
+                :description="item.description"
+                :icon="iconOf(item.category)"
+                :tone="toneOf(item.category)"
+                clickable
                 @click="openDetail(item)"
               >
-                <span class="plugin-card__icon" :class="`plugin-card__icon--${toneOf(item.category)}`">
-                  <t-icon :name="iconOf(item.category)" size="22px" />
-                </span>
-                <div class="plugin-card__body">
-                  <div class="plugin-card__title-row">
-                    <h3 class="plugin-card__title">{{ item.title }}</h3>
-                    <t-tag v-if="item.installed" size="small" variant="light" theme="success">已安装</t-tag>
-                    <t-tag v-else-if="reviewLabel(item)" size="small" variant="light" :theme="reviewTheme(item)">
-                      {{ reviewLabel(item) }}
-                    </t-tag>
-                    <t-tag size="small" variant="light">{{ sourceLabel(item) }}</t-tag>
-                  </div>
-                  <p class="plugin-card__desc">{{ item.description || '暂无描述' }}</p>
-                  <div class="plugin-card__meta">
-                    <span>{{ categoryLabel(item.category) || '扩展' }}</span>
-                  </div>
-                </div>
-                <div class="plugin-card__actions" @click.stop>
+                <template #tags>
+                  <t-tag v-if="item.installed" size="small" variant="light" theme="success">已安装</t-tag>
+                  <t-tag v-else-if="reviewLabel(item)" size="small" variant="light" :theme="reviewTheme(item)">
+                    {{ reviewLabel(item) }}
+                  </t-tag>
+                  <t-tag size="small" variant="light">{{ sourceLabel(item) }}</t-tag>
+                </template>
+                <template #meta>{{ categoryLabel(item.category) || '扩展' }}</template>
+                <template #actions>
                   <t-button
                     v-if="canInstall(item)"
                     theme="primary"
@@ -182,8 +174,8 @@
                       移除
                     </t-button>
                   </template>
-                </div>
-              </article>
+                </template>
+              </resource-item-card>
             </div>
           </section>
 
@@ -204,6 +196,7 @@
               </template>
             </t-empty>
           </div>
+        </template>
         </template>
       </div>
     </div>
@@ -284,6 +277,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import ResourceItemCard from '@/components/ResourceItemCard.vue'
+import KnowledgeView from '@/views/KnowledgeView.vue'
+import McpView from '@/views/McpView.vue'
+import ToolsView from '@/views/ToolsView.vue'
+import WorkflowsView from '@/views/WorkflowsView.vue'
 import {
   fetchPluginCategories,
   installPlugin,
@@ -292,14 +290,20 @@ import {
   type PluginCatalogVO,
   type PluginCategoryVO,
 } from '@/api/plugin'
+import { listKnowledgeBases } from '@/api/knowledge'
+import { listMcpServers } from '@/api/mcp'
+import { listTools } from '@/api/tool'
+import { listWorkflows } from '@/api/workflow'
 import { extractApiError } from '@/api/apiError'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { PermissionCodes } from '@/constants/permissions'
+import { RESOURCE_MANAGE_CATEGORIES } from '@/constants/resourceManage'
 import {
   PLUGIN_CATEGORY_CREATE_LABELS,
   PLUGIN_CATEGORY_MANAGE_PATHS,
   createPathForCategory,
+  isPluginMineCategory,
   resolvePluginOpenPath,
 } from '@/constants/resourceRoutes'
 
@@ -333,6 +337,19 @@ const categories = ref<PluginCategoryVO[]>([])
 const keyword = ref('')
 const detailItem = ref<PluginCatalogVO | null>(null)
 const detailVisible = ref(false)
+
+const mineNavItems = RESOURCE_MANAGE_CATEGORIES
+const mineCounts = ref<Record<string, number>>({
+  workflows: 0,
+  knowledge: 0,
+  tools: 0,
+  mcp: 0,
+})
+
+const mineCategory = computed(() => {
+  const mine = route.query.mine
+  return typeof mine === 'string' && isPluginMineCategory(mine) ? mine : ''
+})
 
 const CREATE_PERMISSIONS: Record<string, string> = {
   workflows: PermissionCodes.WORKFLOW_CREATE,
@@ -370,15 +387,6 @@ const discoverView = computed<DiscoverView>(() => {
   if (activeTab.value === 'skills') return 'skills'
   return 'all'
 })
-
-const manageOptions = computed<DropdownOption[]>(() =>
-  Object.entries(PLUGIN_CATEGORY_MANAGE_PATHS)
-    .filter(([category]) => categories.value.some((item) => item.value === category))
-    .map(([category, path]) => ({
-      content: `我的${categories.value.find((item) => item.value === category)?.label || category}`,
-      value: path,
-    })),
-)
 
 const createOptions = computed<DropdownOption[]>(() =>
   Object.entries(PLUGIN_CATEGORY_MANAGE_PATHS)
@@ -464,9 +472,8 @@ const resultCountLabel = computed(() => {
 })
 
 const emptyDescription = computed(() => {
-  if (workspaceFilter.value) return '没有历史工作空间插件。请到「管理」中新建，创建后本空间成员共用'
   if (hasActiveFilters.value) return '没有匹配的扩展'
-  return '暂无官方插件。工作流、知识库、工具与 MCP 请到「管理」中新建，创建后本空间成员共用'
+  return '暂无官方插件。本空间的工作流、知识库、工具与 MCP 在左侧「我的」中管理'
 })
 
 function sortItems(items: PluginCatalogVO[]) {
@@ -474,14 +481,20 @@ function sortItems(items: PluginCatalogVO[]) {
 }
 
 function isNavActive(key: string) {
-  if (key === 'workspace') return workspaceFilter.value
-  if (workspaceFilter.value) return false
+  if (mineCategory.value) {
+    return key === `mine-${mineCategory.value}`
+  }
+  if (key.startsWith('mine-')) return false
   if (key === 'installed') return installFilter.value === 'installed'
   if (installFilter.value === 'installed') return false
   if (key === 'skills') return activeTab.value === 'skills'
   if (activeTab.value === 'skills') return false
   if (key === 'all') return !activeCategory.value && discoverView.value === 'all'
   return activeCategory.value === key
+}
+
+function mineCountOf(category: string) {
+  return mineCounts.value[category] ?? 0
 }
 
 function countOf(category: string) {
@@ -525,7 +538,7 @@ function canInstall(item: PluginCatalogVO) {
 }
 
 function detailStatus(item: PluginCatalogVO) {
-  if (item.installed) return '已安装，可在对应资源页使用'
+  if (item.installed) return '已安装，可在「我的」中使用'
   const review = reviewLabel(item)
   return review || '未安装'
 }
@@ -567,9 +580,28 @@ function selectInstalled() {
   router.replace({ path: '/plugin-market', query })
 }
 
-function selectWorkspace() {
+function selectMine(category: string) {
   keyword.value = ''
-  router.replace({ path: '/plugin-market', query: { filter: 'workspace' } })
+  router.replace({ path: '/plugin-market', query: { mine: category } })
+}
+
+async function loadMineCounts() {
+  try {
+    const [workflows, knowledge, tools, mcp] = await Promise.all([
+      listWorkflows(),
+      listKnowledgeBases(),
+      listTools(),
+      listMcpServers(),
+    ])
+    mineCounts.value = {
+      workflows: workflows.data.data?.length ?? 0,
+      knowledge: knowledge.data.data?.length ?? 0,
+      tools: tools.data.data?.length ?? 0,
+      mcp: mcp.data.data?.length ?? 0,
+    }
+  } catch {
+    mineCounts.value = { workflows: 0, knowledge: 0, tools: 0, mcp: 0 }
+  }
 }
 
 async function loadCategories() {
@@ -652,6 +684,7 @@ async function runInstallAction(item: PluginCatalogVO) {
       MessagePlugin.success(`已安装「${item.title}」`)
     }
     await loadPlugins()
+    await loadMineCounts()
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '操作失败'))
   } finally {
@@ -667,11 +700,11 @@ watch(plugins, (list) => {
 
 onMounted(async () => {
   await loadCategories()
-  await loadPlugins()
+  await Promise.all([loadPlugins(), loadMineCounts()])
 })
 useReloadOnWorkspaceChange(async () => {
   await loadCategories()
-  await loadPlugins()
+  await Promise.all([loadPlugins(), loadMineCounts()])
 })
 </script>
 
@@ -761,171 +794,6 @@ useReloadOnWorkspaceChange(async () => {
   color: var(--box-ink);
 }
 
-.plugin-market__toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 12px;
-  margin-bottom: 20px;
-}
-
-.plugin-market__search {
-  width: min(420px, 100%);
-}
-
-.plugin-market__count {
-  margin-left: auto;
-  font: var(--td-font-body-small);
-  color: var(--box-muted);
-}
-
-.plugin-market__section + .plugin-market__section {
-  margin-top: 28px;
-}
-
-.plugin-market__section-head {
-  margin-bottom: 12px;
-}
-
-.plugin-market__section-title {
-  margin: 0;
-  font: var(--td-font-title-medium);
-  color: var(--box-ink);
-}
-
-.plugin-market__section-desc {
-  margin: 4px 0 0;
-  font: var(--td-font-body-small);
-  color: var(--box-muted);
-}
-
-.plugin-market__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 12px;
-}
-
-.plugin-card {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: start;
-  min-height: 108px;
-  padding: 16px 18px;
-  border: 1px solid var(--box-border);
-  border-radius: var(--box-radius-md);
-  background: var(--box-surface);
-  box-shadow: var(--box-shadow-card);
-  cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
-}
-
-.plugin-card:hover {
-  border-color: var(--td-gray-color-4);
-  box-shadow: var(--box-shadow-soft);
-  transform: translateY(-1px);
-}
-
-.plugin-card--skeleton {
-  min-height: 108px;
-  cursor: default;
-  background: var(--td-gray-color-1);
-  animation: plugin-card-shimmer 1.2s ease-in-out infinite;
-}
-
-.plugin-card__body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.plugin-card__title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.plugin-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.plugin-card__icon--ink {
-  background: #eef0f2;
-  color: #1f2329;
-}
-
-.plugin-card__icon--sky {
-  background: #e8f1ff;
-  color: #2563eb;
-}
-
-.plugin-card__icon--stone {
-  background: #f3eee8;
-  color: #57534e;
-}
-
-.plugin-card__icon--violet {
-  background: #f3e8ff;
-  color: #7c3aed;
-}
-
-.plugin-card__icon--teal {
-  background: #e6f6f3;
-  color: #0f766e;
-}
-
-.plugin-card__title {
-  margin: 0;
-  min-width: 0;
-  font: var(--td-font-title-small);
-  color: var(--box-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plugin-card__desc {
-  margin: 0;
-  font: var(--td-font-body-small);
-  color: var(--box-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.plugin-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  font: var(--td-font-body-small);
-  color: var(--box-muted);
-}
-
-.plugin-card__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: stretch;
-  min-width: 76px;
-}
-
-.plugin-market__empty {
-  padding: 48px 0;
-  border: 1px solid var(--box-border);
-  border-radius: var(--box-radius-md);
-  background: var(--box-surface);
-}
-
 .plugin-detail {
   display: flex;
   flex-direction: column;
@@ -996,16 +864,6 @@ useReloadOnWorkspaceChange(async () => {
   color: var(--box-muted);
 }
 
-@keyframes plugin-card-shimmer {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 @media (max-width: 1100px) {
   .plugin-market__layout {
     grid-template-columns: 1fr;
@@ -1029,10 +887,6 @@ useReloadOnWorkspaceChange(async () => {
 
   .plugin-market__nav-item em {
     display: none;
-  }
-
-  .plugin-market__list {
-    grid-template-columns: 1fr;
   }
 }
 

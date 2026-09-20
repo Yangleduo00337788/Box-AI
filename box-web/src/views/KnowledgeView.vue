@@ -6,9 +6,10 @@
     :filtered="filtered.length"
     :loading="loading"
     :can-create="can(PermissionCodes.KNOWLEDGE_CREATE)"
+    embedded
     @create="openCreate"
   >
-    <div v-if="filtered.length" class="resource-manage__list">
+    <div v-if="filtered.length" class="plugin-market__list">
       <resource-item-card
         v-for="item in filtered"
         :key="item.id"
@@ -20,17 +21,26 @@
         @click="openDetail(item)"
       >
         <template #tags>
-          <t-tag size="small" variant="light">{{ item.status || 'READY' }}</t-tag>
+          <t-tag size="small" variant="light" theme="success">工作空间</t-tag>
+          <t-tag size="small" variant="light" :theme="statusTheme(item.status || 'READY')">
+            {{ statusLabel(item.status || 'READY') }}
+          </t-tag>
         </template>
         <template #meta>{{ item.documentCount ?? 0 }} 篇文档 · {{ item.chunkCount ?? 0 }} 个分块</template>
         <template #actions>
-          <t-space>
-            <t-button variant="text" theme="primary" @click="openDetail(item)">文档</t-button>
-            <t-button v-if="can(PermissionCodes.KNOWLEDGE_UPDATE)" variant="text" @click="openEdit(item)">编辑</t-button>
-            <t-button v-if="can(PermissionCodes.KNOWLEDGE_DELETE)" variant="text" theme="danger" @click="remove(item)">
-              删除
-            </t-button>
-          </t-space>
+          <t-button theme="primary" size="small" @click="openDetail(item)">打开</t-button>
+          <t-button v-if="can(PermissionCodes.KNOWLEDGE_UPDATE)" variant="outline" theme="default" size="small" @click="openEdit(item)">
+            编辑
+          </t-button>
+          <t-button
+            v-if="can(PermissionCodes.KNOWLEDGE_DELETE)"
+            variant="outline"
+            theme="default"
+            size="small"
+            @click="remove(item)"
+          >
+            删除
+          </t-button>
         </template>
       </resource-item-card>
     </div>

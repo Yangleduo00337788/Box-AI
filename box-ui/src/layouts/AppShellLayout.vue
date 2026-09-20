@@ -407,13 +407,6 @@ function onSearch() {
   overflow-x: hidden;
   overflow-y: auto;
   padding: 8px;
-  scrollbar-width: none;
-}
-
-.sidebar-nav::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
 }
 
 .nav-group {
@@ -616,6 +609,7 @@ function onSearch() {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .app-layout--consumer .sidebar-collapse,

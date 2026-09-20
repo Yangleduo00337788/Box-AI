@@ -142,7 +142,7 @@ watch(
     } else if (/^\/agents\/\d+/.test(path)) {
       void router.replace('/agents')
     } else if (/^\/workflows\/\d+/.test(path)) {
-      void router.replace('/workflows')
+      void router.replace('/plugin-market?mine=workflows')
     }
   },
 )

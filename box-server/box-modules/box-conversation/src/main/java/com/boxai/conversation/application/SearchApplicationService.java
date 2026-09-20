@@ -107,7 +107,7 @@ public class SearchApplicationService {
                     knowledgeBase.getId(),
                     knowledgeBase.getName(),
                     knowledgeBase.getDescription(),
-                    "/knowledge"));
+                    "/plugin-market?mine=knowledge"));
         }
         for (Tool tool : tools) {
             results.add(new SearchResultVO(
@@ -115,7 +115,7 @@ public class SearchApplicationService {
                     tool.getId(),
                     tool.getName(),
                     tool.getDescription(),
-                    "/tools"));
+                    "/plugin-market?mine=tools"));
         }
         for (PluginCatalog plugin : plugins) {
             results.add(new SearchResultVO(

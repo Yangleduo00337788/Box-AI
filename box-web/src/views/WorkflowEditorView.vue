@@ -1,7 +1,7 @@
 <template>
-  <div class="editor box-hide-scrollbar">
+  <div class="editor">
     <header class="editor__header">
-      <t-button variant="text" shape="square" @click="router.push('/workflows')">
+      <t-button variant="text" shape="square" @click="router.push(pluginMarketMinePath('workflows'))">
         <template #icon><t-icon name="chevron-left" /></template>
       </t-button>
       <div class="editor__title">
@@ -135,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
@@ -150,6 +150,7 @@ import {
   type WorkflowVO,
 } from '@/api/workflow'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
+import { pluginMarketMinePath } from '@/constants/resourceRoutes'
 
 const WorkflowEditorCanvas = defineAsyncComponent(
   () => import('@/components/workflow/WorkflowEditorCanvas.vue'),
@@ -400,13 +401,6 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => {
-  document.documentElement.classList.add('wf-editor-no-scrollbar')
-})
-
-onUnmounted(() => {
-  document.documentElement.classList.remove('wf-editor-no-scrollbar')
-})
 </script>
 
 <style scoped>
@@ -418,17 +412,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.editor,
-.editor :deep(*) {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.editor :deep(*::-webkit-scrollbar) {
-  width: 0;
-  height: 0;
-  display: none;
-}
 
 .editor__header {
   display: flex;

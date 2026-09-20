@@ -6,9 +6,10 @@
     :filtered="filtered.length"
     :loading="loading"
     :can-create="can(PermissionCodes.TOOL_CREATE)"
+    embedded
     @create="openCreate"
   >
-    <div v-if="filtered.length" class="resource-manage__list">
+    <div v-if="filtered.length" class="plugin-market__list">
       <resource-item-card
         v-for="item in filtered"
         :key="item.id"
@@ -18,6 +19,7 @@
         tone="violet"
       >
         <template #tags>
+          <t-tag size="small" variant="light" theme="success">工作空间</t-tag>
           <t-tag size="small" variant="light">{{ item.transportType || 'SSE' }}</t-tag>
         </template>
         <template #meta>
@@ -25,14 +27,10 @@
           <template v-if="item.lastSyncAt"> · 同步于 {{ item.lastSyncAt }}</template>
         </template>
         <template #actions>
-          <t-space>
-            <t-button variant="text" theme="primary" :loading="syncingId === item.id" @click="sync(item.id)">
-              同步
-            </t-button>
-            <t-button variant="text" theme="danger" @click="remove(item)">
-              删除
-            </t-button>
-          </t-space>
+          <t-button theme="primary" size="small" :loading="syncingId === item.id" @click="sync(item.id)">
+            同步
+          </t-button>
+          <t-button variant="outline" theme="default" size="small" @click="remove(item)">删除</t-button>
         </template>
       </resource-item-card>
     </div>

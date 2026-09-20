@@ -6,9 +6,10 @@
     :filtered="filtered.length"
     :loading="loading"
     :can-create="can(PermissionCodes.WORKFLOW_CREATE)"
+    embedded
     @create="openCreate"
   >
-    <div v-if="filtered.length" class="resource-manage__list">
+    <div v-if="filtered.length" class="plugin-market__list">
       <resource-item-card
         v-for="item in filtered"
         :key="item.id"
@@ -20,11 +21,15 @@
         @click="openEditor(item)"
       >
         <template #tags>
+          <t-tag size="small" variant="light" theme="success">工作空间</t-tag>
           <t-tag size="small" variant="light" :theme="item.status === 'PUBLISHED' ? 'success' : 'default'">
             {{ workflowStatusLabel(item.status) }}
           </t-tag>
         </template>
         <template #meta>草稿 v{{ item.draftVersionNo ?? 1 }}</template>
+        <template #actions>
+          <t-button theme="primary" size="small" @click="openEditor(item)">打开</t-button>
+        </template>
       </resource-item-card>
     </div>
     <t-empty v-else-if="keyword.trim()" description="没有匹配的工作流" />

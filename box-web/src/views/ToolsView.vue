@@ -6,9 +6,10 @@
     :filtered="filtered.length"
     :loading="loading"
     :can-create="can(PermissionCodes.TOOL_CREATE)"
+    embedded
     @create="openCreate"
   >
-    <div v-if="filtered.length" class="resource-manage__list">
+    <div v-if="filtered.length" class="plugin-market__list">
       <resource-item-card
         v-for="item in filtered"
         :key="item.id"
@@ -18,18 +19,23 @@
         tone="stone"
       >
         <template #tags>
+          <t-tag size="small" variant="light" theme="success">工作空间</t-tag>
           <t-tag size="small" variant="light">{{ item.type || 'HTTP' }}</t-tag>
         </template>
         <template #meta>{{ item.toolKey }}{{ methodOf(item) ? ` · ${methodOf(item)}` : '' }}</template>
         <template #actions>
-          <t-space>
-            <t-button variant="text" theme="primary" :loading="testingId === item.id" @click="runTest(item.id)">
-              测试
-            </t-button>
-            <t-button v-if="can(PermissionCodes.TOOL_DELETE)" variant="text" theme="danger" @click="remove(item)">
-              删除
-            </t-button>
-          </t-space>
+          <t-button theme="primary" size="small" :loading="testingId === item.id" @click="runTest(item.id)">
+            测试
+          </t-button>
+          <t-button
+            v-if="can(PermissionCodes.TOOL_DELETE)"
+            variant="outline"
+            theme="default"
+            size="small"
+            @click="remove(item)"
+          >
+            删除
+          </t-button>
         </template>
       </resource-item-card>
     </div>

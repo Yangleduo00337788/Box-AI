@@ -1,19 +1,21 @@
 <template>
-  <article class="resource-item" :class="{ 'is-clickable': clickable }" @click="onClick">
-    <span class="resource-item__icon" :class="`resource-item__icon--${tone}`">
+  <article class="plugin-card" :class="{ 'is-clickable': clickable }" @click="onClick">
+    <span class="plugin-card__icon" :class="`plugin-card__icon--${tone}`">
       <t-icon :name="icon" size="22px" />
     </span>
-    <div class="resource-item__body">
-      <div class="resource-item__title-row">
-        <h3>{{ title }}</h3>
-        <slot name="tags" />
+    <div class="plugin-card__body">
+      <div class="plugin-card__title-row">
+        <h3 class="plugin-card__title">{{ title }}</h3>
+        <div v-if="$slots.tags" class="plugin-card__tags">
+          <slot name="tags" />
+        </div>
       </div>
-      <p>{{ description || '暂无描述' }}</p>
-      <div v-if="$slots.meta" class="resource-item__meta">
+      <p class="plugin-card__desc">{{ description || '暂无描述' }}</p>
+      <div v-if="$slots.meta" class="plugin-card__meta">
         <slot name="meta" />
       </div>
     </div>
-    <div v-if="$slots.actions" class="resource-item__actions" @click.stop>
+    <div v-if="$slots.actions" class="plugin-card__actions" @click.stop>
       <slot name="actions" />
     </div>
   </article>

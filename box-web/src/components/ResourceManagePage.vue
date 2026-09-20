@@ -1,6 +1,12 @@
 <template>
-  <div class="resource-manage-page">
-    <page-header :title="meta.title" :desc="meta.desc" :back-to="backTo" :back-label="backLabel">
+  <div class="resource-manage-page" :class="{ 'resource-manage-page--embedded': embedded }">
+    <page-header
+      v-if="!embedded"
+      :title="meta.title"
+      :desc="meta.desc"
+      :back-to="backTo"
+      :back-label="backLabel"
+    >
       <template #actions>
         <t-button v-if="canCreate" theme="primary" @click="emit('create')">
           <template #icon><t-icon name="add" /></template>
@@ -9,7 +15,7 @@
       </template>
     </page-header>
 
-    <nav class="resource-manage__tabs" aria-label="资源类型">
+    <nav v-if="!embedded" class="resource-manage__tabs" aria-label="资源类型">
       <router-link
         v-for="item in RESOURCE_MANAGE_CATEGORIES"
         :key="item.value"
@@ -22,25 +28,34 @@
       </router-link>
     </nav>
 
-    <div class="resource-manage__toolbar">
+    <div class="plugin-market__toolbar">
       <t-input
         :model-value="keyword"
         :placeholder="meta.searchPlaceholder"
         clearable
-        class="resource-manage__search"
+        class="plugin-market__search"
         @update:model-value="onKeyword"
       >
         <template #prefix-icon>
           <t-icon name="search" />
         </template>
       </t-input>
-      <t-tag variant="light" theme="primary">本空间共享</t-tag>
-      <span class="resource-manage__count">{{ countLabel }}</span>
+      <t-button v-if="embedded && canCreate" theme="primary" class="plugin-market__create" @click="emit('create')">
+        <template #icon><t-icon name="add" /></template>
+        {{ meta.createLabel }}
+      </t-button>
+      <span class="plugin-market__count">{{ countLabel }}</span>
     </div>
 
-    <t-loading :loading="loading" size="small">
-      <slot />
-    </t-loading>
+    <section class="plugin-market__section">
+      <div v-if="embedded" class="plugin-market__section-head">
+        <h2 class="plugin-market__section-title">{{ meta.label }}</h2>
+        <p class="plugin-market__section-desc">{{ meta.desc }}</p>
+      </div>
+      <t-loading :loading="loading" size="small" class="plugin-market__loading">
+        <slot />
+      </t-loading>
+    </section>
     <slot name="dialogs" />
   </div>
 </template>
@@ -58,6 +73,7 @@ const props = defineProps<{
   filtered: number
   loading?: boolean
   canCreate?: boolean
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -83,12 +99,7 @@ const meta = computed(() => {
   )
 })
 
-const countLabel = computed(() => {
-  if (props.keyword.trim() && props.filtered !== props.total) {
-    return `${props.filtered} / ${props.total}`
-  }
-  return `${props.total} 项`
-})
+const countLabel = computed(() => `${props.filtered} 个扩展`)
 
 function onKeyword(value: string | number) {
   emit('update:keyword', String(value ?? ''))

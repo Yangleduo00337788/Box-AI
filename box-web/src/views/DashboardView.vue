@@ -122,8 +122,8 @@ const stats = computed(() => {
 
 const quickActions = [
   { label: '创建智能体', action: 'create-agent' as const, icon: 'gesture-applause' },
-  { label: '创建工作流', path: '/workflows', icon: 'tree-square-dot-vertical' },
-  { label: '创建知识库', path: '/knowledge', icon: 'book' },
+  { label: '创建工作流', path: '/plugin-market?mine=workflows&create=1', icon: 'tree-square-dot-vertical' },
+  { label: '创建知识库', path: '/plugin-market?mine=knowledge&create=1', icon: 'book' },
   { label: '添加模型', path: '/models', icon: 'cpu' },
 ]
 

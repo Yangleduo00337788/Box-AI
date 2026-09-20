@@ -1,9 +1,23 @@
-/** 插件市场分类 → 工作空间资源管理路由 */
+/** 插件市场「我的」资源分类 */
+export const PLUGIN_MINE_CATEGORIES = ['workflows', 'knowledge', 'tools', 'mcp'] as const
+
+export type PluginMineCategory = (typeof PLUGIN_MINE_CATEGORIES)[number]
+
+export function isPluginMineCategory(value: string): value is PluginMineCategory {
+  return (PLUGIN_MINE_CATEGORIES as readonly string[]).includes(value)
+}
+
+export function pluginMarketMinePath(category: string, extra: Record<string, string> = {}): string {
+  const query = new URLSearchParams({ mine: category, ...extra })
+  return `/plugin-market?${query.toString()}`
+}
+
+/** 插件市场分类 → 工作空间「我的」资源 */
 export const PLUGIN_CATEGORY_MANAGE_PATHS: Record<string, string> = {
-  workflows: '/workflows',
-  knowledge: '/knowledge',
-  tools: '/tools',
-  mcp: '/mcp',
+  workflows: pluginMarketMinePath('workflows'),
+  knowledge: pluginMarketMinePath('knowledge'),
+  tools: pluginMarketMinePath('tools'),
+  mcp: pluginMarketMinePath('mcp'),
 }
 
 export const PLUGIN_CATEGORY_CREATE_LABELS: Record<string, string> = {
@@ -14,22 +28,27 @@ export const PLUGIN_CATEGORY_CREATE_LABELS: Record<string, string> = {
 }
 
 export function createPathForCategory(category: string): string | null {
-  const path = PLUGIN_CATEGORY_MANAGE_PATHS[category]
-  return path ? `${path}?create=1` : null
+  if (!isPluginMineCategory(category)) return null
+  return pluginMarketMinePath(category, { create: '1' })
 }
-
-const MANAGE_PATH_ENTRIES = Object.entries(PLUGIN_CATEGORY_MANAGE_PATHS)
 
 export function managePathForCategory(category: string): string | null {
   return PLUGIN_CATEGORY_MANAGE_PATHS[category] ?? null
 }
 
 export function categoryForManageRoute(path: string): string | null {
-  for (const [category, managePath] of MANAGE_PATH_ENTRIES) {
-    if (path === managePath || path.startsWith(`${managePath}/`)) {
-      return category
-    }
+  const normalized = path.split('?')[0] || path
+  try {
+    const url = new URL(path, 'http://local.invalid')
+    const mine = url.searchParams.get('mine')
+    if (mine && isPluginMineCategory(mine)) return mine
+  } catch {
+    /* ignore */
   }
+  if (normalized === '/workflows' || normalized.startsWith('/workflows/')) return 'workflows'
+  if (normalized === '/knowledge' || normalized.startsWith('/knowledge/')) return 'knowledge'
+  if (normalized === '/tools' || normalized.startsWith('/tools/')) return 'tools'
+  if (normalized === '/mcp' || normalized.startsWith('/mcp/')) return 'mcp'
   return null
 }
 
@@ -39,10 +58,10 @@ export function pluginMarketPathForCategory(category: string): string {
 
 export function pluginMarketPathForManageRoute(path: string): string {
   const category = categoryForManageRoute(path)
-  return category ? pluginMarketPathForCategory(category) : '/plugin-market'
+  return category ? pluginMarketMinePath(category) : '/plugin-market'
 }
 
-/** 已安装插件「打开」：工作流优先进编辑器，其余走 API targetPath 或资源列表 */
+/** 已安装插件「打开」：工作流优先进编辑器，其余进插件市场「我的」 */
 export function resolvePluginOpenPath(item: {
   category: string
   resourceId?: number
@@ -52,8 +71,8 @@ export function resolvePluginOpenPath(item: {
   if ((category === 'workflows' || category === 'workflow') && item.resourceId) {
     return `/workflows/${item.resourceId}/editor`
   }
-  if (item.targetPath) {
-    return item.targetPath
-  }
-  return managePathForCategory(item.category)
+  const minePath = managePathForCategory(item.category)
+  if (minePath) return minePath
+  if (item.targetPath) return item.targetPath
+  return null
 }
