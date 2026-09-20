@@ -15,6 +15,7 @@ export interface AdminPluginCatalogVO {
   manifestJson?: string
   status: string
   reviewStatus?: string
+  sourceType?: string
   visibility?: string
   tenantIdsJson?: string | null
   rolloutPercent?: number

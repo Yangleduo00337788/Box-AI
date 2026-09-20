@@ -1,6 +1,6 @@
 <template>
   <div class="plugin-catalog-page admin-page">
-    <page-header title="插件市场" desc="先审核再上架。C 端只展示已通过且上架的插件。" />
+    <page-header title="插件市场" desc="官方插件由平台管理员上架，全平台可用；工作空间插件由成员自行上传，仅本空间共享。" />
 
     <t-card :bordered="false" class="admin-tab-card">
       <t-tabs v-model="tab">
@@ -300,6 +300,12 @@ const pluginColumns: PrimaryTableCol<AdminPluginCatalogVO>[] = [
   { colKey: 'title', title: '标题', minWidth: 160 },
   { colKey: 'pluginCode', title: '编码', width: 140 },
   { colKey: 'category', title: '分类', width: 100, cell: (_, { row }) => categoryLabel(row.category) },
+  {
+    colKey: 'sourceType',
+    title: '来源',
+    width: 100,
+    cell: (_, { row }) => (row.sourceType === 'USER' ? '工作空间' : '官方'),
+  },
   { colKey: 'installCount', title: '安装数', width: 90 },
   {
     colKey: 'visibility',
@@ -340,13 +346,15 @@ const pluginColumns: PrimaryTableCol<AdminPluginCatalogVO>[] = [
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
-        h(Link, { theme: 'primary', hover: 'color', onClick: () => openRollout(row) }, () => '灰度'),
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openPluginEdit(row) }, () => '编辑'),
-        row.reviewStatus !== 'APPROVED'
+        row.sourceType !== 'USER' && row.reviewStatus !== 'APPROVED'
           ? h(Link, { theme: 'success', hover: 'color', onClick: () => reviewPlugin(row, 'APPROVED') }, () => '通过')
           : null,
-        row.reviewStatus !== 'REJECTED'
+        row.sourceType !== 'USER' && row.reviewStatus !== 'REJECTED'
           ? h(Link, { theme: 'danger', hover: 'color', onClick: () => reviewPlugin(row, 'REJECTED') }, () => '拒绝')
+          : null,
+        row.sourceType !== 'USER'
+          ? h(Link, { theme: 'primary', hover: 'color', onClick: () => openRollout(row) }, () => '灰度')
           : null,
         row.reviewStatus === 'APPROVED' && row.status !== 'LISTED'
           ? h(Link, { theme: 'primary', hover: 'color', onClick: () => listPlugin(row) }, () => '上架')
@@ -415,9 +423,8 @@ function buildManifestJson() {
     })
   }
   if (category === 'workflows') {
-    return JSON.stringify({
-      definitionJson: pluginForm.definitionJson.trim(),
-    })
+    const definition = pluginForm.definitionJson.trim()
+    return JSON.stringify(definition ? { definitionJson: definition } : {})
   }
   if (category === 'skills') {
     return JSON.stringify({
