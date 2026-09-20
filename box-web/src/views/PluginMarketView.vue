@@ -1,8 +1,19 @@
 <template>
   <div class="plugin-market">
-    <page-header title="插件市场" desc="发现插件与技能，扩展当前工作空间的工具、知识库、工作流和 MCP">
+    <page-header title="插件市场" desc="官方插件全平台可用。工作流、知识库、工具与 MCP 在本空间创建后全体成员共用。">
       <template #actions>
         <t-space>
+          <t-dropdown
+            v-if="createOptions.length"
+            :options="createOptions"
+            trigger="click"
+            @click="onManageSelect"
+          >
+            <t-button theme="primary">
+              新建
+              <template #suffix><t-icon name="chevron-down" /></template>
+            </t-button>
+          </t-dropdown>
           <t-button variant="outline" @click="router.push('/market')">智能体市场</t-button>
           <t-dropdown
             v-if="manageOptions.length"
@@ -73,6 +84,16 @@
           <span>已安装</span>
           <em>{{ installedCount }}</em>
         </button>
+        <button
+          type="button"
+          class="plugin-market__nav-item"
+          :class="{ 'is-active': isNavActive('workspace') }"
+          @click="selectWorkspace"
+        >
+          <t-icon name="root-list" />
+          <span>工作空间</span>
+          <em>{{ workspaceCount }}</em>
+        </button>
       </aside>
 
       <div class="plugin-market__main">
@@ -121,6 +142,10 @@
                   <div class="plugin-card__title-row">
                     <h3 class="plugin-card__title">{{ item.title }}</h3>
                     <t-tag v-if="item.installed" size="small" variant="light" theme="success">已安装</t-tag>
+                    <t-tag v-else-if="reviewLabel(item)" size="small" variant="light" :theme="reviewTheme(item)">
+                      {{ reviewLabel(item) }}
+                    </t-tag>
+                    <t-tag size="small" variant="light">{{ sourceLabel(item) }}</t-tag>
                   </div>
                   <p class="plugin-card__desc">{{ item.description || '暂无描述' }}</p>
                   <div class="plugin-card__meta">
@@ -129,7 +154,7 @@
                 </div>
                 <div class="plugin-card__actions" @click.stop>
                   <t-button
-                    v-if="!item.installed"
+                    v-if="canInstall(item)"
                     theme="primary"
                     variant="outline"
                     size="small"
@@ -138,9 +163,9 @@
                   >
                     安装
                   </t-button>
-                  <template v-else>
+                  <template v-else-if="item.installed">
                     <t-button
-                      v-if="item.targetPath"
+                      v-if="resolvePluginOpenPath(item)"
                       theme="primary"
                       size="small"
                       @click="openInstalled(item)"
@@ -165,7 +190,17 @@
           <div v-if="!categoriesLoading && !filteredPlugins.length" class="plugin-market__empty">
             <t-empty :description="emptyDescription">
               <template #action>
-                <t-button v-if="hasActiveFilters" variant="outline" @click="resetFilters">清除筛选</t-button>
+                <t-space>
+                  <t-button v-if="hasActiveFilters" variant="outline" @click="resetFilters">清除筛选</t-button>
+                  <t-dropdown
+                    v-if="createOptions.length"
+                    :options="createOptions"
+                    trigger="click"
+                    @click="onManageSelect"
+                  >
+                    <t-button theme="primary">新建</t-button>
+                  </t-dropdown>
+                </t-space>
               </template>
             </t-empty>
           </div>
@@ -199,12 +234,16 @@
             <dd>{{ categoryLabel(detailItem.category) || '—' }}</dd>
           </div>
           <div>
+            <dt>来源</dt>
+            <dd>{{ sourceLabel(detailItem) }}</dd>
+          </div>
+          <div>
             <dt>安装范围</dt>
             <dd>当前工作空间</dd>
           </div>
           <div>
             <dt>状态</dt>
-            <dd>{{ detailItem.installed ? '已安装，可在对应资源页使用' : '未安装' }}</dd>
+            <dd>{{ detailStatus(detailItem) }}</dd>
           </div>
         </dl>
         <p class="plugin-detail__hint">安装后会在工作空间创建对应资源，可随时从市场移除。</p>
@@ -212,15 +251,15 @@
       <template #footer>
         <t-space v-if="detailItem">
           <t-button
-            v-if="!detailItem.installed"
+            v-if="canInstall(detailItem)"
             theme="primary"
             :loading="actingId === detailItem.id"
             @click="handleInstall(detailItem)"
           >
             安装到工作空间
           </t-button>
-          <template v-else>
-            <t-button v-if="detailItem.targetPath" theme="primary" @click="openInstalled(detailItem)">
+          <template v-else-if="detailItem.installed">
+            <t-button v-if="detailItem && resolvePluginOpenPath(detailItem)" theme="primary" @click="openInstalled(detailItem)">
               打开
             </t-button>
             <t-button
@@ -235,6 +274,7 @@
         </t-space>
       </template>
     </t-drawer>
+
   </div>
 </template>
 
@@ -254,7 +294,14 @@ import {
 } from '@/api/plugin'
 import { extractApiError } from '@/api/apiError'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
-import { PLUGIN_CATEGORY_MANAGE_PATHS } from '@/constants/resourceRoutes'
+import { usePermission } from '@/composables/usePermission'
+import { PermissionCodes } from '@/constants/permissions'
+import {
+  PLUGIN_CATEGORY_CREATE_LABELS,
+  PLUGIN_CATEGORY_MANAGE_PATHS,
+  createPathForCategory,
+  resolvePluginOpenPath,
+} from '@/constants/resourceRoutes'
 
 const ALL_CATEGORY = ''
 const SKILLS_CATEGORY = 'skills'
@@ -277,6 +324,7 @@ type CatalogSection = {
 
 const route = useRoute()
 const router = useRouter()
+const { can } = usePermission()
 const loading = ref(false)
 const categoriesLoading = ref(false)
 const actingId = ref<number | null>(null)
@@ -285,6 +333,13 @@ const categories = ref<PluginCategoryVO[]>([])
 const keyword = ref('')
 const detailItem = ref<PluginCatalogVO | null>(null)
 const detailVisible = ref(false)
+
+const CREATE_PERMISSIONS: Record<string, string> = {
+  workflows: PermissionCodes.WORKFLOW_CREATE,
+  knowledge: PermissionCodes.KNOWLEDGE_CREATE,
+  tools: PermissionCodes.TOOL_CREATE,
+  mcp: PermissionCodes.TOOL_CREATE,
+}
 
 const pluginCategories = computed(() =>
   categories.value.filter((item) => item.value !== SKILLS_CATEGORY),
@@ -309,6 +364,7 @@ const activeCategory = computed(() => {
 })
 
 const installFilter = computed(() => (route.query.filter === 'installed' ? 'installed' : 'all'))
+const workspaceFilter = computed(() => route.query.filter === 'workspace')
 
 const discoverView = computed<DiscoverView>(() => {
   if (activeTab.value === 'skills') return 'skills'
@@ -324,6 +380,16 @@ const manageOptions = computed<DropdownOption[]>(() =>
     })),
 )
 
+const createOptions = computed<DropdownOption[]>(() =>
+  Object.entries(PLUGIN_CATEGORY_MANAGE_PATHS)
+    .filter(([category]) => categories.value.some((item) => item.value === category))
+    .filter(([category]) => can(CREATE_PERMISSIONS[category] || PermissionCodes.TOOL_CREATE))
+    .map(([category]) => ({
+      content: PLUGIN_CATEGORY_CREATE_LABELS[category] || `新建${category}`,
+      value: createPathForCategory(category) || '',
+    })),
+)
+
 const pluginCount = computed(
   () => plugins.value.filter((item) => item.category !== SKILLS_CATEGORY).length,
 )
@@ -333,18 +399,26 @@ const skillCount = computed(
 )
 
 const installedCount = computed(() => plugins.value.filter((item) => item.installed).length)
+const workspaceCount = computed(() => plugins.value.filter((item) => item.sourceType === 'USER').length)
 
 const hasActiveFilters = computed(
   () =>
     Boolean(keyword.value.trim()) ||
     installFilter.value !== 'all' ||
     Boolean(activeCategory.value) ||
-    discoverView.value !== 'all',
+    discoverView.value !== 'all' ||
+    workspaceFilter.value,
 )
 
 const filteredPlugins = computed(() => {
   const q = keyword.value.trim().toLowerCase()
   return plugins.value.filter((item) => {
+    if (workspaceFilter.value) {
+      if (item.sourceType !== 'USER') return false
+      if (!q) return true
+      const haystack = `${item.title} ${item.description || ''} ${categoryLabel(item.category)}`.toLowerCase()
+      return haystack.includes(q)
+    }
     if (installFilter.value === 'installed') {
       if (!item.installed) return false
       if (activeTab.value === 'skills' && item.category !== SKILLS_CATEGORY) return false
@@ -368,6 +442,7 @@ const catalogSections = computed<CatalogSection[]>(() => {
 
 const listTitle = computed(() => {
   if (keyword.value.trim()) return '搜索结果'
+  if (workspaceFilter.value) return '工作空间'
   if (installFilter.value === 'installed') return '已安装'
   if (activeTab.value === 'skills') return skillCategory.value?.label || '技能'
   if (activeCategory.value) return categoryLabel(activeCategory.value)
@@ -375,7 +450,7 @@ const listTitle = computed(() => {
 })
 
 const listDesc = computed(() => {
-  if (keyword.value.trim() || installFilter.value === 'installed') return ''
+  if (keyword.value.trim() || installFilter.value === 'installed' || workspaceFilter.value) return ''
   if (activeCategory.value) {
     return pluginCategories.value.find((item) => item.value === activeCategory.value)?.desc || ''
   }
@@ -389,8 +464,9 @@ const resultCountLabel = computed(() => {
 })
 
 const emptyDescription = computed(() => {
+  if (workspaceFilter.value) return '没有历史工作空间插件。请到「管理」中新建，创建后本空间成员共用'
   if (hasActiveFilters.value) return '没有匹配的扩展'
-  return '该分类暂无扩展'
+  return '暂无官方插件。工作流、知识库、工具与 MCP 请到「管理」中新建，创建后本空间成员共用'
 })
 
 function sortItems(items: PluginCatalogVO[]) {
@@ -398,6 +474,8 @@ function sortItems(items: PluginCatalogVO[]) {
 }
 
 function isNavActive(key: string) {
+  if (key === 'workspace') return workspaceFilter.value
+  if (workspaceFilter.value) return false
   if (key === 'installed') return installFilter.value === 'installed'
   if (installFilter.value === 'installed') return false
   if (key === 'skills') return activeTab.value === 'skills'
@@ -420,6 +498,36 @@ function toneOf(category: string) {
 
 function categoryLabel(value: string) {
   return categories.value.find((item) => item.value === value)?.label || ''
+}
+
+function sourceLabel(item: PluginCatalogVO) {
+  return item.sourceType === 'USER' ? '工作空间' : '官方'
+}
+
+function reviewLabel(item: PluginCatalogVO) {
+  if (item.reviewStatus === 'PENDING_REVIEW') return '待审核'
+  if (item.reviewStatus === 'REJECTED') return '已拒绝'
+  if (item.status === 'UNLISTED') return '已下架'
+  return ''
+}
+
+function reviewTheme(item: PluginCatalogVO) {
+  if (item.reviewStatus === 'REJECTED') return 'danger'
+  if (item.reviewStatus === 'PENDING_REVIEW') return 'warning'
+  return 'default'
+}
+
+function canInstall(item: PluginCatalogVO) {
+  if (item.installed) return false
+  if (item.reviewStatus === 'PENDING_REVIEW' || item.reviewStatus === 'REJECTED') return false
+  if (item.status === 'UNLISTED') return false
+  return true
+}
+
+function detailStatus(item: PluginCatalogVO) {
+  if (item.installed) return '已安装，可在对应资源页使用'
+  const review = reviewLabel(item)
+  return review || '未安装'
 }
 
 function onManageSelect(option: DropdownOption) {
@@ -457,6 +565,11 @@ function selectInstalled() {
   keyword.value = ''
   const query = activeTab.value === 'skills' ? marketQuery('skills', ALL_CATEGORY, { filter: 'installed' }) : { filter: 'installed' }
   router.replace({ path: '/plugin-market', query })
+}
+
+function selectWorkspace() {
+  keyword.value = ''
+  router.replace({ path: '/plugin-market', query: { filter: 'workspace' } })
 }
 
 async function loadCategories() {
@@ -504,8 +617,9 @@ function openDetail(item: PluginCatalogVO) {
 }
 
 function openInstalled(item: PluginCatalogVO) {
-  if (item.targetPath) {
-    router.push(item.targetPath)
+  const path = resolvePluginOpenPath(item)
+  if (path) {
+    router.push(path)
   }
 }
 

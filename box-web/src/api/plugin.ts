@@ -17,6 +17,9 @@ export interface PluginCatalogVO {
   resourceType?: string
   resourceId?: number
   targetPath?: string
+  sourceType?: string
+  status?: string
+  reviewStatus?: string
 }
 
 export function fetchPluginCategories() {
