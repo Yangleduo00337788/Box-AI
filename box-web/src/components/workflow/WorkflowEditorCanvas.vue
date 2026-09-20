@@ -1,22 +1,32 @@
 <template>
   <div class="editor__layout">
     <aside class="palette">
-      <h3>节点库</h3>
-      <p class="palette__hint">拖到右侧画布添加</p>
-      <div
-        v-for="item in PALETTE_ITEMS"
-        :key="item.type"
-        class="palette__item"
-        draggable="true"
-        @dragstart="onPaletteDragStart($event, item)"
-      >
-        <t-icon :name="item.icon" />
-        <span>{{ item.label }}</span>
-        <small>{{ item.type }}</small>
+      <div class="palette__head">
+        <h3>节点库</h3>
+        <p>单击添加，或拖到画布</p>
+      </div>
+      <div class="palette__scroll">
+        <section v-for="group in paletteGroups" :key="group.key" class="palette__group">
+          <h4>{{ group.label }}</h4>
+          <button
+            v-for="item in group.items"
+            :key="item.type"
+            type="button"
+            class="palette__item"
+            :class="{ 'is-disabled': isPaletteDisabled(item.type) }"
+            :disabled="isPaletteDisabled(item.type)"
+            draggable="true"
+            @click="onPaletteClick(item)"
+            @dragstart="onPaletteDragStart($event, item)"
+          >
+            <t-icon :name="item.icon" />
+            <span>{{ item.label }}</span>
+          </button>
+        </section>
       </div>
     </aside>
 
-    <div class="canvas-wrap">
+    <div ref="canvasWrapRef" class="canvas-wrap">
       <VueFlow
         v-model:nodes="nodes"
         v-model:edges="edges"
@@ -32,6 +42,7 @@
         :elevate-edges-on-select="true"
         :select-nodes-on-drag="false"
         :delete-key-code="null"
+        :connection-line-options="connectionLineOptions"
         fit-view-on-init
         @drop="onDrop"
         @dragover="onDragOver"
@@ -48,7 +59,10 @@
     </div>
 
     <aside v-if="selectedEdge" class="inspector">
-      <h3>连线配置</h3>
+      <div class="inspector__head">
+        <h3>连线</h3>
+        <t-button variant="text" theme="danger" size="small" @click="removeSelectedEdge">删除</t-button>
+      </div>
       <t-form label-align="top">
         <t-form-item label="起点">
           <t-input :value="edgeSourceLabel" disabled />
@@ -61,15 +75,22 @@
             {{ selectedEdge.sourceHandle === 'true' ? 'True 分支' : 'False 分支' }}
           </t-tag>
         </t-form-item>
-        <t-alert theme="info" message="按 Delete 或 Backspace 可删除此连线" />
-        <t-form-item>
-          <t-button theme="danger" variant="outline" block @click="removeSelectedEdge">删除连线</t-button>
-        </t-form-item>
       </t-form>
     </aside>
 
     <aside v-else-if="selectedNode?.data" class="inspector">
-      <h3>节点配置</h3>
+      <div class="inspector__head">
+        <h3>节点配置</h3>
+        <t-button
+          v-if="(selectedNode.data as WorkflowNodeData).nodeType !== 'Start'"
+          variant="text"
+          theme="danger"
+          size="small"
+          @click="removeSelectedNode"
+        >
+          删除
+        </t-button>
+      </div>
       <t-form label-align="top">
         <t-form-item label="显示名称">
           <t-input v-model="(selectedNode.data as WorkflowNodeData).label" />
@@ -321,6 +342,12 @@
         </t-form-item>
       </t-form>
     </aside>
+
+    <aside v-else class="inspector inspector--empty">
+      <t-icon name="edit-1" />
+      <p>选中节点或连线后在此配置</p>
+      <span>单击左侧节点添加到画布中心，也可拖到指定位置</span>
+    </aside>
   </div>
 </template>
 
@@ -348,8 +375,10 @@ import {
   defaultWorkflowDefinition,
   definitionToFlow,
   flowToDefinition,
-  PALETTE_ITEMS,
+  groupedPaletteItems,
   autoLayoutFlow,
+  styledFlowEdge,
+  FLOW_EDGE_COLOR,
   type WorkflowNodeData,
 } from '@/utils/workflowFlow'
 import { listAgents, type AgentVO } from '@/api/agent'
@@ -373,7 +402,11 @@ const variables = ref<WorkflowDefinition['variables']>([])
 const selectedNode = ref<any>(null)
 const selectedEdge = ref<Edge | null>(null)
 const draggedPalette = ref<{ type: string; label: string } | null>(null)
+const paletteDragging = ref(false)
+const canvasWrapRef = ref<HTMLElement | null>(null)
 const isDraggingNode = ref(false)
+
+const paletteGroups = groupedPaletteItems()
 
 const { screenToFlowCoordinate, onConnect, getSelectedNodes, getSelectedEdges, fitView } = useVueFlow()
 
@@ -387,11 +420,17 @@ const autoSave = useWorkflowAutoSave(
 )
 
 const nodeTypes = { workflow: markRaw(WorkflowFlowNode) } as NodeTypesObject
-const defaultEdgeOptions = {
-  type: 'smoothstep',
-  animated: true,
-  selectable: true,
-  focusable: true,
+const defaultEdgeOptions = styledFlowEdge({
+  source: '',
+  target: '',
+})
+
+const connectionLineOptions = {
+  type: 'default' as const,
+  style: {
+    stroke: FLOW_EDGE_COLOR,
+    strokeWidth: 2,
+  },
 }
 
 const knowledgeBaseOptions = ref<Array<{ label: string; value: number }>>([])
@@ -468,13 +507,9 @@ function selectNode(node: any) {
 onConnect((connection: Connection) => {
   recordBeforeChange()
   edges.value = addEdge(
-    {
+    styledFlowEdge({
       ...connection,
-      type: 'smoothstep',
-      animated: true,
-      selectable: true,
-      focusable: true,
-    },
+    }),
     edges.value,
   ) as any[]
   autoSave.scheduleAutoSave()
@@ -750,7 +785,53 @@ function getDefinitionJson() {
   return JSON.stringify(flowToDefinition(nodes.value, edges.value, variables.value))
 }
 
+function hasStartNode() {
+  return nodes.value.some((node) => (node.data as WorkflowNodeData | undefined)?.nodeType === 'Start')
+}
+
+function isPaletteDisabled(type: string) {
+  return type === 'Start' && hasStartNode()
+}
+
+function addNodeAt(type: string, label: string, position: { x: number; y: number }) {
+  if (type === 'Start' && hasStartNode()) {
+    MessagePlugin.warning('工作流只能有一个开始节点')
+    return
+  }
+  recordBeforeChange()
+  const node = createFlowNode(type, label, position)
+  nodes.value.push(node)
+  selectNode(node)
+  syncInspectorFromNode(node)
+  autoSave.scheduleAutoSave()
+}
+
+function addNodeAtCanvasCenter(item: { type: string; label: string }) {
+  const wrap = canvasWrapRef.value
+  const rect = wrap?.getBoundingClientRect()
+  const offset = (nodes.value.length % 6) * 20
+  const position = screenToFlowCoordinate({
+    x: (rect?.left ?? 0) + (rect?.width ?? 480) / 2 + offset,
+    y: (rect?.top ?? 0) + (rect?.height ?? 320) / 2 + offset,
+  })
+  addNodeAt(item.type, item.label, position)
+}
+
+function onPaletteClick(item: { type: string; label: string }) {
+  if (paletteDragging.value) {
+    paletteDragging.value = false
+    return
+  }
+  if (isPaletteDisabled(item.type)) return
+  addNodeAtCanvasCenter(item)
+}
+
 function onPaletteDragStart(event: DragEvent, item: { type: string; label: string }) {
+  if (isPaletteDisabled(item.type)) {
+    event.preventDefault()
+    return
+  }
+  paletteDragging.value = true
   draggedPalette.value = item
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
@@ -769,20 +850,10 @@ function onDrop(event: DragEvent) {
   event.preventDefault()
   const type = event.dataTransfer?.getData('application/vueflow') || draggedPalette.value?.type
   const label = draggedPalette.value?.label || type
-  if (!type || !label) return
-
-  const position = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
-
-  if (type === 'Start' && nodes.value.some((node) => (node.data as WorkflowNodeData | undefined)?.nodeType === 'Start')) {
-    MessagePlugin.warning('工作流只能有一个开始节点')
-    draggedPalette.value = null
-    return
-  }
-
-  recordBeforeChange()
-  nodes.value.push(createFlowNode(type, label, position))
+  paletteDragging.value = false
   draggedPalette.value = null
-  autoSave.scheduleAutoSave()
+  if (!type || !label) return
+  addNodeAt(type, label, screenToFlowCoordinate({ x: event.clientX, y: event.clientY }))
 }
 
 function onNodeClick(event: any) {
@@ -990,65 +1061,132 @@ defineExpose({
 <style scoped>
 .editor__layout {
   display: grid;
-  grid-template-columns: 200px 1fr auto;
-  gap: 16px;
+  grid-template-columns: 196px minmax(0, 1fr) 320px;
   height: 100%;
-  min-height: 560px;
+  min-height: 0;
+  background: var(--box-surface);
 }
 
 .palette,
 .inspector {
-  border: 1px solid var(--td-component-border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--td-bg-color-container);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--box-shell);
+  border-right: 1px solid var(--box-border);
+}
+
+.inspector {
+  border-right: 0;
+  border-left: 1px solid var(--box-border);
+  padding: 14px 16px;
   overflow: auto;
 }
 
-.palette h3,
-.inspector h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
+.palette__head,
+.inspector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 14px 12px 8px;
 }
 
-.palette__hint {
-  margin: 0 0 12px;
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
+.inspector__head {
+  padding: 0 0 12px;
+}
+
+.palette__head h3,
+.inspector h3 {
+  margin: 0;
+  font: var(--td-font-title-small);
+  color: var(--box-ink);
+}
+
+.palette__head p {
+  margin: 4px 0 0;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+}
+
+.palette__head {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.palette__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 10px 12px;
+}
+
+.palette__group + .palette__group {
+  margin-top: 12px;
+}
+
+.palette__group h4 {
+  margin: 0 0 6px;
+  padding: 0 4px;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+  letter-spacing: 0.04em;
 }
 
 .palette__item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 8px;
+  display: flex;
   align-items: center;
-  margin-bottom: 8px;
-  padding: 10px;
-  border: 1px dashed var(--td-component-border);
-  border-radius: 10px;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--box-ink);
+  font: var(--td-font-body-medium);
+  text-align: left;
   cursor: grab;
-  background: var(--td-bg-color-container-hover, #fafafa);
 }
 
-.palette__item small {
-  grid-column: 2;
-  font-size: 11px;
-  color: var(--td-text-color-placeholder);
+.palette__item :deep(.t-icon) {
+  color: var(--box-muted);
+}
+
+.palette__item:hover:not(:disabled) {
+  background: var(--box-hover);
+}
+
+.palette__item:disabled,
+.palette__item.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .canvas-wrap {
   position: relative;
-  border: 1px solid var(--td-component-border);
-  border-radius: 12px;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  min-height: 560px;
 }
 
 .canvas-wrap :deep(.vue-flow) {
   width: 100%;
   height: 100%;
-  min-height: 560px;
   background: var(--td-bg-color-page, #f5f5f5);
+}
+
+.canvas-wrap :deep(.vue-flow__edge-path),
+.canvas-wrap :deep(.vue-flow__connection-path) {
+  stroke: #c5c7c9;
+  stroke-width: 2;
+  fill: none;
+}
+
+.canvas-wrap :deep(.vue-flow__edge.animated .vue-flow__edge-path) {
+  stroke-dasharray: 36 10 !important;
+  animation: wf-edge-flow 1.6s linear infinite !important;
 }
 
 .canvas-wrap :deep(.vue-flow__edge.selected .vue-flow__edge-path),
@@ -1058,34 +1196,53 @@ defineExpose({
   stroke-width: 2.5;
 }
 
-.inspector {
-  width: 300px;
+.canvas-wrap :deep(.vue-flow__edge-text) {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #8a8f96;
 }
 
-@media (min-width: 1920px) {
+@keyframes wf-edge-flow {
+  to {
+    stroke-dashoffset: -46;
+  }
+}
+
+.canvas-wrap :deep(.vue-flow__minimap) {
+  overflow: hidden;
+  border: 1px solid var(--box-border);
+  border-radius: 10px;
+  box-shadow: var(--box-shadow-card);
+}
+
+.inspector--empty {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--box-muted);
+  padding: 24px 20px;
+}
+
+.inspector--empty :deep(.t-icon) {
+  font-size: 28px;
+}
+
+.inspector--empty p {
+  margin: 0;
+  font: var(--td-font-body-medium);
+  color: var(--box-ink);
+}
+
+.inspector--empty span {
+  max-width: 220px;
+  font: var(--td-font-body-small);
+  line-height: 1.5;
+}
+
+@media (max-width: 1080px) {
   .editor__layout {
-    grid-template-columns: 240px minmax(0, 1fr) 360px;
-    gap: 20px;
-    min-height: 720px;
-  }
-
-  .palette,
-  .inspector {
-    padding: 16px;
-  }
-
-  .canvas-wrap,
-  .canvas-wrap :deep(.vue-flow) {
-    min-height: 720px;
-  }
-
-  .canvas-wrap :deep(.vue-flow__minimap) {
-    width: 180px;
-    height: 120px;
-  }
-
-  .inspector {
-    width: 360px;
+    grid-template-columns: 168px minmax(0, 1fr) 280px;
   }
 }
 

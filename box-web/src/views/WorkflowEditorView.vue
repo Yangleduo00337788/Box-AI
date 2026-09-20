@@ -1,34 +1,43 @@
 <template>
-  <div class="editor">
+  <div class="editor box-hide-scrollbar">
     <header class="editor__header">
       <t-button variant="text" shape="square" @click="router.push('/workflows')">
         <template #icon><t-icon name="chevron-left" /></template>
       </t-button>
-      <div>
+      <div class="editor__title">
         <h1>{{ workflow?.name || '工作流编辑器' }}</h1>
-        <p>拖拽节点连线 · 点击连线后 Delete 删除 · Ctrl+Z / Ctrl+Y 撤销重做 · 拖拽后自动保存</p>
+        <p>
+          <span v-if="autoSaveStatusLabel" class="autosave-status" :class="`autosave-status--${autoSaveStatus}`">
+            {{ autoSaveStatusLabel }}
+          </span>
+          <span v-else>单击或拖拽左侧节点到画布 · Delete 删除 · Ctrl+Z 撤销</span>
+        </p>
       </div>
-      <t-space>
-        <t-button variant="outline" :disabled="!canUndo" @click="onUndo">
-          <template #icon><t-icon name="rollback" /></template>
-          撤销
-        </t-button>
-        <t-button variant="outline" :disabled="!canRedo" @click="onRedo">
-          <template #icon><t-icon name="rollfront" /></template>
-          重做
-        </t-button>
-        <t-button variant="outline" @click="onAutoLayout">自动布局</t-button>
-        <span v-if="autoSaveStatusLabel" class="autosave-status" :class="`autosave-status--${autoSaveStatus}`">
-          {{ autoSaveStatusLabel }}
-        </span>
+      <div class="editor__actions">
+        <t-tooltip content="撤销 Ctrl+Z">
+          <t-button variant="outline" shape="square" :disabled="!canUndo" @click="onUndo">
+            <template #icon><t-icon name="rollback" /></template>
+          </t-button>
+        </t-tooltip>
+        <t-tooltip content="重做 Ctrl+Y">
+          <t-button variant="outline" shape="square" :disabled="!canRedo" @click="onRedo">
+            <template #icon><t-icon name="rollfront" /></template>
+          </t-button>
+        </t-tooltip>
+        <t-tooltip content="自动布局">
+          <t-button variant="outline" shape="square" @click="onAutoLayout">
+            <template #icon><t-icon name="view-module" /></template>
+          </t-button>
+        </t-tooltip>
         <t-button variant="outline" :loading="validating" @click="validate">校验</t-button>
         <t-button variant="outline" :loading="running" @click="runDebug">调试</t-button>
         <t-button variant="outline" @click="openPublish">发布</t-button>
         <t-button theme="primary" :loading="saving" @click="save">保存</t-button>
-      </t-space>
+      </div>
     </header>
 
-    <t-loading :loading="loading" size="small" class="editor__body">
+    <div class="editor__body">
+    <t-loading :loading="loading" size="small" class="editor__loading">
       <Suspense>
         <WorkflowEditorCanvas
           v-if="workflowId"
@@ -42,6 +51,7 @@
         </template>
       </Suspense>
     </t-loading>
+    </div>
 
     <t-drawer v-model:visible="debugVisible" header="调试结果" size="560px" :footer="false">
       <template v-if="debugResult">
@@ -125,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
@@ -389,49 +399,71 @@ watch(
   },
   { immediate: true },
 )
+
+onMounted(() => {
+  document.documentElement.classList.add('wf-editor-no-scrollbar')
+})
+
+onUnmounted(() => {
+  document.documentElement.classList.remove('wf-editor-no-scrollbar')
+})
 </script>
 
 <style scoped>
 .editor {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 96px);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
-@media (min-width: 1920px) {
-  .editor {
-    height: calc(100vh - 72px);
-  }
+.editor,
+.editor :deep(*) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
 
-  .editor__header h1 {
-    font-size: 20px;
-  }
-
-  .editor__fallback {
-    min-height: 720px;
-  }
+.editor :deep(*::-webkit-scrollbar) {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .editor__header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--td-component-border);
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--box-border);
+}
+
+.editor__title {
+  min-width: 0;
 }
 
 .editor__header h1 {
   margin: 0;
-  font-size: 18px;
+  font: var(--td-font-title-medium);
+  color: var(--box-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor__header p {
-  margin: 4px 0 0;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
+  margin: 2px 0 0;
+  color: var(--box-muted);
+  font: var(--td-font-body-small);
 }
 
-.editor__header :deep(.t-space) {
+.editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   margin-left: auto;
 }
 
@@ -440,18 +472,23 @@ watch(
   min-height: 0;
 }
 
+.editor__loading,
+.editor__loading :deep(.t-loading),
+.editor__loading :deep(.t-loading__parent) {
+  height: 100%;
+}
+
 .editor__fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 560px;
-  color: var(--td-text-color-secondary);
+  height: 100%;
+  min-height: 320px;
+  color: var(--box-muted);
 }
 
 .autosave-status {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-  min-width: 72px;
+  font: var(--td-font-body-small);
 }
 
 .autosave-status--pending,

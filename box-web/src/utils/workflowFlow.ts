@@ -1,6 +1,54 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { WorkflowDefinition } from '@/api/workflow'
 
+export const FLOW_EDGE_COLOR = '#c5c7c9'
+
+export function branchLabelFromHandle(sourceHandle?: string | null, explicit?: string | null) {
+  const custom = explicit?.trim()
+  if (custom) return custom
+  if (!sourceHandle) return undefined
+  const handle = sourceHandle.trim().toLowerCase()
+  if (handle === 'true') return 'True'
+  if (handle === 'false') return 'False'
+  if (handle === 'body') return '循环体'
+  if (handle === 'next') return '完成后'
+  if (handle === 'default') return '默认'
+  if (handle.startsWith('branch-')) {
+    const index = Number(handle.slice(7))
+    return Number.isFinite(index) ? `分支 ${index + 1}` : sourceHandle
+  }
+  return sourceHandle
+}
+
+export function styledFlowEdge<T extends Partial<Edge> & { source: string; target: string }>(edge: T): T {
+  const label = branchLabelFromHandle(
+    edge.sourceHandle,
+    typeof edge.label === 'string' ? edge.label : undefined,
+  )
+  return {
+    ...edge,
+    type: 'default',
+    animated: true,
+    selectable: edge.selectable !== false,
+    focusable: edge.focusable !== false,
+    label,
+    style: {
+      stroke: FLOW_EDGE_COLOR,
+      strokeWidth: 2,
+    },
+    labelStyle: {
+      fill: '#8a8f96',
+      fontSize: 11,
+      fontWeight: 600,
+    },
+    labelBgStyle: {
+      fill: '#f7f7f5',
+    },
+    labelBgPadding: [6, 3] as [number, number],
+    labelBgBorderRadius: 4,
+  }
+}
+
 export interface WorkflowNodeData {
   label: string
   nodeType: string
@@ -26,6 +74,23 @@ export const PALETTE_ITEMS = [
   { type: 'Parallel', label: '并行', icon: 'fork' },
   { type: 'Output', label: '输出', icon: 'logout' },
 ] as const
+
+export const PALETTE_GROUPS: Array<{ key: string; label: string; types: string[] }> = [
+  { key: 'basic', label: '基础', types: ['Start', 'Output'] },
+  { key: 'ai', label: '智能', types: ['LLM', 'Agent', 'Knowledge'] },
+  { key: 'io', label: '集成', types: ['HTTP', 'Webhook', 'Tool', 'SubWorkflow'] },
+  { key: 'flow', label: '流程', types: ['Condition', 'Switch', 'Loop', 'Parallel', 'Delay'] },
+  { key: 'data', label: '数据', types: ['Variable', 'Template', 'Code'] },
+]
+
+export function groupedPaletteItems() {
+  return PALETTE_GROUPS.map((group) => ({
+    ...group,
+    items: group.types
+      .map((type) => PALETTE_ITEMS.find((item) => item.type === type))
+      .filter((item): item is (typeof PALETTE_ITEMS)[number] => Boolean(item)),
+  }))
+}
 
 export function defaultWorkflowDefinition(): WorkflowDefinition {
   return {
@@ -72,18 +137,16 @@ export function definitionToFlow(definition: WorkflowDefinition): { nodes: Node[
     },
   }))
 
-  const edges: Edge[] = (definition.edges || []).map((edge, index) => ({
-    id: edge.id || `edge-${index}-${edge.source}-${edge.target}`,
-    source: edge.source,
-    target: edge.target,
-    sourceHandle: edge.sourceHandle,
-    targetHandle: edge.targetHandle,
-    label: edge.label,
-    animated: true,
-    type: 'smoothstep',
-    selectable: true,
-    focusable: true,
-  }))
+  const edges: Edge[] = (definition.edges || []).map((edge, index) =>
+    styledFlowEdge({
+      id: edge.id || `edge-${index}-${edge.source}-${edge.target}`,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      label: edge.label,
+    }),
+  )
 
   return { nodes, edges }
 }

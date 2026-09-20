@@ -97,6 +97,9 @@ const contentPadded = computed(() => {
   if (route.path.startsWith('/settings')) {
     return false
   }
+  if (route.name === 'workflow-editor') {
+    return false
+  }
   return route.name !== 'agent-builder'
 })
 
