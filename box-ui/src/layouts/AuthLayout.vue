@@ -8,9 +8,8 @@
 
     <div class="auth-shell">
       <portal-badge v-if="portalLabel" :label="portalLabel" :theme="portalTheme" />
-      <brand-wordmark v-if="showBrand" size="lg" class="auth-brand" />
-      <p v-if="slogan" class="auth-slogan" :class="{ 'auth-slogan--compact': !showBrand }">{{ slogan }}</p>
-      <img v-if="showMascot" :src="logoMascot" alt="" class="auth-mascot" :class="{ 'auth-mascot--lead': !showBrand }" />
+      <img v-if="showMascot" :src="logoMascot" alt="" class="auth-mascot" />
+      <p v-if="slogan" class="auth-slogan">{{ slogan }}</p>
 
       <div class="auth-card">
         <slot />
@@ -22,7 +21,6 @@
 </template>
 
 <script setup lang="ts">
-import BrandWordmark from '../components/BrandWordmark.vue'
 import PortalBadge from '../components/PortalBadge.vue'
 import logoMascot from '../assets/logo-mascot.png'
 
@@ -30,14 +28,12 @@ withDefaults(
   defineProps<{
     slogan?: string
     showMascot?: boolean
-    showBrand?: boolean
     portalLabel?: string
     portalTheme?: 'consumer' | 'enterprise' | 'personal' | 'admin'
   }>(),
   {
     slogan: '把模型、知识、工具、工作流装进一个 Box',
     showMascot: true,
-    showBrand: true,
     portalTheme: 'consumer',
   },
 )
@@ -102,13 +98,6 @@ withDefaults(
   max-width: 520px;
 }
 
-.auth-brand {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 12px;
-  background: transparent;
-}
-
 .auth-slogan {
   margin: 0 0 20px;
   text-align: center;
@@ -122,25 +111,15 @@ withDefaults(
   -webkit-font-smoothing: antialiased;
 }
 
-.auth-slogan--compact {
-  margin-top: 0;
-  margin-bottom: 16px;
-}
-
 .auth-mascot {
   display: block;
   width: min(160px, 50vw);
   height: auto;
-  margin: 0 auto 20px;
+  margin: 0 auto 12px;
   background: transparent;
   object-fit: contain;
   -webkit-user-drag: none;
   user-select: none;
-}
-
-.auth-mascot--lead {
-  width: min(140px, 42vw);
-  margin-bottom: 16px;
 }
 
 .auth-card {
