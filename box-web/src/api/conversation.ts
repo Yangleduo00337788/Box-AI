@@ -114,6 +114,7 @@ export async function sendMessageStream(
     onToolConfirm?: (payload: ChatToolConfirmPayload) => void
     platformModelId?: number
     toolConfirmationToken?: string
+    pluginIds?: number[]
   },
 ): Promise<void> {
   const payload: {
@@ -121,6 +122,7 @@ export async function sendMessageStream(
     stream: boolean
     platformModelId?: number
     toolConfirmationToken?: string
+    pluginIds?: number[]
   } = {
     message,
     stream: true,
@@ -130,6 +132,9 @@ export async function sendMessageStream(
   }
   if (options?.toolConfirmationToken) {
     payload.toolConfirmationToken = options.toolConfirmationToken
+  }
+  if (options?.pluginIds?.length) {
+    payload.pluginIds = options.pluginIds
   }
   const response = await fetch(`/api/v1/conversations/${id}/messages`, {
     method: 'POST',

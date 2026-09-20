@@ -38,8 +38,9 @@ withDefaults(
   box-shadow: none;
 }
 
-/* 白框：独立圆角卡片，略宽于下方灰条 */
-.chat-composer-stack__panel :deep(.box-chat-sender__input .t-chat-sender__textarea) {
+/* 白框：独立圆角卡片，略宽于下方灰条（无插件时边框在 textarea 上） */
+.chat-composer-stack__panel
+  :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea) {
   padding: 16px 18px 14px;
   border: 1px solid var(--box-composer-border);
   border-radius: var(--box-composer-radius);
@@ -47,12 +48,50 @@ withDefaults(
   box-shadow: var(--box-composer-shadow);
 }
 
-.chat-composer-stack__panel :deep(.box-chat-sender__input .t-chat-sender__textarea:hover),
-.chat-composer-stack__panel :deep(.box-chat-sender__input .t-chat-sender__textarea--focus),
-.chat-composer-stack__panel :deep(.box-chat-sender__input .t-chat-sender__textarea--focus:hover) {
+.chat-composer-stack__panel
+  :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea:hover),
+.chat-composer-stack__panel
+  :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea--focus),
+.chat-composer-stack__panel
+  :deep(
+    .box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea--focus:hover
+  ) {
   border-color: var(--box-composer-border);
   background: var(--box-surface);
   box-shadow: var(--box-composer-shadow);
+}
+
+/* 有插件：仅外层一层卡片，内层输入区不再套框 */
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins) {
+  padding: 14px 18px 14px;
+  border: 1px solid var(--box-composer-border);
+  border-radius: var(--box-composer-radius);
+  background: var(--box-surface);
+  box-shadow: var(--box-composer-shadow);
+}
+
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__content) {
+  padding: 0;
+}
+
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea__wrapper) {
+  padding: 0;
+}
+
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea:hover),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea--focus),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea--focus:hover) {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-textarea__inner) {
+  min-height: 28px;
+  padding: 0;
 }
 
 .chat-composer-stack__panel :deep(.t-textarea__inner) {
@@ -83,8 +122,13 @@ withDefaults(
 }
 
 @media (max-width: 640px) {
-  .chat-composer-stack__panel :deep(.box-chat-sender__input .t-chat-sender__textarea) {
+  .chat-composer-stack__panel
+    :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea) {
     padding: 14px 14px 12px;
+  }
+
+  .chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins) {
+    padding: 12px 14px 12px;
   }
 
   .chat-composer-stack__agent-rail {

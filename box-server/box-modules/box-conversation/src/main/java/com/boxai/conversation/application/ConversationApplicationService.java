@@ -61,6 +61,7 @@ public class ConversationApplicationService {
     private final WorkspacePermissionService workspacePermissionService;
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
     private final ChatProjectApplicationService chatProjectApplicationService;
+    private final MessagePluginContextService messagePluginContextService;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
 
@@ -74,6 +75,7 @@ public class ConversationApplicationService {
                                           WorkspacePermissionService workspacePermissionService,
                                           AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
                                           ChatProjectApplicationService chatProjectApplicationService,
+                                          MessagePluginContextService messagePluginContextService,
                                           PlatformTransactionManager transactionManager,
                                           ObjectMapper objectMapper) {
         this.conversationRepository = conversationRepository;
@@ -86,6 +88,7 @@ public class ConversationApplicationService {
         this.workspacePermissionService = workspacePermissionService;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
         this.chatProjectApplicationService = chatProjectApplicationService;
+        this.messagePluginContextService = messagePluginContextService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.objectMapper = objectMapper;
     }
@@ -180,7 +183,8 @@ public class ConversationApplicationService {
     public SendMessageVO sendMessage(Long id, SendMessageRequest request) {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Conversation conversation = requireConversation(id);
-        String content = request.message().trim();
+        MessagePluginContextService.EnrichedMessage outgoing = resolveOutgoingMessage(request);
+        String content = outgoing.content();
         AgentVersion draft = agentVersionRepository.findLatestDraft(conversation.getAgentId()).orElse(null);
         Execution execution = executionRecorder.startAgentExecution(
                 conversation.getAgentId(),
@@ -198,7 +202,7 @@ public class ConversationApplicationService {
                 retrieval);
         executionRecorder.recordRagSpan(execution, Map.of("query", content), retrieval.citations());
         agentChatExecutor.assertQuotaAvailable();
-        Message userMessage = appendMessage(conversation, "USER", content, null);
+        Message userMessage = appendMessage(conversation, "USER", content, null, outgoing.metadataJson());
         try {
             String assistantContent = agentChatExecutor.chat(prepared, execution);
             executionRecorder.recordLlmSpan(execution, content, Map.of("content", assistantContent));
@@ -223,7 +227,8 @@ public class ConversationApplicationService {
     public SseEmitter streamMessage(Long id, SendMessageRequest request, HttpServletResponse response) {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Conversation conversation = requireConversation(id);
-        String content = request.message().trim();
+        MessagePluginContextService.EnrichedMessage outgoing = resolveOutgoingMessage(request);
+        String content = outgoing.content();
         AgentVersion draft = agentVersionRepository.findLatestDraft(conversation.getAgentId()).orElse(null);
         KnowledgeRetrievalResult retrieval = draft == null
                 ? KnowledgeRetrievalResult.empty()
@@ -236,7 +241,7 @@ public class ConversationApplicationService {
                 retrieval);
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
-        appendMessage(conversation, "USER", content, null);
+        appendMessage(conversation, "USER", content, null, outgoing.metadataJson());
         maybeUpdateTitle(conversation, content);
         updateConversationMeta(conversation, 1);
         Long conversationId = conversation.getId();
@@ -257,6 +262,16 @@ public class ConversationApplicationService {
             executionRecorder.succeed(execution, toOutputJson(assistantContent), estimateTokens(assistantContent));
             captureLongTermMemory(draft, fresh, content, assistantContent);
         }), execution.getId(), citationsJson, execution);
+    }
+
+    private MessagePluginContextService.EnrichedMessage resolveOutgoingMessage(SendMessageRequest request) {
+        String raw = request.message() == null ? "" : request.message().trim();
+        List<Long> pluginIds = request.pluginIds();
+        boolean hasPlugins = pluginIds != null && !pluginIds.isEmpty();
+        if (raw.isBlank() && !hasPlugins) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "消息不能为空");
+        }
+        return messagePluginContextService.enrich(workspaceId(), raw, pluginIds);
     }
 
     private PreparedAgentChat buildPreparedChat(Conversation conversation,

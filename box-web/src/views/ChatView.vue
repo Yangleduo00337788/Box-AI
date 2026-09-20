@@ -20,11 +20,14 @@
           :auto-hint="autoModelHint"
           v-model:selected-model-key="selectedModelKey"
           :attachment-items="composerAttachmentItems"
+          :selected-plugins="composerPlugins"
           @send="onComposerSend"
           @stop="stopGeneration"
           @toggle-voice="toggleVoiceInput"
           @remove-attachment="removeComposerAttachment"
           @file-change="onFileSelected"
+          @pick-plugin="onComposerPluginPick"
+          @remove-plugin="onComposerPluginRemove"
         />
         <template #agent>
           <chat-agent-rail />
@@ -135,10 +138,13 @@
           :auto-hint="autoModelHint"
           v-model:selected-model-key="selectedModelKey"
           :attachment-items="composerAttachmentItems"
+          :selected-plugins="composerPlugins"
           @send="onComposerSend"
           @stop="stopGeneration"
           @remove-attachment="removeComposerAttachment"
           @file-change="onFileSelected"
+          @pick-plugin="onComposerPluginPick"
+          @remove-plugin="onComposerPluginRemove"
         />
       </chat-composer-stack>
 
@@ -189,6 +195,7 @@ import { extractApiError } from '@/api/apiError'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { uploadImageAsset } from '@/api/asset'
+import type { PluginCatalogVO } from '@/api/plugin'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { useChatSuggestions, type ChatSuggestion } from '@/composables/useChatSuggestions'
@@ -237,6 +244,7 @@ const { suggestions, loading: suggestionsLoading, refresh: refreshSuggestions } 
 const chatting = ref(false)
 const composerText = ref('')
 const composerAttachments = ref<ComposerAttachment[]>([])
+const composerPlugins = ref<PluginCatalogVO[]>([])
 const messages = ref<MessageVO[]>([])
 const chatListRef = ref<InstanceType<typeof BoxChatMessageList> | null>(null)
 const listening = ref(false)
@@ -350,6 +358,8 @@ const latestExecution = ref<ExecutionVO | null>(null)
 
 const agentAvatarColor = computed(() => getAvatarColor(selectedAgent.value?.name || 'Box'))
 
+const pluginsReady = computed(() => composerPlugins.value.length > 0)
+
 const attachmentsReady = computed(() =>
   composerAttachments.value.some(
     (item) => !item.uploading && (item.kind === 'text' ? !!item.textContent : !!item.remoteUrl),
@@ -369,14 +379,17 @@ const composerAttachmentItems = computed<TdAttachmentItem[]>(() =>
 
 const canSendNewChat = computed(
   () =>
-    (!!composerText.value.trim() || attachmentsReady.value) &&
+    (!!composerText.value.trim() || attachmentsReady.value || pluginsReady.value) &&
     !chatting.value &&
     !attachmentsUploading.value &&
     !!selectedAgent.value,
 )
 
 const canSendMessage = computed(
-  () => (!!composerText.value.trim() || attachmentsReady.value) && !chatting.value && !attachmentsUploading.value,
+  () =>
+    (!!composerText.value.trim() || attachmentsReady.value || pluginsReady.value) &&
+    !chatting.value &&
+    !attachmentsUploading.value,
 )
 
 const BRAND_SUGGESTION_TITLES = new Set(['box', 'coze', '扣子', '盒子'])
@@ -671,6 +684,7 @@ async function startNewChat(text: string) {
     await sendChat(id, prompt)
     composerText.value = ''
     clearComposerAttachments()
+    clearComposerPlugins()
   } catch (error) {
     MessagePlugin.error(extractApiError(error, '创建对话失败'))
   } finally {
@@ -682,7 +696,8 @@ async function sendChat(id?: number, preset?: string) {
   const targetId = id ?? conversationId.value
   if (!targetId) return
   const text = (preset ?? buildComposerPayload()).trim()
-  if (!text || chatting.value) return
+  const pluginIds = composerPlugins.value.map((item) => item.id)
+  if ((!text && !pluginIds.length) || chatting.value) return
 
   const platformModelId = resolvePlatformModelId()
   if (modelPickerEnabled.value && platformModelId == null) {
@@ -705,6 +720,7 @@ async function sendChat(id?: number, preset?: string) {
   })
   composerText.value = ''
   clearComposerAttachments()
+  clearComposerPlugins()
   await scrollChatToBottom()
 
   try {
@@ -725,6 +741,7 @@ async function sendChat(id?: number, preset?: string) {
     }, {
       signal: controller.signal,
       platformModelId,
+      pluginIds: pluginIds.length ? pluginIds : undefined,
       onCitations: (citations) => applyStreamCitations(assistantIndex, citations),
       onDone: (executionId) => {
         requestQuotaRefresh()
@@ -860,10 +877,31 @@ function clearComposerAttachments() {
   composerAttachments.value = []
 }
 
+function clearComposerPlugins() {
+  composerPlugins.value = []
+}
+
 function removeComposerAttachment(id: string) {
   const current = composerAttachments.value.find((item) => item.id === id)
   if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
   composerAttachments.value = composerAttachments.value.filter((item) => item.id !== id)
+}
+
+function onComposerPluginPick(plugin: PluginCatalogVO) {
+  const index = composerPlugins.value.findIndex((item) => item.id === plugin.id)
+  if (index >= 0) {
+    composerPlugins.value.splice(index, 1)
+    return
+  }
+  if (composerPlugins.value.length >= 8) {
+    MessagePlugin.warning('单次消息最多启用 8 个插件')
+    return
+  }
+  composerPlugins.value.push(plugin)
+}
+
+function onComposerPluginRemove(pluginId: number) {
+  composerPlugins.value = composerPlugins.value.filter((item) => item.id !== pluginId)
 }
 
 async function onFileSelected(event: Event) {

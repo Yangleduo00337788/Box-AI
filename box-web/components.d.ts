@@ -16,6 +16,7 @@ declare module 'vue' {
     BrandWordmark: typeof import('./src/components/BrandWordmark.vue')['default']
     ChatAgentRail: typeof import('./src/components/ChatAgentRail.vue')['default']
     ChatBrandHero: typeof import('./src/components/ChatBrandHero.vue')['default']
+    ChatComposerPlusMenu: typeof import('./src/components/ChatComposerPlusMenu.vue')['default']
     ChatComposerStack: typeof import('./src/components/ChatComposerStack.vue')['default']
     ChatMarkdown: typeof import('./src/components/ChatMarkdown.vue')['default']
     ChatMessageFeedbackDialog: typeof import('./src/components/ChatMessageFeedbackDialog.vue')['default']
