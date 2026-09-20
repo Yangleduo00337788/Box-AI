@@ -33,7 +33,7 @@ const config = computed(() => {
     description: '暂无资源',
     createLabel: '新建',
     marketLabel: '浏览模板',
-    hint: '可从空白创建，或前往插件市场安装模板',
+    hint: '创建后本工作空间成员共用，或前往插件市场安装模板',
   }
 })
 

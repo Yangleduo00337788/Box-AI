@@ -1,45 +1,60 @@
 <template>
-  <div>
-    <page-header
-      title="知识库"
-      desc="上传文档、自动分块并建立向量索引，供 Agent RAG 检索"
-      :back-to="backTo"
-      :back-label="backLabel"
-    >
-      <template #actions>
-        <t-button v-if="can(PermissionCodes.KNOWLEDGE_CREATE)" theme="primary" @click="openCreate">
-          <template #icon><t-icon name="add" /></template>
-          新建知识库
-        </t-button>
-      </template>
-    </page-header>
-
-    <t-loading :loading="loading" size="small">
-      <t-table v-if="items.length" row-key="id" :data="items" :columns="columns" :bordered="true" stripe hover>
-        <template #op="{ row }">
+  <resource-manage-page
+    category="knowledge"
+    v-model:keyword="keyword"
+    :total="items.length"
+    :filtered="filtered.length"
+    :loading="loading"
+    :can-create="can(PermissionCodes.KNOWLEDGE_CREATE)"
+    @create="openCreate"
+  >
+    <div v-if="filtered.length" class="resource-manage__list">
+      <resource-item-card
+        v-for="item in filtered"
+        :key="item.id"
+        :title="item.name"
+        :description="item.description"
+        icon="folder"
+        tone="sky"
+        clickable
+        @click="openDetail(item)"
+      >
+        <template #tags>
+          <t-tag size="small" variant="light">{{ item.status || 'READY' }}</t-tag>
+        </template>
+        <template #meta>{{ item.documentCount ?? 0 }} 篇文档 · {{ item.chunkCount ?? 0 }} 个分块</template>
+        <template #actions>
           <t-space>
-            <t-button variant="text" theme="primary" @click="openDetail(row)">文档</t-button>
-            <t-button v-if="can(PermissionCodes.KNOWLEDGE_UPDATE)" variant="text" @click="openEdit(row)">编辑</t-button>
-            <t-button v-if="can(PermissionCodes.KNOWLEDGE_DELETE)" variant="text" theme="danger" @click="remove(row)">删除</t-button>
+            <t-button variant="text" theme="primary" @click="openDetail(item)">文档</t-button>
+            <t-button v-if="can(PermissionCodes.KNOWLEDGE_UPDATE)" variant="text" @click="openEdit(item)">编辑</t-button>
+            <t-button v-if="can(PermissionCodes.KNOWLEDGE_DELETE)" variant="text" theme="danger" @click="remove(item)">
+              删除
+            </t-button>
           </t-space>
         </template>
-      </t-table>
-      <resource-manage-empty v-else category="knowledge" @create="openCreate" />
-    </t-loading>
+      </resource-item-card>
+    </div>
+    <t-empty v-else-if="keyword.trim()" description="没有匹配的知识库" />
+    <resource-manage-empty v-else-if="!loading" category="knowledge" @create="openCreate" />
 
+    <template #dialogs>
     <t-dialog
       v-model:visible="formVisible"
       :header="editingKb ? '编辑知识库' : '新建知识库'"
-      :footer="false"
       width="480px"
+      :confirm-btn="{ content: editingKb ? '保存' : '创建', loading: saving }"
+      :close-on-overlay-click="false"
+      @confirm="submitForm"
     >
-      <t-form :data="form" label-align="top" @submit="submitForm">
-        <t-form-item label="名称"><t-input v-model="form.name" maxlength="128" /></t-form-item>
-        <t-form-item label="描述"><t-textarea v-model="form.description" :autosize="{ minRows: 2, maxRows: 4 }" /></t-form-item>
-        <t-form-item>
-          <t-button theme="primary" type="submit" :loading="saving">
-            {{ editingKb ? '保存' : '创建' }}
-          </t-button>
+      <p v-if="!editingKb" class="resource-create-hint">创建后本工作空间成员均可检索和使用。</p>
+      <t-form :data="form" label-align="top">
+        <t-form-item label="名称"><t-input v-model="form.name" maxlength="128" placeholder="例如：产品手册" /></t-form-item>
+        <t-form-item label="描述">
+          <t-textarea
+            v-model="form.description"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="说明收录范围，方便同事选用"
+          />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -162,19 +177,22 @@
         </t-form-item>
       </t-form>
     </t-dialog>
-  </div>
+    </template>
+  </resource-manage-page>
 </template>
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
-import PageHeader from '@/components/PageHeader.vue'
+import ResourceItemCard from '@/components/ResourceItemCard.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
-import { useResourceManageBack } from '@/composables/useResourceManageBack'
+import ResourceManagePage from '@/components/ResourceManagePage.vue'
+import { useOpenCreateFromQuery } from '@/composables/useOpenCreateFromQuery'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { PermissionCodes } from '@/constants/permissions'
+import { filterResourcesByKeyword } from '@/constants/resourceManage'
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,
@@ -198,7 +216,6 @@ import {
   KNOWLEDGE_DOCUMENT_UPLOAD_HINT,
 } from '@/constants/knowledgeDocumentUpload'
 
-const { backTo, backLabel } = useResourceManageBack('knowledge')
 const { can } = usePermission()
 
 const canUpload = computed(() => can(PermissionCodes.KNOWLEDGE_UPLOAD))
@@ -221,6 +238,7 @@ const urlImporting = ref(false)
 const importUrl = ref('')
 const importCron = ref('')
 const items = ref<KnowledgeBaseVO[]>([])
+const keyword = ref('')
 const documents = ref<KnowledgeDocumentVO[]>([])
 const formVisible = ref(false)
 const editingKb = ref<KnowledgeBaseVO | null>(null)
@@ -241,13 +259,9 @@ const chunksLoading = ref(false)
 const chunks = ref<KnowledgeChunkVO[]>([])
 const activeDoc = ref<KnowledgeDocumentVO | null>(null)
 
-const columns = [
-  { colKey: 'name', title: '名称' },
-  { colKey: 'documentCount', title: '文档', width: 80 },
-  { colKey: 'chunkCount', title: '分块', width: 80 },
-  { colKey: 'status', title: '状态', width: 100 },
-  { colKey: 'op', title: '操作', width: 220 },
-]
+const filtered = computed(() =>
+  filterResourcesByKeyword(items.value, keyword.value, (item) => [item.name, item.description, item.status]),
+)
 
 const docColumns = [
   { colKey: 'fileName', title: '文件名' },
@@ -309,6 +323,8 @@ function openCreate() {
   formVisible.value = true
 }
 
+useOpenCreateFromQuery(openCreate)
+
 function openEdit(row: KnowledgeBaseVO) {
   editingKb.value = row
   form.value = { name: row.name, description: row.description || '' }
@@ -316,7 +332,7 @@ function openEdit(row: KnowledgeBaseVO) {
 }
 
 async function submitForm() {
-  if (!form.value.name.trim()) return
+  if (!form.value.name.trim()) return false
   saving.value = true
   try {
     const name = form.value.name.trim()
@@ -338,7 +354,7 @@ async function submitForm() {
     } else {
       await createKnowledgeBase({ name, description })
       formVisible.value = false
-      MessagePlugin.success('知识库已创建')
+      MessagePlugin.success('知识库已创建，本空间成员均可使用')
     }
     await load()
   } finally {
@@ -639,6 +655,11 @@ onUnmounted(stopDocumentPolling)
 </script>
 
 <style scoped>
+.resource-create-hint {
+  margin: 0 0 16px;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+}
 .toolbar {
   display: flex;
   align-items: center;

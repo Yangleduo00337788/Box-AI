@@ -1,63 +1,87 @@
 <template>
-  <div>
-    <page-header
-      title="工作流"
-      desc="可视化编排 Agent 工作流，支持调试与发布"
-      :back-to="backTo"
-      :back-label="backLabel"
-    >
-      <template #actions>
-        <t-button v-if="can(PermissionCodes.WORKFLOW_CREATE)" theme="primary" @click="openCreate">
-          <template #icon><t-icon name="add" /></template>
-          新建工作流
-        </t-button>
-      </template>
-    </page-header>
+  <resource-manage-page
+    category="workflows"
+    v-model:keyword="keyword"
+    :total="items.length"
+    :filtered="filtered.length"
+    :loading="loading"
+    :can-create="can(PermissionCodes.WORKFLOW_CREATE)"
+    @create="openCreate"
+  >
+    <div v-if="filtered.length" class="resource-manage__list">
+      <resource-item-card
+        v-for="item in filtered"
+        :key="item.id"
+        :title="item.name"
+        :description="item.description"
+        icon="tree-square-dot"
+        tone="ink"
+        clickable
+        @click="openEditor(item)"
+      >
+        <template #tags>
+          <t-tag size="small" variant="light" :theme="item.status === 'PUBLISHED' ? 'success' : 'default'">
+            {{ workflowStatusLabel(item.status) }}
+          </t-tag>
+        </template>
+        <template #meta>草稿 v{{ item.draftVersionNo ?? 1 }}</template>
+      </resource-item-card>
+    </div>
+    <t-empty v-else-if="keyword.trim()" description="没有匹配的工作流" />
+    <resource-manage-empty v-else-if="!loading" category="workflows" @create="openCreate" />
 
-    <t-loading :loading="loading" size="small">
-      <div v-if="items.length" class="grid">
-        <article v-for="item in items" :key="item.id" class="card" @click="openEditor(item)">
-          <div class="card__head">
-            <h3>{{ item.name }}</h3>
-            <t-tag size="small" variant="light">{{ item.status }}</t-tag>
-          </div>
-          <p>{{ item.description || '暂无描述' }}</p>
-          <div class="card__meta">v{{ item.draftVersionNo ?? 1 }}</div>
-        </article>
-      </div>
-      <resource-manage-empty v-else category="workflows" @create="openCreate" />
-    </t-loading>
-
-    <t-dialog v-model:visible="dialogVisible" header="新建工作流" :footer="false" width="480px">
-      <t-form :data="form" label-align="top" @submit="submit">
-        <t-form-item label="名称"><t-input v-model="form.name" /></t-form-item>
-        <t-form-item label="描述"><t-textarea v-model="form.description" :autosize="{ minRows: 2, maxRows: 4 }" /></t-form-item>
-        <t-form-item><t-button theme="primary" type="submit" :loading="saving">创建并编辑</t-button></t-form-item>
-      </t-form>
-    </t-dialog>
-  </div>
+    <template #dialogs>
+      <t-dialog
+        v-model:visible="dialogVisible"
+        header="新建工作流"
+        width="480px"
+        :confirm-btn="{ content: '创建并编辑', loading: saving }"
+        :close-on-overlay-click="false"
+        @confirm="submit"
+      >
+        <p class="resource-create-hint">创建后本工作空间成员均可使用和编辑。</p>
+        <t-form :data="form" label-align="top">
+          <t-form-item label="名称">
+            <t-input v-model="form.name" placeholder="例如：客服工单处理" />
+          </t-form-item>
+          <t-form-item label="描述">
+            <t-textarea
+              v-model="form.description"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="说明用途，方便同事识别"
+            />
+          </t-form-item>
+        </t-form>
+      </t-dialog>
+    </template>
+  </resource-manage-page>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import PageHeader from '@/components/PageHeader.vue'
+import ResourceItemCard from '@/components/ResourceItemCard.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
-import { useResourceManageBack } from '@/composables/useResourceManageBack'
+import ResourceManagePage from '@/components/ResourceManagePage.vue'
+import { useOpenCreateFromQuery } from '@/composables/useOpenCreateFromQuery'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { PermissionCodes } from '@/constants/permissions'
+import { filterResourcesByKeyword } from '@/constants/resourceManage'
 import { createWorkflow, listWorkflows, type WorkflowVO } from '@/api/workflow'
 
-const { backTo, backLabel } = useResourceManageBack('workflows')
 const { can } = usePermission()
-
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
+const keyword = ref('')
 const items = ref<WorkflowVO[]>([])
 const dialogVisible = ref(false)
 const form = ref({ name: '', description: '' })
+
+const filtered = computed(() =>
+  filterResourcesByKeyword(items.value, keyword.value, (item) => [item.name, item.description, item.status]),
+)
 
 async function load() {
   loading.value = true
@@ -74,8 +98,10 @@ function openCreate() {
   dialogVisible.value = true
 }
 
+useOpenCreateFromQuery(openCreate)
+
 async function submit() {
-  if (!form.value.name.trim()) return
+  if (!form.value.name.trim()) return false
   saving.value = true
   try {
     const { data } = await createWorkflow({
@@ -96,16 +122,20 @@ function openEditor(item: WorkflowVO) {
   router.push(`/workflows/${item.id}/editor`)
 }
 
+function workflowStatusLabel(status: string) {
+  if (status === 'PUBLISHED') return '已发布'
+  if (status === 'DRAFT') return '草稿'
+  return status || '草稿'
+}
+
 load()
 useReloadOnWorkspaceChange(load)
 </script>
 
 <style scoped>
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-.card { padding: 16px; border: 1px solid var(--td-component-border); border-radius: 12px; cursor: pointer; }
-.card:hover { border-color: var(--td-brand-color); }
-.card__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.card__head h3 { margin: 0; font-size: 16px; }
-.card p { margin: 0 0 12px; color: var(--td-text-color-secondary); font-size: 13px; }
-.card__meta { font-size: 12px; color: var(--td-text-color-placeholder); }
+.resource-create-hint {
+  margin: 0 0 16px;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+}
 </style>

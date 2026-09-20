@@ -1,75 +1,110 @@
 <template>
-  <div>
-    <page-header
-      title="工具"
-      desc="配置 HTTP 工具，绑定到 Agent 后支持 Tool Calling"
-      :back-to="backTo"
-      :back-label="backLabel"
-    >
-      <template #actions>
-        <t-button v-if="can(PermissionCodes.TOOL_CREATE)" theme="primary" @click="openCreate">
-          <template #icon><t-icon name="add" /></template>
-          新建工具
-        </t-button>
-      </template>
-    </page-header>
-
-    <t-loading :loading="loading" size="small">
-      <t-table v-if="items.length" row-key="id" :data="items" :columns="columns" :bordered="true" stripe hover>
-        <template #op="{ row }">
+  <resource-manage-page
+    category="tools"
+    v-model:keyword="keyword"
+    :total="items.length"
+    :filtered="filtered.length"
+    :loading="loading"
+    :can-create="can(PermissionCodes.TOOL_CREATE)"
+    @create="openCreate"
+  >
+    <div v-if="filtered.length" class="resource-manage__list">
+      <resource-item-card
+        v-for="item in filtered"
+        :key="item.id"
+        :title="item.name"
+        :description="item.description"
+        icon="tools"
+        tone="stone"
+      >
+        <template #tags>
+          <t-tag size="small" variant="light">{{ item.type || 'HTTP' }}</t-tag>
+        </template>
+        <template #meta>{{ item.toolKey }}{{ methodOf(item) ? ` · ${methodOf(item)}` : '' }}</template>
+        <template #actions>
           <t-space>
-            <t-button variant="text" theme="primary" :loading="testingId === row.id" @click="runTest(row.id)">测试</t-button>
-            <t-button v-if="can(PermissionCodes.TOOL_DELETE)" variant="text" theme="danger" @click="remove(row)">删除</t-button>
+            <t-button variant="text" theme="primary" :loading="testingId === item.id" @click="runTest(item.id)">
+              测试
+            </t-button>
+            <t-button v-if="can(PermissionCodes.TOOL_DELETE)" variant="text" theme="danger" @click="remove(item)">
+              删除
+            </t-button>
           </t-space>
         </template>
-      </t-table>
-      <resource-manage-empty v-else category="tools" @create="openCreate" />
-    </t-loading>
+      </resource-item-card>
+    </div>
+    <t-empty v-else-if="keyword.trim()" description="没有匹配的工具" />
+    <resource-manage-empty v-else-if="!loading" category="tools" @create="openCreate" />
 
-    <t-dialog v-model:visible="dialogVisible" header="新建 HTTP 工具" :footer="false" width="560px">
-      <t-form :data="form" label-align="top" @submit="submit">
-        <t-form-item label="名称"><t-input v-model="form.name" /></t-form-item>
-        <t-form-item label="Tool Key"><t-input v-model="form.toolKey" placeholder="如 get_weather" /></t-form-item>
-        <t-form-item label="描述"><t-textarea v-model="form.description" :autosize="{ minRows: 2, maxRows: 4 }" /></t-form-item>
-        <t-form-item label="URL"><t-input v-model="form.url" placeholder="https://..." /></t-form-item>
-        <t-form-item label="Method">
-          <t-select v-model="form.method" :options="['GET', 'POST', 'PUT', 'DELETE'].map((v) => ({ label: v, value: v }))" />
-        </t-form-item>
-        <t-form-item><t-button theme="primary" type="submit" :loading="saving">创建</t-button></t-form-item>
-      </t-form>
-    </t-dialog>
-  </div>
+    <template #dialogs>
+      <t-dialog
+        v-model:visible="dialogVisible"
+        header="新建 HTTP 工具"
+        width="560px"
+        :confirm-btn="{ content: '创建', loading: saving }"
+        :close-on-overlay-click="false"
+        @confirm="submit"
+      >
+        <p class="resource-create-hint">创建后本工作空间成员均可绑定到 Agent 使用。</p>
+        <t-form :data="form" label-align="top">
+          <t-form-item label="名称">
+            <t-input v-model="form.name" placeholder="例如：查询天气" />
+          </t-form-item>
+          <t-form-item label="Tool Key">
+            <t-input v-model="form.toolKey" placeholder="如 get_weather" />
+          </t-form-item>
+          <t-form-item label="描述">
+            <t-textarea
+              v-model="form.description"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="说明能力，便于模型选择调用"
+            />
+          </t-form-item>
+          <t-form-item label="URL">
+            <t-input v-model="form.url" placeholder="https://..." />
+          </t-form-item>
+          <t-form-item label="Method">
+            <t-select v-model="form.method" :options="methodOptions" />
+          </t-form-item>
+        </t-form>
+      </t-dialog>
+    </template>
+  </resource-manage-page>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
-import PageHeader from '@/components/PageHeader.vue'
+import ResourceItemCard from '@/components/ResourceItemCard.vue'
 import ResourceManageEmpty from '@/components/ResourceManageEmpty.vue'
-import { useResourceManageBack } from '@/composables/useResourceManageBack'
+import ResourceManagePage from '@/components/ResourceManagePage.vue'
+import { useOpenCreateFromQuery } from '@/composables/useOpenCreateFromQuery'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { PermissionCodes } from '@/constants/permissions'
+import { filterResourcesByKeyword } from '@/constants/resourceManage'
 import { createTool, deleteTool, listTools, testTool, type ToolVO } from '@/api/tool'
 
-const { backTo, backLabel } = useResourceManageBack('tools')
 const { can } = usePermission()
-
 const loading = ref(false)
 const saving = ref(false)
 const testingId = ref<number | null>(null)
+const keyword = ref('')
 const items = ref<ToolVO[]>([])
 const dialogVisible = ref(false)
 const form = ref({ name: '', toolKey: '', description: '', url: '', method: 'GET' })
+const methodOptions = ['GET', 'POST', 'PUT', 'DELETE'].map((value) => ({ label: value, value }))
 
-const columns = [
-  { colKey: 'name', title: '名称' },
-  { colKey: 'toolKey', title: 'Key' },
-  { colKey: 'type', title: '类型', width: 90 },
-  { colKey: 'description', title: '描述', ellipsis: true },
-  { colKey: 'op', title: '操作', width: 160 },
-]
+const filtered = computed(() =>
+  filterResourcesByKeyword(items.value, keyword.value, (item) => [
+    item.name,
+    item.toolKey,
+    item.description,
+    item.type,
+    methodOf(item),
+  ]),
+)
 
 async function load() {
   loading.value = true
@@ -81,13 +116,19 @@ async function load() {
   }
 }
 
+function methodOf(item: ToolVO) {
+  return item.httpConfig?.method || ''
+}
+
 function openCreate() {
   form.value = { name: '', toolKey: '', description: '', url: '', method: 'GET' }
   dialogVisible.value = true
 }
 
+useOpenCreateFromQuery(openCreate)
+
 async function submit() {
-  if (!form.value.name.trim() || !form.value.toolKey.trim() || !form.value.url.trim()) return
+  if (!form.value.name.trim() || !form.value.toolKey.trim() || !form.value.url.trim()) return false
   saving.value = true
   try {
     await createTool({
@@ -98,7 +139,7 @@ async function submit() {
       httpConfig: { method: form.value.method, url: form.value.url.trim() },
     })
     dialogVisible.value = false
-    MessagePlugin.success('工具已创建')
+    MessagePlugin.success('工具已创建，本空间成员均可使用')
     await load()
   } finally {
     saving.value = false
@@ -118,7 +159,7 @@ async function runTest(id: number) {
 function remove(item: ToolVO) {
   void confirmResourceDelete({
     header: '确认删除',
-    body: `确定删除工具「${item.name}」吗？`,
+    body: `确定删除工具「${item.name}」吗？删除后本空间将无法再绑定使用。`,
     resourceLabel: '工具',
     onDelete: async () => {
       await deleteTool(item.id)
@@ -133,3 +174,11 @@ function remove(item: ToolVO) {
 load()
 useReloadOnWorkspaceChange(load)
 </script>
+
+<style scoped>
+.resource-create-hint {
+  margin: 0 0 16px;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+}
+</style>
