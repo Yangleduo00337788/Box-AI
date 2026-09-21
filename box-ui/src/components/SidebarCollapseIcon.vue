@@ -1,7 +1,7 @@
 <template>
   <svg
     class="sidebar-collapse-icon"
-    :class="{ 'sidebar-collapse-icon--collapsed': collapsed }"
+    :class="{ 'sidebar-collapse-icon--collapsed': props.collapsed }"
     viewBox="0 0 24 24"
     width="18"
     height="18"
@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   collapsed?: boolean
 }>()
 </script>

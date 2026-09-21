@@ -1,5 +1,11 @@
 /// <reference types="vite/client" />
 
+declare module '*.vue' {
+  import type { DefineComponent } from 'vue'
+  const component: DefineComponent<object, object, unknown>
+  export default component
+}
+
 declare module '*.png' {
   const src: string
   export default src
@@ -13,16 +19,6 @@ declare module '*.webp' {
 declare module '*.gif' {
   const src: string
   export default src
-}
-
-import 'vue-router'
-
-declare module 'vue-router' {
-  interface RouteMeta {
-    public?: boolean
-    title?: string
-    catalogCategory?: 'tools' | 'mcp'
-  }
 }
 
 declare module '@box/ui/layouts/AuthLayout.vue' {

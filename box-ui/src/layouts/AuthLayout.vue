@@ -7,9 +7,9 @@
     </div>
 
     <div class="auth-shell">
-      <portal-badge v-if="portalLabel" :label="portalLabel" :theme="portalTheme" />
-      <img v-if="showMascot" :src="logoMascot" alt="" class="auth-mascot" />
-      <p v-if="slogan" class="auth-slogan">{{ slogan }}</p>
+      <portal-badge v-if="props.portalLabel" :label="props.portalLabel" :theme="props.portalTheme" />
+      <img v-if="props.showMascot" :src="logoMascot" alt="" class="auth-mascot" />
+      <p v-if="props.slogan" class="auth-slogan">{{ props.slogan }}</p>
 
       <div class="auth-card">
         <slot />
@@ -24,7 +24,7 @@
 import PortalBadge from '../components/PortalBadge.vue'
 import logoMascot from '../assets/logo-mascot.png'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     slogan?: string
     showMascot?: boolean

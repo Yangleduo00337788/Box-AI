@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["src/*"],
+      "@box/ui/types/*": ["../box-ui/src/types/*"],
+      "@box/ui/setup/*": ["../box-ui/src/setup/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "env.d.ts"]
+}

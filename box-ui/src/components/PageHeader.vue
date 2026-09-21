@@ -1,8 +1,8 @@
 <template>
   <div class="page-header">
     <div class="page-header__main">
-      <h1 class="page-header__title">{{ title }}</h1>
-      <p v-if="desc" class="page-header__desc">{{ desc }}</p>
+      <h1 class="page-header__title">{{ props.title }}</h1>
+      <p v-if="props.desc" class="page-header__desc">{{ props.desc }}</p>
     </div>
     <div v-if="$slots.actions" class="page-header__actions">
       <slot name="actions" />
@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   title: string
   desc?: string
 }>()

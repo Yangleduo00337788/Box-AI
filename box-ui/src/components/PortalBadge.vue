@@ -1,9 +1,9 @@
 <template>
-  <span class="portal-badge" :class="`portal-badge--${theme}`">{{ label }}</span>
+  <span class="portal-badge" :class="`portal-badge--${props.theme}`">{{ props.label }}</span>
 </template>
 
 <script setup lang="ts">
-withDefaults(
+const props = withDefaults(
   defineProps<{
     label: string
     theme?: 'consumer' | 'enterprise' | 'personal' | 'admin'

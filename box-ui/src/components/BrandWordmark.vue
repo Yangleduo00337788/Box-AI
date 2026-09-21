@@ -2,19 +2,19 @@
   <div
     class="brand-wordmark"
     :class="[
-      `brand-wordmark--${size}`,
-      `brand-wordmark--${align}`,
-      `brand-wordmark--mode-${mode}`,
-      { 'brand-wordmark--collapsed': collapsed },
+      `brand-wordmark--${props.size}`,
+      `brand-wordmark--${props.align}`,
+      `brand-wordmark--mode-${props.mode}`,
+      { 'brand-wordmark--collapsed': props.collapsed },
     ]"
   >
     <img
-      v-if="collapsed || mode === 'mascot'"
-      :src="mode === 'mascot' ? logoSidebar : logoMascot"
+      v-if="props.collapsed || props.mode === 'mascot'"
+      :src="props.mode === 'mascot' ? logoSidebar : logoMascot"
       alt="盒子"
       class="brand-wordmark__mascot"
     />
-    <span v-else-if="mode === 'text'" class="brand-wordmark__text">盒子</span>
+    <span v-else-if="props.mode === 'text'" class="brand-wordmark__text">盒子</span>
     <img
       v-else
       :src="logoWordmark"
@@ -29,7 +29,7 @@ import logoWordmark from '../assets/logo.png'
 import logoMascot from '../assets/logo-mascot.png'
 import logoSidebar from '../assets/logo-sidebar.png'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     size?: 'lg' | 'md' | 'sm'
     align?: 'center' | 'left'
