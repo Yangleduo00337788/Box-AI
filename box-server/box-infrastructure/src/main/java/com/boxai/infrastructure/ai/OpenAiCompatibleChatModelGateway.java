@@ -31,8 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Component
 public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
@@ -81,8 +79,6 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         return model.chat(toMessages(config, turns)).aiMessage().text();
     }
 
-    private static final Pattern TOOL_CALL_PATTERN = Pattern.compile("\\{[^{}]*\"tool\"\\s*:\\s*\"([^\"]+)\"[^{}]*\\}");
-
     @Override
     public String chatWithTools(ModelRuntimeConfig config,
                                 List<ChatTurn> turns,
@@ -113,12 +109,34 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         if (response == null || response.isBlank()) {
             return null;
         }
-        Matcher matcher = TOOL_CALL_PATTERN.matcher(response);
-        if (!matcher.find()) {
+        String trimmed = response.trim();
+        ToolCall direct = parseToolCallJson(trimmed);
+        if (direct != null) {
+            return direct;
+        }
+        int start = trimmed.indexOf('{');
+        while (start >= 0) {
+            int end = findJsonObjectEnd(trimmed, start);
+            if (end > start) {
+                ToolCall parsed = parseToolCallJson(trimmed.substring(start, end + 1));
+                if (parsed != null) {
+                    return parsed;
+                }
+            }
+            start = trimmed.indexOf('{', start + 1);
+        }
+        return null;
+    }
+
+    private ToolCall parseToolCallJson(String json) {
+        if (json == null || json.isBlank()) {
             return null;
         }
         try {
-            JsonNode node = OBJECT_MAPPER.readTree(matcher.group());
+            JsonNode node = OBJECT_MAPPER.readTree(json);
+            if (!node.isObject()) {
+                return null;
+            }
             String toolKey = node.path("tool").asText(null);
             if (toolKey == null || toolKey.isBlank()) {
                 return null;
@@ -130,8 +148,40 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
             }
             return new ToolCall(toolKey, arguments);
         } catch (Exception ex) {
-            return new ToolCall(matcher.group(1), Map.of());
+            return null;
         }
+    }
+
+    private int findJsonObjectEnd(String text, int start) {
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int index = start; index < text.length(); index++) {
+            char current = text.charAt(index);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (current == '\\') {
+                    escaped = true;
+                } else if (current == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (current == '"') {
+                inString = true;
+                continue;
+            }
+            if (current == '{') {
+                depth++;
+            } else if (current == '}') {
+                depth--;
+                if (depth == 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
     }
 
     private Object jsonValue(JsonNode node) {

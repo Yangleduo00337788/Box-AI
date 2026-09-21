@@ -190,7 +190,10 @@ import ChatShareLinkDialog from '@/components/ChatShareLinkDialog.vue'
 import ChatAgentRail from '@/components/ChatAgentRail.vue'
 import ChatBrandHero from '@/components/ChatBrandHero.vue'
 import ChatComposerStack from '@/components/ChatComposerStack.vue'
-import { buildConversationListItems } from '@/utils/boxChatListItems'
+import { buildConversationListItems, type ConversationMessageVO } from '@/utils/boxChatListItems'
+import type { ChatToolEventPayload } from '@/api/chatStream'
+import { resolveToolInvokeLabel } from '@/utils/chatToolLabel'
+import type { ChatToolRun, MessagePluginMeta } from '@/utils/messageMetadata'
 import { extractApiError } from '@/api/apiError'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
@@ -245,7 +248,7 @@ const chatting = ref(false)
 const composerText = ref('')
 const composerAttachments = ref<ComposerAttachment[]>([])
 const composerPlugins = ref<PluginCatalogVO[]>([])
-const messages = ref<MessageVO[]>([])
+const messages = ref<ConversationMessageVO[]>([])
 const chatListRef = ref<InstanceType<typeof BoxChatMessageList> | null>(null)
 const listening = ref(false)
 
@@ -620,6 +623,60 @@ function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
 }
 
+function pluginsMetadataJson(plugins: PluginCatalogVO[]): string | undefined {
+  if (!plugins.length) return undefined
+  const payload: MessagePluginMeta[] = plugins.map((item) => ({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    sourceType: item.sourceType,
+  }))
+  return JSON.stringify({ plugins: payload })
+}
+
+function toPluginMeta(plugins: PluginCatalogVO[]): MessagePluginMeta[] {
+  return plugins.map((item) => ({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    sourceType: item.sourceType,
+  }))
+}
+
+function upsertToolRun(
+  runs: ChatToolRun[] | undefined,
+  payload: ChatToolEventPayload,
+  plugins: MessagePluginMeta[],
+  phase: 'start' | 'end',
+): ChatToolRun[] {
+  const next = [...(runs || [])]
+  const label = resolveToolInvokeLabel(payload.toolKey, plugins)
+  if (phase === 'start') {
+    if (!next.some((item) => item.toolKey === payload.toolKey && item.status === 'running')) {
+      next.push({ toolKey: payload.toolKey, label, status: 'running' })
+    }
+    return next
+  }
+  const normalizedStatus = payload.status === 'SUCCEEDED' || !payload.status ? 'success' : 'failed'
+  const index = next.findIndex((item) => item.toolKey === payload.toolKey)
+  if (index >= 0) {
+    next[index] = {
+      ...next[index],
+      label,
+      status: normalizedStatus,
+      output: payload.output,
+    }
+  } else {
+    next.push({
+      toolKey: payload.toolKey,
+      label,
+      status: normalizedStatus,
+      output: payload.output,
+    })
+  }
+  return next
+}
+
 function onAgentDropdown(data: { value?: string | number }) {
   if (typeof data?.value === 'number') {
     selectAgent(data.value)
@@ -697,6 +754,8 @@ async function sendChat(id?: number, preset?: string) {
   if (!targetId) return
   const text = (preset ?? buildComposerPayload()).trim()
   const pluginIds = composerPlugins.value.map((item) => item.id)
+  const pluginSnapshot = [...composerPlugins.value]
+  const pluginMeta = toPluginMeta(pluginSnapshot)
   if ((!text && !pluginIds.length) || chatting.value) return
 
   const platformModelId = resolvePlatformModelId()
@@ -717,6 +776,7 @@ async function sendChat(id?: number, preset?: string) {
     contentType: 'TEXT',
     sequenceNo: messages.value.length + 1,
     createdAt: new Date().toISOString(),
+    metadataJson: pluginsMetadataJson(pluginSnapshot),
   })
   composerText.value = ''
   clearComposerAttachments()
@@ -732,6 +792,7 @@ async function sendChat(id?: number, preset?: string) {
       contentType: 'TEXT',
       sequenceNo: messages.value.length + 1,
       createdAt: new Date().toISOString(),
+      toolRuns: [],
     })
     await scrollChatToBottom()
 
@@ -743,6 +804,18 @@ async function sendChat(id?: number, preset?: string) {
       platformModelId,
       pluginIds: pluginIds.length ? pluginIds : undefined,
       onCitations: (citations) => applyStreamCitations(assistantIndex, citations),
+      onToolStart: (payload) => {
+        const assistant = messages.value[assistantIndex]
+        if (!assistant) return
+        assistant.toolRuns = upsertToolRun(assistant.toolRuns, payload, pluginMeta, 'start')
+        void scrollChatToBottom()
+      },
+      onToolEnd: (payload) => {
+        const assistant = messages.value[assistantIndex]
+        if (!assistant) return
+        assistant.toolRuns = upsertToolRun(assistant.toolRuns, payload, pluginMeta, 'end')
+        void scrollChatToBottom()
+      },
       onDone: (executionId) => {
         requestQuotaRefresh()
         if (tracePanelOpen.value) {

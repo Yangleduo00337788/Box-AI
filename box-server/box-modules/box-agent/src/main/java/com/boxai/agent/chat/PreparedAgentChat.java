@@ -18,6 +18,7 @@ public record PreparedAgentChat(
         Long modelId,
         Long agentVersionId,
         List<ToolDefinition> tools,
+        List<ResolvedAgentTool> resolvedTools,
         String toolConfirmationToken
 ) {
     public PreparedAgentChat withToolConfirmationToken(String token) {
@@ -33,6 +34,7 @@ public record PreparedAgentChat(
                 modelId,
                 agentVersionId,
                 tools,
+                resolvedTools,
                 token);
     }
 }

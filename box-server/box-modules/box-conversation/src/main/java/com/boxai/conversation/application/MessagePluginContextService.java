@@ -12,11 +12,14 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 @Service
 public class MessagePluginContextService {
 
     private static final int MAX_PLUGINS = 8;
+    private static final Set<String> COMPOSER_CATEGORIES = Set.of("skills", "tools", "mcp");
 
     private final PluginCatalogRepository pluginCatalogRepository;
     private final WorkspacePluginInstallRepository workspacePluginInstallRepository;
@@ -59,6 +62,11 @@ public class MessagePluginContextService {
                     .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "插件未安装到当前工作空间"));
             PluginCatalog plugin = pluginCatalogRepository.findById(pluginId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在"));
+            String category = plugin.getCategory() == null ? "" : plugin.getCategory().trim().toLowerCase(Locale.ROOT);
+            if (!COMPOSER_CATEGORIES.contains(category)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST,
+                        "对话加号仅支持技能、工具与 MCP 插件，请在工作空间智能体中配置知识库与工作流");
+            }
             items.add(new PluginContextItem(
                     plugin.getId(),
                     plugin.getTitle(),
@@ -68,16 +76,7 @@ public class MessagePluginContextService {
         if (items.isEmpty()) {
             return new EnrichedMessage(base, null);
         }
-        StringBuilder content = new StringBuilder(base);
-        content.append("\n\n---\n本次消息启用的插件：\n");
-        for (PluginContextItem item : items) {
-            String source = "USER".equals(item.sourceType()) ? "工作空间" : "官方";
-            content.append("- ").append(item.title())
-                    .append("（").append(source)
-                    .append(item.category() == null || item.category().isBlank() ? "" : " · " + item.category())
-                    .append("）\n");
-        }
-        return new EnrichedMessage(content.toString().trim(), pluginsMetadata(items));
+        return new EnrichedMessage(base, pluginsMetadata(items));
     }
 
     private String pluginsMetadata(List<PluginContextItem> items) {

@@ -1,6 +1,8 @@
 package com.boxai.conversation.application;
 
 import com.boxai.agent.application.AgentLongTermMemoryApplicationService;
+import com.boxai.agent.application.ConversationPluginApplicationService;
+import com.boxai.agent.chat.ConversationPluginRound;
 import com.boxai.agent.chat.AgentChatExecutor;
 import com.boxai.agent.chat.AgentChatPreparer;
 import com.boxai.agent.chat.PreparedAgentChat;
@@ -62,6 +64,7 @@ public class ConversationApplicationService {
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
     private final ChatProjectApplicationService chatProjectApplicationService;
     private final MessagePluginContextService messagePluginContextService;
+    private final ConversationPluginApplicationService conversationPluginApplicationService;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
 
@@ -76,6 +79,7 @@ public class ConversationApplicationService {
                                           AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
                                           ChatProjectApplicationService chatProjectApplicationService,
                                           MessagePluginContextService messagePluginContextService,
+                                          ConversationPluginApplicationService conversationPluginApplicationService,
                                           PlatformTransactionManager transactionManager,
                                           ObjectMapper objectMapper) {
         this.conversationRepository = conversationRepository;
@@ -89,6 +93,7 @@ public class ConversationApplicationService {
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
         this.chatProjectApplicationService = chatProjectApplicationService;
         this.messagePluginContextService = messagePluginContextService;
+        this.conversationPluginApplicationService = conversationPluginApplicationService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.objectMapper = objectMapper;
     }
@@ -199,7 +204,8 @@ public class ConversationApplicationService {
                 content,
                 request.platformModelId(),
                 request.toolConfirmationToken(),
-                retrieval);
+                retrieval,
+                request.pluginIds());
         executionRecorder.recordRagSpan(execution, Map.of("query", content), retrieval.citations());
         agentChatExecutor.assertQuotaAvailable();
         Message userMessage = appendMessage(conversation, "USER", content, null, outgoing.metadataJson());
@@ -238,7 +244,8 @@ public class ConversationApplicationService {
                 content,
                 request.platformModelId(),
                 request.toolConfirmationToken(),
-                retrieval);
+                retrieval,
+                request.pluginIds());
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
         appendMessage(conversation, "USER", content, null, outgoing.metadataJson());
@@ -278,13 +285,16 @@ public class ConversationApplicationService {
                                                 String userMessage,
                                                 Long platformModelId,
                                                 String toolConfirmationToken,
-                                                KnowledgeRetrievalResult retrieval) {
+                                                KnowledgeRetrievalResult retrieval,
+                                                List<Long> pluginIds) {
+        ConversationPluginRound pluginRound = conversationPluginApplicationService.resolve(workspaceId(), pluginIds);
         PreparedAgentChat prepared = agentChatPreparer.prepare(
                 conversation.getAgentId(),
                 historyTurns(conversation, userMessage),
                 userMessage,
                 platformModelId,
-                retrieval);
+                retrieval,
+                pluginRound);
         if (toolConfirmationToken == null || toolConfirmationToken.isBlank()) {
             return prepared;
         }
@@ -368,7 +378,7 @@ public class ConversationApplicationService {
         KnowledgeRetrievalResult retrieval = draft == null
                 ? KnowledgeRetrievalResult.empty()
                 : agentChatPreparer.retrieveKnowledge(draft, content);
-        PreparedAgentChat prepared = buildPreparedChat(conversation, content, platformModelId, null, retrieval);
+        PreparedAgentChat prepared = buildPreparedChat(conversation, content, platformModelId, null, retrieval, null);
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
         Long modelId = prepared.modelId();

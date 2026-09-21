@@ -47,7 +47,7 @@
             </button>
           </template>
           <div v-else class="composer-plus-menu__state">
-            <span>暂无已安装插件</span>
+            <span>暂无可用技能 / 工具 / MCP</span>
             <t-button variant="text" theme="primary" size="small" @click="emit('open-market')">去插件市场</t-button>
           </div>
         </div>

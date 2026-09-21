@@ -37,6 +37,7 @@ public class AgentToolRuntimeService {
     private final AgentSubAgentRepository agentSubAgentRepository;
     private final AgentRepository agentRepository;
     private final AgentSubAgentRuntimeService agentSubAgentRuntimeService;
+    private final AgentWorkflowRuntimeService agentWorkflowRuntimeService;
 
     public AgentToolRuntimeService(AgentToolRepository agentToolRepository,
                                    AgentMcpRepository agentMcpRepository,
@@ -47,7 +48,8 @@ public class AgentToolRuntimeService {
                                    McpToolCatalogParser mcpToolCatalogParser,
                                    AgentSubAgentRepository agentSubAgentRepository,
                                    AgentRepository agentRepository,
-                                   @Lazy AgentSubAgentRuntimeService agentSubAgentRuntimeService) {
+                                   @Lazy AgentSubAgentRuntimeService agentSubAgentRuntimeService,
+                                   @Lazy AgentWorkflowRuntimeService agentWorkflowRuntimeService) {
         this.agentToolRepository = agentToolRepository;
         this.agentMcpRepository = agentMcpRepository;
         this.toolRepository = toolRepository;
@@ -58,14 +60,46 @@ public class AgentToolRuntimeService {
         this.agentSubAgentRepository = agentSubAgentRepository;
         this.agentRepository = agentRepository;
         this.agentSubAgentRuntimeService = agentSubAgentRuntimeService;
+        this.agentWorkflowRuntimeService = agentWorkflowRuntimeService;
     }
 
     public List<ResolvedAgentTool> resolveTools(Long versionId) {
+        return resolveTools(versionId, List.of());
+    }
+
+    public List<ResolvedAgentTool> resolveTools(Long versionId, List<ResolvedAgentTool> extraTools) {
         List<ResolvedAgentTool> tools = new ArrayList<>();
         tools.addAll(resolveBoundTools(versionId));
         tools.addAll(resolveMcpTools(versionId));
         tools.addAll(resolveSubAgents(versionId));
-        return tools;
+        tools.addAll(agentWorkflowRuntimeService.resolveCallableTools(versionId));
+        if (extraTools != null && !extraTools.isEmpty()) {
+            tools.addAll(extraTools);
+        }
+        return dedupeByKey(tools);
+    }
+
+    public List<ResolvedAgentTool> resolveConversationTools(Long versionId, List<ResolvedAgentTool> extraTools) {
+        List<ResolvedAgentTool> tools = new ArrayList<>();
+        tools.addAll(agentWorkflowRuntimeService.resolveCallableTools(versionId));
+        if (extraTools != null && !extraTools.isEmpty()) {
+            tools.addAll(extraTools);
+        }
+        return dedupeByKey(tools);
+    }
+
+    private List<ResolvedAgentTool> dedupeByKey(List<ResolvedAgentTool> tools) {
+        List<ResolvedAgentTool> deduped = new ArrayList<>();
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        for (ResolvedAgentTool tool : tools) {
+            if (tool == null || tool.toolKey() == null) {
+                continue;
+            }
+            if (keys.add(tool.toolKey())) {
+                deduped.add(tool);
+            }
+        }
+        return deduped;
     }
 
     private List<ResolvedAgentTool> resolveBoundTools(Long versionId) {
@@ -88,6 +122,7 @@ public class AgentToolRuntimeService {
                     tool.getName(),
                     tool.getDescription(),
                     tool.getType(),
+                    null,
                     null,
                     null,
                     null,
@@ -115,7 +150,9 @@ public class AgentToolRuntimeService {
                         "MCP",
                         server.getId(),
                         catalogTool.name(),
-                        null));
+                        null,
+                        null,
+                        false));
             }
         }
         return tools;
@@ -143,7 +180,9 @@ public class AgentToolRuntimeService {
                     "SUB_AGENT",
                     null,
                     null,
-                    subAgent.getId()));
+                    subAgent.getId(),
+                    null,
+                    false));
         }
         return tools;
     }
@@ -170,6 +209,9 @@ public class AgentToolRuntimeService {
         }
         if ("SUB_AGENT".equals(resolved.type())) {
             return agentSubAgentRuntimeService.delegate(resolved.subAgentId(), arguments == null ? Map.of() : arguments);
+        }
+        if ("WORKFLOW".equals(resolved.type())) {
+            return agentWorkflowRuntimeService.invoke(resolved.workflowId(), arguments == null ? Map.of() : arguments);
         }
         return execute(resolved.toolId(), arguments == null ? Map.of() : arguments);
     }

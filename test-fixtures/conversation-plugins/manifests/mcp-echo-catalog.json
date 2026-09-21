@@ -1,0 +1,6 @@
+{
+  "endpointUrl": "http://127.0.0.1:3100/mcp",
+  "transportType": "HTTP",
+  "authType": "NONE",
+  "toolCatalogJson": "[{\"name\":\"echo\",\"description\":\"回显参数 message，用于验证 MCP 工具是否被模型选中并执行。参数：message(string)\"}]"
+}

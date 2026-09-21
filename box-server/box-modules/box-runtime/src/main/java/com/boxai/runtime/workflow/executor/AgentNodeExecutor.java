@@ -10,6 +10,7 @@ import com.boxai.runtime.workflow.core.NodeExecutionResult;
 import com.boxai.runtime.workflow.engine.WorkflowTemplateRenderer;
 import com.boxai.security.context.WorkspaceContext;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -24,8 +25,8 @@ public class AgentNodeExecutor implements NodeExecutor {
     private final WorkflowTemplateRenderer templateRenderer;
 
     public AgentNodeExecutor(AgentRepository agentRepository,
-                             AgentChatPreparer agentChatPreparer,
-                             AgentChatExecutor agentChatExecutor,
+                             @Lazy AgentChatPreparer agentChatPreparer,
+                             @Lazy AgentChatExecutor agentChatExecutor,
                              WorkflowTemplateRenderer templateRenderer) {
         this.agentRepository = agentRepository;
         this.agentChatPreparer = agentChatPreparer;

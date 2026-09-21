@@ -32,7 +32,8 @@ class AgentToolRuntimeServiceTest {
                 mock(com.boxai.tool.application.McpToolCatalogParser.class),
                 mock(com.boxai.domain.agent.AgentSubAgentRepository.class),
                 mock(com.boxai.domain.agent.AgentRepository.class),
-                mock(AgentSubAgentRuntimeService.class));
+                mock(AgentSubAgentRuntimeService.class),
+                mock(AgentWorkflowRuntimeService.class));
 
         Tool tool = new Tool();
         tool.setId(9L);
@@ -43,7 +44,7 @@ class AgentToolRuntimeServiceTest {
         when(toolExecutionService.execute(eq(tool), any())).thenReturn("42");
 
         List<ResolvedAgentTool> tools = List.of(new ResolvedAgentTool(
-                9L, "calc", "Calc", "returns number", "FUNCTION", null, null, null));
+                9L, "calc", "Calc", "returns number", "FUNCTION", null, null, null, null, false));
         String result = service.executeByKey(tools, "calc", Map.of("x", 1));
 
         assertEquals("42", result);

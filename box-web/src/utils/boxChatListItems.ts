@@ -15,7 +15,13 @@ import {
   type LocalChatMessage,
 } from '@/utils/chatMessageAdapter'
 import { formatChatMessageTime, getAvatarColor } from '@/utils/format'
-import { parseMessageReasoning } from '@/utils/messageMetadata'
+import {
+  parseMessagePlugins,
+  parseMessageReasoning,
+  stripLegacyPluginSuffix,
+  type ChatToolRun,
+  type MessagePluginMeta,
+} from '@/utils/messageMetadata'
 import type { SharedConversationVO } from '@/api/conversation'
 
 export type BoxChatActionBarItem = 'copy' | 'replay' | 'good' | 'bad' | 'share'
@@ -47,6 +53,11 @@ export interface BoxChatListItem {
   reasoning?: string
   /** 等待首包 / 无正文时展示「思考中」渐变动画 */
   thinkingActive?: boolean
+  thinkingLabel?: string
+  toolInvokeActive?: boolean
+  toolInvokeLabel?: string
+  enabledPlugins?: MessagePluginMeta[]
+  toolRuns?: ChatToolRun[]
   replyQuote?: BoxChatReplyQuote
   showActions: boolean
   actionBar: BoxChatActionBarItem[]
@@ -147,8 +158,12 @@ function findLocalReplyQuote(
   return undefined
 }
 
+export type ConversationMessageVO = MessageVO & {
+  toolRuns?: ChatToolRun[]
+}
+
 export function buildConversationListItems(
-  messages: MessageVO[],
+  messages: ConversationMessageVO[],
   chatting: boolean,
   options: BoxChatListActionsOptions = {},
   identity: BoxChatIdentityContext,
@@ -162,8 +177,17 @@ export function buildConversationListItems(
   const agent = agentIdentity(identity)
 
   return messages.map((item, index) => {
+    const toolRuns = item.toolRuns || []
+    const runningTool = toolRuns.find((run) => run.status === 'running')
+    const hasAssistantText = Boolean(item.content?.trim())
     const thinkingActive =
-      chatting && index === messages.length - 1 && item.role === 'ASSISTANT' && !item.content?.trim()
+      chatting &&
+      index === messages.length - 1 &&
+      item.role === 'ASSISTANT' &&
+      !hasAssistantText &&
+      !runningTool
+    const toolInvokeActive =
+      chatting && index === messages.length - 1 && item.role === 'ASSISTANT' && Boolean(runningTool)
     const streaming =
       chatting &&
       index === messages.length - 1 &&
@@ -172,7 +196,9 @@ export function buildConversationListItems(
     const citations = item.citations?.length ? item.citations : parseMessageCitations(item.metadataJson)
     const reasoning = parseMessageReasoning(item.metadataJson)
     const isUser = item.role === 'USER'
-    const parts = isUser ? parseUserContent(item.content || '') : null
+    const rawContent = isUser ? stripLegacyPluginSuffix(item.content || '') : item.content || ''
+    const parts = isUser ? parseUserContent(rawContent) : null
+    const enabledPlugins = isUser ? parseMessagePlugins(item.metadataJson) : []
     const showReplay =
       enableRegenerate &&
       item.role === 'ASSISTANT' &&
@@ -180,10 +206,13 @@ export function buildConversationListItems(
       !chatting
     const id = isUser ? user : agent
     const userImages = isUser ? parseUserContent(item.content || '').images : []
-    const hasBody = messageHasBody(isUser, item.content || '', parts?.text, userImages.length)
+    const hasBody =
+      messageHasBody(isUser, rawContent, parts?.text, userImages.length) ||
+      enabledPlugins.length > 0 ||
+      (toolRuns.length > 0 && !isUser)
     const sentAt = item.createdAt || undefined
     const sentTimeLabel = formatChatMessageTime(sentAt) || undefined
-    const copyText = isUser ? (parts?.text || item.content || '') : item.content || ''
+    const copyText = isUser ? (parts?.text || rawContent || '') : item.content || ''
 
     return {
       key: item.id ?? index,
@@ -195,7 +224,7 @@ export function buildConversationListItems(
         : streaming
           ? 'streaming'
           : toChatUiStatus(item, index, messages, chatting),
-      animation: undefined,
+      animation: streaming ? 'gradient' : undefined,
       plainText: item.content || '',
       copyText,
       displayName: id.displayName,
@@ -209,6 +238,11 @@ export function buildConversationListItems(
       citations,
       reasoning,
       thinkingActive,
+      thinkingLabel: '正在思考中',
+      toolInvokeActive,
+      toolInvokeLabel: runningTool ? `正在调用 ${runningTool.label}` : undefined,
+      enabledPlugins,
+      toolRuns: !isUser ? toolRuns : undefined,
       replyQuote: isUser ? undefined : findConversationReplyQuote(messages, index, user.displayName),
       showActions: !thinkingActive && hasBody,
       actionBar: isUser
@@ -257,7 +291,7 @@ export function buildLocalListItems(
         : streaming
           ? 'streaming'
           : toLocalChatUiStatus(item, index, messages, chatting),
-      animation: undefined,
+      animation: streaming ? 'gradient' : undefined,
       plainText: item.content || '',
       copyText,
       displayName: id.displayName,

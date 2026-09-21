@@ -335,6 +335,35 @@ export function unbindAgentKnowledge(agentId: number, knowledgeBaseId: number) {
   return http.delete<Result<void>>(`/agents/${agentId}/knowledge/${knowledgeBaseId}`)
 }
 
+export interface AgentWorkflowBindingVO {
+  id: number
+  workflowId: number
+  workflowName?: string
+  enabled?: boolean
+  defaultWorkflow?: boolean
+  callable?: boolean
+}
+
+export function listAgentWorkflows(agentId: number) {
+  return http.get<Result<AgentWorkflowBindingVO[]>>(`/agents/${agentId}/workflows`)
+}
+
+export function bindAgentWorkflow(
+  agentId: number,
+  payload: {
+    workflowId: number
+    enabled?: boolean
+    defaultWorkflow?: boolean
+    callable?: boolean
+  },
+) {
+  return http.post<Result<AgentWorkflowBindingVO>>(`/agents/${agentId}/workflows`, payload)
+}
+
+export function unbindAgentWorkflow(agentId: number, workflowId: number) {
+  return http.delete<Result<void>>(`/agents/${agentId}/workflows/${workflowId}`)
+}
+
 export function listAgentTools(agentId: number) {
   return http.get<Result<AgentToolBindingVO[]>>(`/agents/${agentId}/tools`)
 }

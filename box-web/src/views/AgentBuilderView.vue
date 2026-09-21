@@ -141,6 +141,37 @@
             </t-form>
           </div>
 
+          <div v-else-if="activeTab === 'workflows'" class="config-panel">
+            <h2 class="config-panel__title">工作流</h2>
+            <p class="config-panel__desc">
+              绑定工作流后，可将一条设为「默认」在每次对话前执行，或将工作流暴露为可调用工具供模型按需触发。
+            </p>
+            <t-select
+              v-model="selectedWorkflowId"
+              :options="workflowOptions"
+              placeholder="选择要绑定的工作流"
+              clearable
+              style="margin-bottom: 12px"
+            />
+            <t-space direction="vertical" style="margin-bottom: 12px">
+              <t-checkbox v-model="bindWorkflowDefault">设为默认工作流（每条消息前执行）</t-checkbox>
+              <t-checkbox v-model="bindWorkflowCallable">暴露为可调用工具</t-checkbox>
+            </t-space>
+            <t-button theme="primary" :loading="bindingWorkflow" @click="bindWorkflow">绑定工作流</t-button>
+            <t-table row-key="id" :data="workflowBindings" :columns="workflowColumns" size="small" style="margin-top: 16px">
+              <template #defaultWorkflow="{ row }">
+                <t-tag v-if="row.defaultWorkflow" size="small" theme="primary" variant="light">默认</t-tag>
+                <span v-else>—</span>
+              </template>
+              <template #callable="{ row }">
+                {{ row.callable ? '是' : '否' }}
+              </template>
+              <template #op="{ row }">
+                <t-button variant="text" theme="danger" @click="unbindWorkflow(row.workflowId)">解除</t-button>
+              </template>
+            </t-table>
+          </div>
+
           <div v-else-if="activeTab === 'knowledge'" class="config-panel">
             <h2 class="config-panel__title">知识库</h2>
             <p class="config-panel__desc">绑定知识库后，对话将自动 RAG 检索</p>
@@ -200,51 +231,10 @@
           </div>
 
           <div v-else-if="activeTab === 'tools'" class="config-panel">
-            <h2 class="config-panel__title">工具</h2>
-            <p class="config-panel__desc">绑定 HTTP 工具或 MCP Server 后，Agent 支持 Tool Calling</p>
-
-            <h3 class="config-subtitle">HTTP 工具</h3>
-            <t-select
-              v-model="selectedToolId"
-              :options="toolOptions"
-              placeholder="选择要绑定的工具"
-              clearable
-              style="margin-bottom: 12px"
-            />
-            <t-button theme="primary" :loading="bindingTool" @click="bindTool">绑定 HTTP 工具</t-button>
-            <t-checkbox v-model="bindToolRequireConfirm" style="margin-bottom: 8px">
-              绑定后需二次确认（危险工具）
-            </t-checkbox>
-            <t-table row-key="id" :data="toolBindings" :columns="toolColumns" size="small" style="margin-top: 16px">
-              <template #requireConfirmation="{ row }">
-                <t-switch
-                  size="small"
-                  :value="row.requireConfirmation"
-                  @change="(val: boolean) => toggleToolRequireConfirm(row.toolId, val)"
-                />
-              </template>
-              <template #op="{ row }">
-                <t-button variant="text" theme="danger" @click="unbindTool(row.toolId)">解除</t-button>
-              </template>
-            </t-table>
-
-            <h3 class="config-subtitle">MCP Server</h3>
-            <t-select
-              v-model="selectedMcpId"
-              :options="mcpOptions"
-              placeholder="选择要绑定的 MCP Server（需先同步工具目录）"
-              clearable
-              style="margin-bottom: 12px"
-            />
-            <t-button theme="primary" :loading="bindingMcp" @click="bindMcp">绑定 MCP</t-button>
-            <t-table row-key="id" :data="mcpBindings" :columns="mcpColumns" size="small" style="margin-top: 16px">
-              <template #tools="{ row }">
-                {{ parseMcpToolCount(row.toolCatalogJson) }}
-              </template>
-              <template #op="{ row }">
-                <t-button variant="text" theme="danger" @click="unbindMcp(row.mcpServerId)">解除</t-button>
-              </template>
-            </t-table>
+            <h2 class="config-panel__title">协作</h2>
+            <p class="config-panel__desc">
+              HTTP 工具、MCP 与技能请在对话页输入框「加号 → 插件」中按消息选用。此处可配置子智能体委派。
+            </p>
 
             <h3 class="config-subtitle">子智能体</h3>
             <p class="config-panel__desc">绑定其他 Agent 后，主 Agent 可通过 Tool Calling 委派子任务</p>
@@ -535,7 +525,7 @@ import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import {
   archiveAgentVersion,
   bindAgentKnowledge,
-  bindAgentMcp,
+  bindAgentWorkflow,
   bindAgentSubAgent,
   bindAgentTool,
   updateAgentToolBinding,
@@ -546,6 +536,7 @@ import {
   getAgent,
   getAgentPublishStatus,
   listAgentKnowledge,
+  listAgentWorkflows,
   listAgentMcp,
   listAgentLongTermMemories,
   listAgentSubAgents,
@@ -556,7 +547,7 @@ import {
   publishAgent,
   restoreAgentVersion,
   unbindAgentKnowledge,
-  unbindAgentMcp,
+  unbindAgentWorkflow,
   unbindAgentSubAgent,
   unbindAgentTool,
   unpublishAgent,
@@ -569,6 +560,7 @@ import {
   updateAgentPrompt,
   verifyAgentEmbedDomain,
   type AgentKnowledgeBindingVO,
+  type AgentWorkflowBindingVO,
   type AgentLongTermMemoryVO,
   type AgentMcpBindingVO,
   type AgentPublishVO,
@@ -581,6 +573,7 @@ import {
 import { listKnowledgeBases, type KnowledgeBaseVO } from '@/api/knowledge'
 import { listMcpServers, type McpServerVO } from '@/api/mcp'
 import { listTools, type ToolVO } from '@/api/tool'
+import { listWorkflows, type WorkflowVO } from '@/api/workflow'
 import { listModels, type ModelVO } from '@/api/model'
 import { groupedPlatformModelOptions } from '@/utils/modelOptions'
 import {
@@ -652,7 +645,8 @@ const navItems = [
   { value: 'model', label: '模型', icon: 'cpu' },
   { value: 'memory', label: '记忆', icon: 'time' },
   { value: 'knowledge', label: '知识库', icon: 'book' },
-  { value: 'tools', label: '工具', icon: 'tools' },
+  { value: 'workflows', label: '工作流', icon: 'tree-square-dot' },
+  { value: 'tools', label: '协作', icon: 'usergroup' },
   { value: 'variables', label: '变量', icon: 'data' },
   { value: 'advanced', label: '高级', icon: 'setting' },
   { value: 'debug', label: '调试', icon: 'bug' },
@@ -660,19 +654,25 @@ const navItems = [
 ]
 
 const knowledgeBases = ref<KnowledgeBaseVO[]>([])
+const workflows = ref<WorkflowVO[]>([])
 const tools = ref<ToolVO[]>([])
 const mcpServers = ref<McpServerVO[]>([])
 const knowledgeBindings = ref<AgentKnowledgeBindingVO[]>([])
+const workflowBindings = ref<AgentWorkflowBindingVO[]>([])
 const toolBindings = ref<AgentToolBindingVO[]>([])
 const mcpBindings = ref<AgentMcpBindingVO[]>([])
 const subAgentBindings = ref<AgentSubAgentBindingVO[]>([])
 const allAgents = ref<AgentVO[]>([])
 const publishInfo = ref<AgentPublishVO | null>(null)
 const selectedKnowledgeId = ref<number | undefined>()
+const selectedWorkflowId = ref<number | undefined>()
 const selectedToolId = ref<number | undefined>()
 const selectedMcpId = ref<number | undefined>()
 const selectedSubAgentId = ref<number | undefined>()
+const bindWorkflowDefault = ref(false)
+const bindWorkflowCallable = ref(true)
 const bindingKnowledge = ref(false)
+const bindingWorkflow = ref(false)
 const bindingTool = ref(false)
 const bindingMcp = ref(false)
 const bindingSubAgent = ref(false)
@@ -710,6 +710,11 @@ const compareColumns: PrimaryTableCol<AgentVersionDiffVO>[] = [
 
 const knowledgeOptions = computed(() =>
   knowledgeBases.value.map((item) => ({ label: item.name, value: item.id })),
+)
+const workflowOptions = computed(() =>
+  workflows.value
+    .filter((item) => !workflowBindings.value.some((binding) => binding.workflowId === item.id))
+    .map((item) => ({ label: item.name, value: item.id })),
 )
 const toolOptions = computed(() => tools.value.map((item) => ({ label: `${item.name} (${item.toolKey})`, value: item.id })))
 const mcpOptions = computed(() =>
@@ -776,6 +781,13 @@ const publishSdkExample = computed(() => {
 const knowledgeColumns = [
   { colKey: 'knowledgeBaseId', title: '知识库 ID' },
   { colKey: 'topK', title: 'Top K', width: 80 },
+  { colKey: 'op', title: '操作', width: 100 },
+]
+const workflowColumns = [
+  { colKey: 'workflowName', title: '工作流' },
+  { colKey: 'workflowId', title: 'ID', width: 90 },
+  { colKey: 'defaultWorkflow', title: '默认', width: 80 },
+  { colKey: 'callable', title: '可调用', width: 80 },
   { colKey: 'op', title: '操作', width: 100 },
 ]
 const bindToolRequireConfirm = ref(false)
@@ -1202,10 +1214,12 @@ async function loadAgent() {
         { data: platformRes },
         { data: capRes },
         { data: kbRes },
+        { data: wfRes },
         { data: toolRes },
         { data: mcpRes },
         { data: agentsRes },
         { data: bindKbRes },
+        { data: bindWorkflowRes },
         { data: bindToolRes },
         { data: bindMcpRes },
         { data: bindSubAgentRes },
@@ -1215,10 +1229,12 @@ async function loadAgent() {
         listPlatformModels(),
         fetchPlatformCapabilities(),
         listKnowledgeBases(),
+        listWorkflows(),
         listTools(),
         listMcpServers(),
         listAgents(),
         listAgentKnowledge(agentId.value),
+        listAgentWorkflows(agentId.value),
         listAgentTools(agentId.value),
         listAgentMcp(agentId.value),
         listAgentSubAgents(agentId.value),
@@ -1228,10 +1244,12 @@ async function loadAgent() {
       platformModels.value = platformRes.data || []
       byokEnabled.value = capRes.data?.byokEnabled === true
       knowledgeBases.value = kbRes.data || []
+      workflows.value = wfRes.data || []
       tools.value = toolRes.data || []
       mcpServers.value = mcpRes.data || []
       allAgents.value = agentsRes.data || []
       knowledgeBindings.value = bindKbRes.data || []
+      workflowBindings.value = bindWorkflowRes.data || []
       toolBindings.value = bindToolRes.data || []
       mcpBindings.value = bindMcpRes.data || []
       subAgentBindings.value = bindSubAgentRes.data || []
@@ -1264,50 +1282,29 @@ async function unbindKnowledge(knowledgeBaseId: number) {
   knowledgeBindings.value = knowledgeBindings.value.filter((item) => item.knowledgeBaseId !== knowledgeBaseId)
 }
 
-async function toggleToolRequireConfirm(toolId: number, requireConfirmation: boolean) {
-  await updateAgentToolBinding(agentId.value, toolId, { requireConfirmation })
-  const { data } = await listAgentTools(agentId.value)
-  toolBindings.value = data.data || []
-}
-
-async function bindTool() {
-  if (!selectedToolId.value) return
-  bindingTool.value = true
+async function bindWorkflow() {
+  if (!selectedWorkflowId.value) return
+  bindingWorkflow.value = true
   try {
-    await bindAgentTool(agentId.value, {
-      toolId: selectedToolId.value,
-      enabled: true,
-      requireConfirmation: bindToolRequireConfirm.value,
+    await bindAgentWorkflow(agentId.value, {
+      workflowId: selectedWorkflowId.value,
+      defaultWorkflow: bindWorkflowDefault.value,
+      callable: bindWorkflowCallable.value,
     })
-    const { data } = await listAgentTools(agentId.value)
-    toolBindings.value = data.data || []
-    MessagePlugin.success('工具已绑定')
+    const { data } = await listAgentWorkflows(agentId.value)
+    workflowBindings.value = data.data || []
+    selectedWorkflowId.value = undefined
+    bindWorkflowDefault.value = false
+    bindWorkflowCallable.value = true
+    MessagePlugin.success('工作流已绑定')
   } finally {
-    bindingTool.value = false
+    bindingWorkflow.value = false
   }
 }
 
-async function unbindTool(toolId: number) {
-  await unbindAgentTool(agentId.value, toolId)
-  toolBindings.value = toolBindings.value.filter((item) => item.toolId !== toolId)
-}
-
-async function bindMcp() {
-  if (!selectedMcpId.value) return
-  bindingMcp.value = true
-  try {
-    await bindAgentMcp(agentId.value, { mcpServerId: selectedMcpId.value, enabled: true })
-    const { data } = await listAgentMcp(agentId.value)
-    mcpBindings.value = data.data || []
-    MessagePlugin.success('MCP 已绑定')
-  } finally {
-    bindingMcp.value = false
-  }
-}
-
-async function unbindMcp(mcpServerId: number) {
-  await unbindAgentMcp(agentId.value, mcpServerId)
-  mcpBindings.value = mcpBindings.value.filter((item) => item.mcpServerId !== mcpServerId)
+async function unbindWorkflow(workflowId: number) {
+  await unbindAgentWorkflow(agentId.value, workflowId)
+  workflowBindings.value = workflowBindings.value.filter((item) => item.workflowId !== workflowId)
 }
 
 async function bindSubAgent() {

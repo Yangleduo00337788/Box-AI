@@ -8,6 +8,14 @@ export const PLUGIN_CATEGORY_META: Record<string, { icon: string; tone: string }
   skills: { icon: 'education', tone: 'teal' },
 }
 
+/** 对话输入框加号可选的插件分类 */
+export const COMPOSER_PLUGIN_CATEGORIES = ['skills', 'tools', 'mcp'] as const
+
+export function isComposerPluginCategory(category: string) {
+  const key = category?.trim().toLowerCase()
+  return (COMPOSER_PLUGIN_CATEGORIES as readonly string[]).includes(key)
+}
+
 export const PLUGIN_CATEGORY_LABELS: Record<string, string> = {
   workflows: '工作流',
   knowledge: '知识库',
@@ -16,9 +24,8 @@ export const PLUGIN_CATEGORY_LABELS: Record<string, string> = {
   skills: 'skill',
 }
 
-export function pluginPillLabel(plugin: Pick<PluginCatalogVO, 'category' | 'title'>) {
-  const category = PLUGIN_CATEGORY_LABELS[plugin.category] || plugin.category || '插件'
-  return `${category} ${plugin.title}`.trim()
+export function pluginPillLabel(plugin: Pick<PluginCatalogVO, 'title'> | { title?: string }) {
+  return (plugin.title || '').trim()
 }
 
 export function pluginCategoryIcon(category: string) {

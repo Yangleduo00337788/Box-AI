@@ -1,0 +1,7 @@
+{
+  "url": "https://httpbin.org/get",
+  "method": "GET",
+  "type": "HTTP",
+  "timeoutMs": 15000,
+  "allowRedirect": false
+}

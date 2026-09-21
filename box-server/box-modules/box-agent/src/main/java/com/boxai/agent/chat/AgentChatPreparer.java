@@ -26,6 +26,7 @@ import com.boxai.security.context.WorkspaceContext;
 import com.boxai.agent.application.AgentLongTermMemoryApplicationService;
 import com.boxai.knowledge.application.KnowledgeRetrievalResult;
 import com.boxai.knowledge.application.KnowledgeRetrievalService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -45,6 +46,7 @@ public class AgentChatPreparer {
     private final SecretCipher secretCipher;
     private final KnowledgeRetrievalService knowledgeRetrievalService;
     private final AgentToolRuntimeService agentToolRuntimeService;
+    private final AgentWorkflowRuntimeService agentWorkflowRuntimeService;
     private final AgentLongTermMemoryApplicationService longTermMemoryApplicationService;
     private final ChatUserMessageImageEnricher chatUserMessageImageEnricher;
 
@@ -58,6 +60,7 @@ public class AgentChatPreparer {
                              SecretCipher secretCipher,
                              KnowledgeRetrievalService knowledgeRetrievalService,
                              AgentToolRuntimeService agentToolRuntimeService,
+                             @Lazy AgentWorkflowRuntimeService agentWorkflowRuntimeService,
                              AgentLongTermMemoryApplicationService longTermMemoryApplicationService,
                              ChatUserMessageImageEnricher chatUserMessageImageEnricher) {
         this.agentRepository = agentRepository;
@@ -70,6 +73,7 @@ public class AgentChatPreparer {
         this.secretCipher = secretCipher;
         this.knowledgeRetrievalService = knowledgeRetrievalService;
         this.agentToolRuntimeService = agentToolRuntimeService;
+        this.agentWorkflowRuntimeService = agentWorkflowRuntimeService;
         this.longTermMemoryApplicationService = longTermMemoryApplicationService;
         this.chatUserMessageImageEnricher = chatUserMessageImageEnricher;
     }
@@ -87,10 +91,20 @@ public class AgentChatPreparer {
                                      String userMessage,
                                      Long platformModelOverride,
                                      KnowledgeRetrievalResult retrieval) {
+        return prepare(agentId, history, userMessage, platformModelOverride, retrieval, ConversationPluginRound.empty());
+    }
+
+    public PreparedAgentChat prepare(Long agentId,
+                                     List<ChatTurn> history,
+                                     String userMessage,
+                                     Long platformModelOverride,
+                                     KnowledgeRetrievalResult retrieval,
+                                     ConversationPluginRound pluginRound) {
         Agent agent = requireAgent(agentId);
         AgentVersion version = agentVersionRepository.findLatestDraft(agent.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "智能体草稿版本不存在"));
-        return prepareWithVersion(agent, version, history, userMessage, platformModelOverride, retrieval);
+        ConversationPluginRound effectiveRound = pluginRound == null ? ConversationPluginRound.empty() : pluginRound;
+        return prepareWithVersion(agent, version, history, userMessage, platformModelOverride, retrieval, effectiveRound);
     }
 
     public KnowledgeRetrievalResult retrieveKnowledge(AgentVersion version, String userMessage) {
@@ -114,7 +128,7 @@ public class AgentChatPreparer {
         }
         AgentVersion version = agentVersionRepository.findById(agent.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "发布版本不存在"));
-        return prepareWithVersion(agent, version, history, userMessage, null, retrieval);
+        return prepareWithVersion(agent, version, history, userMessage, null, retrieval, ConversationPluginRound.empty());
     }
 
     private PreparedAgentChat prepareWithVersion(Agent agent,
@@ -122,7 +136,8 @@ public class AgentChatPreparer {
                                                  List<ChatTurn> history,
                                                  String userMessage,
                                                  Long platformModelOverride,
-                                                 KnowledgeRetrievalResult retrieval) {
+                                                 KnowledgeRetrievalResult retrieval,
+                                                 ConversationPluginRound pluginRound) {
         ResolvedAgentChatModel resolved = resolveAgentChatModel(draft, platformModelOverride);
         List<ChatTurn> turns = buildTurns(
                 agent.getId(),
@@ -130,7 +145,8 @@ public class AgentChatPreparer {
                 history,
                 userMessage,
                 retrieval,
-                resolved);
+                resolved,
+                pluginRound);
         return buildPrepared(
                 agent.getId(),
                 resolved.runtimeConfig(),
@@ -139,6 +155,7 @@ public class AgentChatPreparer {
                 resolved.credentialId(),
                 resolved.platformCredential(),
                 resolved.modelId(),
+                pluginRound,
                 null);
     }
 
@@ -224,12 +241,17 @@ public class AgentChatPreparer {
                                             Long credentialId,
                                             boolean platformCredential,
                                             Long modelId,
+                                            ConversationPluginRound pluginRound,
                                             String toolConfirmationToken) {
-        List<ToolDefinition> tools = Boolean.TRUE.equals(draft.getToolEnabled())
-                ? agentToolRuntimeService.resolveTools(draft.getId()).stream()
+        List<ResolvedAgentTool> extraTools = pluginRound == null ? List.of() : pluginRound.extraTools();
+        List<ResolvedAgentTool> resolvedTools = Boolean.TRUE.equals(draft.getToolEnabled())
+                ? agentToolRuntimeService.resolveTools(draft.getId(), extraTools)
+                : agentToolRuntimeService.resolveConversationTools(draft.getId(), extraTools);
+        List<ToolDefinition> tools = resolvedTools.isEmpty()
+                ? List.of()
+                : resolvedTools.stream()
                 .map(item -> new ToolDefinition(item.toolKey(), item.description()))
-                .toList()
-                : List.of();
+                .toList();
         return new PreparedAgentChat(
                 agentId,
                 runtimeConfig,
@@ -242,6 +264,7 @@ public class AgentChatPreparer {
                 modelId,
                 draft.getId(),
                 tools,
+                resolvedTools,
                 toolConfirmationToken);
     }
 
@@ -250,7 +273,8 @@ public class AgentChatPreparer {
                                       List<ChatTurn> history,
                                       String userMessage,
                                       KnowledgeRetrievalResult retrieval,
-                                      ResolvedAgentChatModel resolvedModel) {
+                                      ResolvedAgentChatModel resolvedModel,
+                                      ConversationPluginRound pluginRound) {
         boolean enrichImagesWithOcr = !resolvedModel.sendImagesMultimodal();
         boolean sendImagesMultimodal = resolvedModel.sendImagesMultimodal();
         List<ChatTurn> turns = new ArrayList<>();
@@ -277,6 +301,21 @@ public class AgentChatPreparer {
                         ? memoryBlock
                         : systemPrompt + "\n\n" + memoryBlock;
             }
+        }
+        String workflowContext = agentWorkflowRuntimeService.runDefaultIfPresent(draft.getId(), userMessage);
+        if (workflowContext != null && !workflowContext.isBlank()) {
+            String workflowBlock = "以下为默认工作流执行结果，请结合用户问题使用：\n"
+                    + PromptInjectionGuard.wrapUntrustedContext("workflow", workflowContext);
+            systemPrompt = systemPrompt == null || systemPrompt.isBlank()
+                    ? workflowBlock
+                    : systemPrompt + "\n\n" + workflowBlock;
+        }
+        if (pluginRound != null && pluginRound.skillPromptBlock() != null && !pluginRound.skillPromptBlock().isBlank()) {
+            String skillBlock = "以下为本次用户消息启用的技能说明，你必须严格遵守其中的格式与约束，不得忽略或仅用普通一句话概括：\n"
+                    + PromptInjectionGuard.wrapUntrustedContext("skill", pluginRound.skillPromptBlock());
+            systemPrompt = systemPrompt == null || systemPrompt.isBlank()
+                    ? skillBlock
+                    : systemPrompt + "\n\n" + skillBlock;
         }
         String policy = PromptInjectionGuard.systemPolicy();
         systemPrompt = systemPrompt == null || systemPrompt.isBlank() ? policy : policy + "\n\n" + systemPrompt;

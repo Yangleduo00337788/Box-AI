@@ -71,3 +71,62 @@
     background-position: -20% 50%;
   }
 }
+
+/* 对话输入框与历史消息共用的插件行内标签（蓝色、图标 + 名称、与正文同一行同高） */
+.box-chat-plugin-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.box-chat-plugin-inline:hover {
+  text-decoration: underline;
+  color: #1d4ed8;
+}
+
+.box-chat-plugin-inline__icon {
+  font-size: 1em;
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+.box-chat-plugin-inline--composer {
+  flex-shrink: 0;
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.box-chat-plugin-inline__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+  font-size: 11px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.box-chat-plugin-inline__close:hover {
+  background: rgba(37, 99, 235, 0.2);
+  color: #1d4ed8;
+}

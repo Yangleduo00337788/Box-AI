@@ -108,7 +108,7 @@ public class AgentChatExecutor {
         try {
             String content;
             if (prepared.tools() != null && !prepared.tools().isEmpty()) {
-                List<ResolvedAgentTool> resolvedTools = agentToolRuntimeService.resolveTools(prepared.agentVersionId());
+                List<ResolvedAgentTool> resolvedTools = prepared.resolvedTools();
                 content = chatModelGateway.chatWithTools(
                         prepared.runtimeConfig(),
                         prepared.turns(),
@@ -239,7 +239,7 @@ public class AgentChatExecutor {
                                  Execution execution,
                                  Long workspaceId,
                                  StringBuilder contentBuilder) throws IOException {
-        List<ResolvedAgentTool> resolvedTools = agentToolRuntimeService.resolveTools(prepared.agentVersionId());
+        List<ResolvedAgentTool> resolvedTools = prepared.resolvedTools();
         try {
             chatModelGateway.streamChatWithTools(
                     prepared.runtimeConfig(),

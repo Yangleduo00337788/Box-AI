@@ -173,6 +173,23 @@ public class AgentController {
         return Result.success();
     }
 
+    @GetMapping("/{id}/workflows")
+    public Result<List<com.boxai.agent.api.AgentWorkflowBindingVO>> listWorkflows(@PathVariable Long id) {
+        return Result.success(agentBindingApplicationService.listWorkflows(id));
+    }
+
+    @PostMapping("/{id}/workflows")
+    public Result<com.boxai.agent.api.AgentWorkflowBindingVO> bindWorkflow(@PathVariable Long id,
+                                                                           @Valid @RequestBody com.boxai.agent.api.BindAgentWorkflowRequest request) {
+        return Result.success(agentBindingApplicationService.bindWorkflow(id, request));
+    }
+
+    @DeleteMapping("/{id}/workflows/{workflowId}")
+    public Result<Void> unbindWorkflow(@PathVariable Long id, @PathVariable Long workflowId) {
+        agentBindingApplicationService.unbindWorkflow(id, workflowId);
+        return Result.success();
+    }
+
     @GetMapping("/{id}/tools")
     public Result<List<AgentToolBindingVO>> listTools(@PathVariable Long id) {
         return Result.success(agentBindingApplicationService.listTools(id));

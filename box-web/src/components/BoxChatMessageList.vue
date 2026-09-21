@@ -1,12 +1,15 @@
 <template>
+  <div
+    class="box-chat-message-list"
+    :class="[rootClass, { 'box-chat-message-list--share': shareMode }]"
+  >
   <ChatList
     ref="listRef"
-    class="box-chat-message-list box-hide-scrollbar"
-    :class="[rootClass, { 'box-chat-message-list--share': shareMode }]"
+    class="box-chat-message-list__inner box-hide-scrollbar"
     :clear-history="false"
     :reverse="false"
     :auto-scroll="autoScroll"
-    :show-scroll-button="showScrollButton && !shareMode"
+    :show-scroll-button="false"
     layout="single"
   >
     <div v-if="emptyText && !items.length" class="box-chat-message-list__empty">
@@ -66,12 +69,19 @@
             </t-avatar>
           </template>
           <template #content>
-            <box-chat-thinking-status v-if="item.thinkingActive" />
+            <box-chat-thinking-status
+              v-if="item.thinkingActive"
+              :label="item.thinkingLabel || '正在思考中'"
+            />
             <div
               v-else
               class="box-chat-bubble"
               :class="`box-chat-bubble--${item.uiRole}`"
             >
+              <box-chat-thinking-status
+                v-if="item.toolInvokeActive"
+                :label="item.toolInvokeLabel || '正在调用工具'"
+              />
               <ChatThinking
                 v-if="item.reasoning"
                 status="complete"
@@ -99,11 +109,23 @@
                   <t-image :src="image.url" :alt="image.name" fit="cover" shape="round" />
                 </a>
               </div>
-              <span v-if="item.userText && item.uiRole === 'user'">{{ item.userText }}</span>
+              <div v-if="item.uiRole === 'user' && (item.enabledPlugins?.length || item.userText)" class="box-chat-user-line">
+                <box-chat-message-plugins
+                  v-if="item.enabledPlugins?.length"
+                  :items="item.enabledPlugins"
+                />
+                <span v-if="item.userText" class="box-chat-user-line__text">{{ item.userText }}</span>
+              </div>
               <ChatContent
                 v-else-if="item.uiRole === 'assistant'"
                 role="assistant"
                 :content="{ type: 'markdown', data: item.plainText || '' }"
+                :status="item.uiStatus === 'streaming' ? 'streaming' : 'complete'"
+              />
+              <box-chat-tool-runs
+                v-if="item.uiRole === 'assistant' && item.toolRuns?.length"
+                :runs="item.toolRuns"
+                @open="onToolRunOpen"
               />
             </div>
           </template>
@@ -125,10 +147,20 @@
     </div>
     <slot />
   </ChatList>
+  <button
+    v-if="showJumpToLatest && showScrollButton && !shareMode"
+    type="button"
+    class="box-chat-message-list__jump"
+    aria-label="滚动到底部"
+    @click="onJumpToLatest"
+  >
+    <t-icon name="chevron-down" />
+  </button>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   ChatActionbar,
   ChatContent,
@@ -138,7 +170,12 @@ import {
 } from '@tdesign-vue-next/chat'
 import type { BoxChatListItem } from '@/utils/boxChatListItems'
 import BoxChatCitations from '@/components/BoxChatCitations.vue'
+import BoxChatMessagePlugins from '@/components/BoxChatMessagePlugins.vue'
+import BoxChatToolRuns from '@/components/BoxChatToolRuns.vue'
 import BoxChatThinkingStatus from '@/components/BoxChatThinkingStatus.vue'
+import type { ChatToolRun } from '@/utils/messageMetadata'
+import { pluginMarketPathForCategory } from '@/constants/resourceRoutes'
+import { useRouter } from 'vue-router'
 import '@/styles/box-chat-bubble.css'
 
 const props = withDefaults(
@@ -172,8 +209,46 @@ const emit = defineEmits<{
   'toggle-share-select': [messageId: number, selected: boolean]
 }>()
 
-const listRef = ref<{ scrollToBottom?: (params?: { behavior?: 'auto' | 'smooth' }) => void } | null>(null)
+const listRef = ref<{ scrollToBottom?: (params?: { behavior?: 'auto' | 'smooth' }) => void; $el?: HTMLElement } | null>(null)
 const feedbackMap = reactive<Record<string, 'good' | 'bad' | ''>>({})
+const router = useRouter()
+const showJumpToLatest = ref(false)
+let listEl: HTMLElement | null = null
+
+function updateJumpVisibility() {
+  if (!listEl) {
+    showJumpToLatest.value = false
+    return
+  }
+  const gap = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight
+  showJumpToLatest.value = gap > 72
+}
+
+function unbindListScroll() {
+  listEl?.removeEventListener('scroll', updateJumpVisibility)
+  listEl = null
+}
+
+function bindListScroll() {
+  unbindListScroll()
+  const root = listRef.value?.$el
+  listEl = root?.querySelector?.('.t-chat__list') ?? null
+  listEl?.addEventListener('scroll', updateJumpVisibility, { passive: true })
+  updateJumpVisibility()
+}
+
+function onJumpToLatest() {
+  scrollToBottom({ behavior: 'smooth' })
+  showJumpToLatest.value = false
+}
+
+function onToolRunOpen(run: ChatToolRun) {
+  if (run.toolKey.startsWith('mcp_')) {
+    router.push('/plugin-market?mine=mcp')
+    return
+  }
+  router.push(pluginMarketPathForCategory('tools'))
+}
 
 function onToggleSelect(messageId: number, selected: boolean) {
   emit('toggle-share-select', messageId, selected)
@@ -206,7 +281,23 @@ function onActionBar(type: string, index: number, item: BoxChatListItem) {
 
 function scrollToBottom(params?: { behavior?: 'auto' | 'smooth' }) {
   listRef.value?.scrollToBottom?.(params)
+  nextTick(updateJumpVisibility)
 }
+
+onMounted(() => {
+  nextTick(bindListScroll)
+})
+
+watch(
+  () => props.items.length,
+  () => {
+    nextTick(() => {
+      bindListScroll()
+    })
+  },
+)
+
+onBeforeUnmount(unbindListScroll)
 
 defineExpose({
   scrollToBottom,
@@ -219,6 +310,22 @@ defineExpose({
   min-height: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.box-chat-message-list__inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.box-chat-message-list :deep(.t-chat) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .box-chat-message-list :deep(.t-chat__list) {
@@ -229,14 +336,39 @@ defineExpose({
   flex-direction: column;
   gap: 24px;
   padding: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.box-chat-message-list :deep(.t-chat__scroll-button) {
-  right: 20px;
-  left: auto;
+.box-chat-message-list :deep(.t-chat__list)::-webkit-scrollbar {
+  display: none;
+}
+
+.box-chat-message-list__jump {
+  position: absolute;
+  left: 50%;
   bottom: 12px;
-  transform: none;
-  box-shadow: var(--box-shadow-soft);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--td-component-border);
+  border-radius: 999px;
+  background: var(--box-surface, #fff);
+  color: var(--td-text-color-secondary);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+.box-chat-message-list__jump:hover {
+  border-color: var(--td-brand-color-light);
+  color: var(--td-brand-color);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
 }
 
 .box-chat-message-list :deep(.t-chat-item) {
@@ -417,5 +549,31 @@ defineExpose({
   width: 168px;
   height: 168px;
   border-radius: var(--box-radius-md);
+}
+
+.box-chat-user-line {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.box-chat-user-line :deep(.box-chat-message-plugins) {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin: 0;
+  line-height: 22px;
+}
+
+.box-chat-user-line__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--td-text-color-primary);
+  line-height: 22px;
 }
 </style>

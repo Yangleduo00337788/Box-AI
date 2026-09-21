@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { listPlugins, type PluginCatalogVO } from '@/api/plugin'
-import { isPluginInstalled } from '@/constants/pluginCatalogMeta'
+import { isComposerPluginCategory, isPluginInstalled } from '@/constants/pluginCatalogMeta'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 
 export function useWorkspaceInstalledPlugins() {
@@ -10,6 +10,12 @@ export function useWorkspaceInstalledPlugins() {
   const installed = computed(() =>
     plugins.value
       .filter(isPluginInstalled)
+      .sort((left, right) => left.title.localeCompare(right.title, 'zh-CN')),
+  )
+
+  const composerInstalled = computed(() =>
+    installed.value
+      .filter((item) => isComposerPluginCategory(item.category))
       .sort((left, right) => left.title.localeCompare(right.title, 'zh-CN')),
   )
 
@@ -31,6 +37,7 @@ export function useWorkspaceInstalledPlugins() {
     loading,
     plugins,
     installed,
+    composerInstalled,
     load,
   }
 }

@@ -38,50 +38,29 @@ withDefaults(
   box-shadow: none;
 }
 
-/* 白框：独立圆角卡片，略宽于下方灰条（无插件时边框在 textarea 上） */
-.chat-composer-stack__panel
-  :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea) {
-  padding: 16px 18px 14px;
+/* 有无插件共用同一张白卡片，避免选插件后高度被另一套 padding 压矮 */
+.chat-composer-stack__panel :deep(.box-chat-sender__composer) {
+  --box-composer-pad-y: 16px;
+  --box-composer-pad-x: 18px;
+  padding: var(--box-composer-pad-y) var(--box-composer-pad-x) 12px;
   border: 1px solid var(--box-composer-border);
   border-radius: var(--box-composer-radius);
   background: var(--box-surface);
   box-shadow: var(--box-composer-shadow);
 }
 
-.chat-composer-stack__panel
-  :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea:hover),
-.chat-composer-stack__panel
-  :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea--focus),
-.chat-composer-stack__panel
-  :deep(
-    .box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea--focus:hover
-  ) {
-  border-color: var(--box-composer-border);
-  background: var(--box-surface);
-  box-shadow: var(--box-composer-shadow);
-}
-
-/* 有插件：仅外层一层卡片，内层输入区不再套框 */
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins) {
-  padding: 14px 18px 14px;
-  border: 1px solid var(--box-composer-border);
-  border-radius: var(--box-composer-radius);
-  background: var(--box-surface);
-  box-shadow: var(--box-composer-shadow);
-}
-
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__content) {
+.chat-composer-stack__panel :deep(.box-chat-sender__composer .t-chat-sender__content) {
   padding: 0;
 }
 
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea__wrapper) {
-  padding: 0;
-}
-
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea),
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea:hover),
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea--focus),
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-chat-sender__textarea--focus:hover) {
+.chat-composer-stack__panel :deep(.box-chat-sender__composer .t-chat-sender__textarea),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer .t-chat-sender__textarea:hover),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer .t-chat-sender__textarea--focus),
+.chat-composer-stack__panel
+  :deep(.box-chat-sender__composer .t-chat-sender__textarea--focus:hover),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer .t-textarea),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer .t-textarea:hover),
+.chat-composer-stack__panel :deep(.box-chat-sender__composer .t-textarea--focused) {
   padding: 0;
   border: none;
   box-shadow: none;
@@ -89,13 +68,8 @@ withDefaults(
   background: transparent;
 }
 
-.chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins .t-textarea__inner) {
-  min-height: 28px;
-  padding: 0;
-}
-
 .chat-composer-stack__panel :deep(.t-textarea__inner) {
-  min-height: 72px;
+  min-height: 72px !important;
   font-size: 15px;
   line-height: 1.6;
 }
@@ -122,13 +96,10 @@ withDefaults(
 }
 
 @media (max-width: 640px) {
-  .chat-composer-stack__panel
-    :deep(.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .t-chat-sender__textarea) {
-    padding: 14px 14px 12px;
-  }
-
-  .chat-composer-stack__panel :deep(.box-chat-sender__composer--with-plugins) {
-    padding: 12px 14px 12px;
+  .chat-composer-stack__panel :deep(.box-chat-sender__composer) {
+    --box-composer-pad-y: 14px;
+    --box-composer-pad-x: 14px;
+    padding: var(--box-composer-pad-y) var(--box-composer-pad-x) 10px;
   }
 
   .chat-composer-stack__agent-rail {

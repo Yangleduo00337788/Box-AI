@@ -3,7 +3,29 @@
     <div
       class="box-chat-sender__composer"
       :class="{ 'box-chat-sender__composer--with-plugins': selectedPlugins.length }"
+      :style="pluginPadStyle"
     >
+    <div v-if="selectedPlugins.length" ref="pluginPillsRef" class="box-chat-sender__plugin-pills">
+      <span
+        v-for="plugin in selectedPlugins"
+        :key="plugin.id"
+        class="box-chat-plugin-inline box-chat-plugin-inline--composer"
+        @mouseenter="hoveredPluginId = plugin.id"
+        @mouseleave="hoveredPluginId = null"
+      >
+        <t-icon :name="pluginCategoryIcon(plugin.category)" class="box-chat-plugin-inline__icon" />
+        <span>{{ pluginPillLabel(plugin) }}</span>
+        <button
+          v-show="hoveredPluginId === plugin.id"
+          type="button"
+          class="box-chat-plugin-inline__close"
+          aria-label="取消启用插件"
+          @click.stop="onRemovePlugin(plugin.id)"
+        >
+          <t-icon name="close" />
+        </button>
+      </span>
+    </div>
     <ChatSender
       :value="modelValue"
       :loading="loading"
@@ -17,27 +39,6 @@
       @stop="emit('stop')"
       @remove="onRemoveAttachment"
     >
-      <template v-if="selectedPlugins.length" #input-prefix>
-        <span
-          v-for="plugin in selectedPlugins"
-          :key="plugin.id"
-          class="box-chat-sender__plugin-pill"
-          @mouseenter="hoveredPluginId = plugin.id"
-          @mouseleave="hoveredPluginId = null"
-        >
-          <t-icon :name="pluginComposerIcon()" class="box-chat-sender__plugin-pill-icon" />
-          <span class="box-chat-sender__plugin-pill-text">{{ pluginPillLabel(plugin) }}</span>
-          <button
-            v-show="hoveredPluginId === plugin.id"
-            type="button"
-            class="box-chat-sender__plugin-pill-close"
-            aria-label="取消启用插件"
-            @click.stop="onRemovePlugin(plugin.id)"
-          >
-            <t-icon name="close" />
-          </button>
-        </span>
-      </template>
       <template v-if="showAttach || showCloud" #footer-prefix>
         <div ref="attachAnchorRef" class="box-chat-sender__prefix">
           <t-tooltip v-if="showAttach" content="添加附件或插件" placement="top" theme="light" :show-arrow="false">
@@ -115,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { TextareaProps } from 'tdesign-vue-next'
 import { ChatSender, type TdAttachmentItem } from '@tdesign-vue-next/chat'
@@ -125,7 +126,8 @@ import { appPreferences } from '@/composables/useAppPreferences'
 import { useWorkspaceInstalledPlugins } from '@/composables/useWorkspaceInstalledPlugins'
 import ChatComposerPlusMenu from '@/components/ChatComposerPlusMenu.vue'
 import ChatModelPicker from '@/components/ChatModelPicker.vue'
-import { pluginComposerIcon, pluginPillLabel } from '@/constants/pluginCatalogMeta'
+import { pluginCategoryIcon, pluginPillLabel } from '@/constants/pluginCatalogMeta'
+import '@/styles/box-chat-bubble.css'
 
 const props = withDefaults(
   defineProps<{
@@ -188,9 +190,11 @@ const router = useRouter()
 const rootRef = ref<HTMLElement | null>(null)
 const attachAnchorRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const pluginPillsRef = ref<HTMLElement | null>(null)
+const pluginPillsWidth = ref(0)
 const attachMenuOpen = ref(false)
 const hoveredPluginId = ref<number | null>(null)
-const { installed: installedPlugins, loading: pluginsLoading, load: loadInstalledPlugins } =
+const { composerInstalled: installedPlugins, loading: pluginsLoading, load: loadInstalledPlugins } =
   useWorkspaceInstalledPlugins()
 let textareaEl: HTMLTextAreaElement | null = null
 const modelKey = ref(props.selectedModelKey)
@@ -206,12 +210,32 @@ watch(modelKey, (value) => {
   emit('update:selectedModelKey', value)
 })
 
+const pluginPadStyle = computed(() =>
+  pluginPillsWidth.value > 0
+    ? { '--box-plugin-pills-width': `${pluginPillsWidth.value}px` }
+    : undefined,
+)
+
+function measurePluginPills() {
+  pluginPillsWidth.value = pluginPillsRef.value?.offsetWidth ?? 0
+}
+
 const textareaProps = computed<TextareaProps>(() => ({
   placeholder: props.placeholder,
-  autosize: { minRows: props.minRows, maxRows: props.maxRows },
+  autosize: {
+    minRows: props.minRows,
+    maxRows: props.maxRows,
+  },
 }))
 
 const selectedPluginIdList = computed(() => props.selectedPlugins.map((item) => item.id))
+
+watch(
+  () => props.selectedPlugins.map((item) => item.id).join(','),
+  () => {
+    nextTick(measurePluginPills)
+  },
+)
 
 const attachmentsProps = computed(() => ({
   items: props.attachmentItems,
@@ -291,6 +315,7 @@ onMounted(() => {
   if (props.showAttach && props.showPluginPicker) {
     void loadInstalledPlugins()
   }
+  nextTick(measurePluginPills)
 })
 
 onBeforeUnmount(() => {
@@ -319,22 +344,19 @@ function onFileChange(event: Event) {
 .box-chat-sender__input :deep(.t-chat-sender) {
   padding: 0;
   background: transparent;
+  border: none;
   box-shadow: none;
 }
 
-.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .box-chat-sender__input :deep(.t-chat-sender__textarea) {
-  border: 1px solid var(--box-composer-border, var(--box-border));
-  border-radius: var(--box-composer-radius);
-  background: var(--box-surface);
-  box-shadow: var(--box-composer-shadow, var(--box-shadow-card));
-}
-
-.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .box-chat-sender__input :deep(.t-chat-sender__textarea:hover),
-.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .box-chat-sender__input :deep(.t-chat-sender__textarea--focus),
-.box-chat-sender__composer:not(.box-chat-sender__composer--with-plugins) .box-chat-sender__input :deep(.t-chat-sender__textarea--focus:hover) {
-  border-color: var(--box-composer-border, var(--box-border));
-  background: var(--box-surface);
-  box-shadow: var(--box-composer-shadow, var(--box-shadow-card));
+.box-chat-sender__input :deep(.t-chat-sender__textarea),
+.box-chat-sender__input :deep(.t-chat-sender__textarea:hover),
+.box-chat-sender__input :deep(.t-chat-sender__textarea--focus),
+.box-chat-sender__input :deep(.t-chat-sender__textarea--focus:hover) {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .box-chat-sender__input :deep(.t-textarea__inner) {
@@ -411,66 +433,25 @@ function onFileChange(event: Event) {
   background: #2ba471;
 }
 
-.box-chat-sender__composer--with-plugins .box-chat-sender__input :deep(.t-chat-sender__textarea),
-.box-chat-sender__composer--with-plugins .box-chat-sender__input :deep(.t-chat-sender__textarea:hover),
-.box-chat-sender__composer--with-plugins .box-chat-sender__input :deep(.t-chat-sender__textarea--focus),
-.box-chat-sender__composer--with-plugins .box-chat-sender__input :deep(.t-chat-sender__textarea--focus:hover) {
-  border: none;
-  box-shadow: none;
-  border-radius: 0;
-  background: transparent;
+.box-chat-sender__composer {
+  position: relative;
 }
 
-.box-chat-sender__composer--with-plugins .box-chat-sender__input :deep(.t-chat-sender__textarea__wrapper) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-
-.box-chat-sender__composer--with-plugins .box-chat-sender__input :deep(.t-chat-sender__textarea) {
-  flex: 1 1 140px;
-  min-width: 0;
-}
-
-.box-chat-sender__plugin-pill {
+.box-chat-sender__plugin-pills {
+  position: absolute;
+  top: var(--box-composer-pad-y, 16px);
+  left: var(--box-composer-pad-x, 18px);
+  z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  color: #2563eb;
-  font-size: 15px;
-  line-height: 1.5;
-  user-select: none;
-  flex-shrink: 0;
+  gap: 8px;
+  height: 24px;
+  max-width: 70%;
+  pointer-events: auto;
 }
 
-.box-chat-sender__plugin-pill-text {
-  white-space: nowrap;
+.box-chat-sender__composer--with-plugins :deep(.t-textarea__inner) {
+  padding-left: calc(var(--box-plugin-pills-width, 0px) + 8px) !important;
 }
 
-.box-chat-sender__plugin-pill-icon {
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
-.box-chat-sender__plugin-pill-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.box-chat-sender__plugin-pill-close:hover {
-  background: rgba(37, 99, 235, 0.2);
-}
 </style>

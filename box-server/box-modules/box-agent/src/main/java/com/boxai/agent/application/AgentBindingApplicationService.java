@@ -4,10 +4,12 @@ import com.boxai.agent.api.AgentKnowledgeBindingVO;
 import com.boxai.agent.api.AgentMcpBindingVO;
 import com.boxai.agent.api.AgentSubAgentBindingVO;
 import com.boxai.agent.api.AgentToolBindingVO;
+import com.boxai.agent.api.AgentWorkflowBindingVO;
 import com.boxai.agent.api.BindAgentKnowledgeRequest;
 import com.boxai.agent.api.BindAgentMcpRequest;
 import com.boxai.agent.api.BindAgentSubAgentRequest;
 import com.boxai.agent.api.BindAgentToolRequest;
+import com.boxai.agent.api.BindAgentWorkflowRequest;
 import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
@@ -21,12 +23,16 @@ import com.boxai.domain.agent.AgentSubAgent;
 import com.boxai.domain.agent.AgentSubAgentRepository;
 import com.boxai.domain.agent.AgentTool;
 import com.boxai.domain.agent.AgentToolRepository;
+import com.boxai.domain.agent.AgentWorkflow;
+import com.boxai.domain.agent.AgentWorkflowRepository;
 import com.boxai.domain.agent.AgentVersion;
 import com.boxai.domain.agent.AgentVersionRepository;
 import com.boxai.domain.knowledge.KnowledgeBaseRepository;
 import com.boxai.domain.mcp.McpServer;
 import com.boxai.domain.mcp.McpServerRepository;
 import com.boxai.domain.tool.ToolRepository;
+import com.boxai.domain.workflow.Workflow;
+import com.boxai.domain.workflow.WorkflowRepository;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.security.permission.WorkspacePermissionService;
 import org.springframework.stereotype.Service;
@@ -46,6 +52,8 @@ public class AgentBindingApplicationService {
     private final ToolRepository toolRepository;
     private final McpServerRepository mcpServerRepository;
     private final AgentSubAgentRepository agentSubAgentRepository;
+    private final AgentWorkflowRepository agentWorkflowRepository;
+    private final WorkflowRepository workflowRepository;
     private final WorkspacePermissionService workspacePermissionService;
 
     public AgentBindingApplicationService(AgentRepository agentRepository,
@@ -57,6 +65,8 @@ public class AgentBindingApplicationService {
                                           ToolRepository toolRepository,
                                           McpServerRepository mcpServerRepository,
                                           AgentSubAgentRepository agentSubAgentRepository,
+                                          AgentWorkflowRepository agentWorkflowRepository,
+                                          WorkflowRepository workflowRepository,
                                           WorkspacePermissionService workspacePermissionService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
@@ -67,6 +77,8 @@ public class AgentBindingApplicationService {
         this.toolRepository = toolRepository;
         this.mcpServerRepository = mcpServerRepository;
         this.agentSubAgentRepository = agentSubAgentRepository;
+        this.agentWorkflowRepository = agentWorkflowRepository;
+        this.workflowRepository = workflowRepository;
         this.workspacePermissionService = workspacePermissionService;
     }
 
@@ -212,6 +224,53 @@ public class AgentBindingApplicationService {
         return toMcpVO(binding);
     }
 
+    public List<AgentWorkflowBindingVO> listWorkflows(Long agentId) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
+        Agent agent = requireAgent(agentId);
+        AgentVersion draft = requireDraft(agent);
+        return agentWorkflowRepository.listByVersionId(draft.getId()).stream().map(this::toWorkflowVO).toList();
+    }
+
+    @Transactional
+    public AgentWorkflowBindingVO bindWorkflow(Long agentId, BindAgentWorkflowRequest request) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
+        Agent agent = requireAgent(agentId);
+        AgentVersion draft = requireDraft(agent);
+        Workflow workflow = workflowRepository.findById(request.workflowId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "工作流不存在"));
+        if (!workspaceId().equals(workflow.getWorkspaceId())) {
+            throw new BusinessException(ErrorCode.WORKSPACE_ACCESS_DENIED, "无权访问该工作流");
+        }
+        agentWorkflowRepository.findByVersionAndWorkflow(draft.getId(), request.workflowId())
+                .ifPresent(existing -> {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "该工作流已绑定");
+                });
+        if (Boolean.TRUE.equals(request.defaultWorkflow())) {
+            agentWorkflowRepository.clearDefaultForVersion(draft.getId());
+        }
+        AgentWorkflow binding = new AgentWorkflow();
+        binding.setAgentId(agent.getId());
+        binding.setVersionId(draft.getId());
+        binding.setWorkflowId(request.workflowId());
+        binding.setEnabled(request.enabled() == null || request.enabled());
+        binding.setDefaultWorkflow(Boolean.TRUE.equals(request.defaultWorkflow()));
+        binding.setCallable(request.callable() == null || request.callable());
+        agentWorkflowRepository.save(binding);
+        refreshToolEnabled(draft);
+        return toWorkflowVO(binding);
+    }
+
+    @Transactional
+    public void unbindWorkflow(Long agentId, Long workflowId) {
+        workspacePermissionService.requirePermission(PermissionCodes.AGENT_UPDATE);
+        Agent agent = requireAgent(agentId);
+        AgentVersion draft = requireDraft(agent);
+        AgentWorkflow binding = agentWorkflowRepository.findByVersionAndWorkflow(draft.getId(), workflowId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "绑定关系不存在"));
+        agentWorkflowRepository.delete(binding.getId());
+        refreshToolEnabled(draft);
+    }
+
     public List<AgentSubAgentBindingVO> listSubAgents(Long agentId) {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
         Agent agent = requireAgent(agentId);
@@ -282,6 +341,9 @@ public class AgentBindingApplicationService {
         for (AgentSubAgent binding : agentSubAgentRepository.listByVersionId(targetVersionId)) {
             agentSubAgentRepository.delete(binding.getId());
         }
+        for (AgentWorkflow binding : agentWorkflowRepository.listByVersionId(targetVersionId)) {
+            agentWorkflowRepository.delete(binding.getId());
+        }
         copyBindings(sourceVersionId, targetVersionId, agentId);
     }
 
@@ -325,12 +387,25 @@ public class AgentBindingApplicationService {
             copy.setSortOrder(binding.getSortOrder());
             agentSubAgentRepository.save(copy);
         }
+        for (AgentWorkflow binding : agentWorkflowRepository.listByVersionId(sourceVersionId)) {
+            AgentWorkflow copy = new AgentWorkflow();
+            copy.setAgentId(agentId);
+            copy.setVersionId(targetVersionId);
+            copy.setWorkflowId(binding.getWorkflowId());
+            copy.setEnabled(binding.getEnabled());
+            copy.setDefaultWorkflow(binding.getDefaultWorkflow());
+            copy.setCallable(binding.getCallable());
+            agentWorkflowRepository.save(copy);
+        }
     }
 
     private void refreshToolEnabled(AgentVersion draft) {
+        boolean hasCallableWorkflows = agentWorkflowRepository.listByVersionId(draft.getId()).stream()
+                .anyMatch(binding -> Boolean.TRUE.equals(binding.getEnabled()) && Boolean.TRUE.equals(binding.getCallable()));
         boolean hasTools = !agentToolRepository.listByVersionId(draft.getId()).isEmpty()
                 || !agentMcpRepository.listByVersionId(draft.getId()).isEmpty()
-                || !agentSubAgentRepository.listByVersionId(draft.getId()).isEmpty();
+                || !agentSubAgentRepository.listByVersionId(draft.getId()).isEmpty()
+                || hasCallableWorkflows;
         draft.setToolEnabled(hasTools);
         agentVersionRepository.update(draft);
     }
@@ -387,6 +462,17 @@ public class AgentBindingApplicationService {
                 server == null ? null : server.getServerKey(),
                 binding.getEnabled(),
                 server == null ? null : server.getToolCatalogJson());
+    }
+
+    private AgentWorkflowBindingVO toWorkflowVO(AgentWorkflow binding) {
+        Workflow workflow = workflowRepository.findById(binding.getWorkflowId()).orElse(null);
+        return new AgentWorkflowBindingVO(
+                binding.getId(),
+                binding.getWorkflowId(),
+                workflow == null ? null : workflow.getName(),
+                binding.getEnabled(),
+                binding.getDefaultWorkflow(),
+                binding.getCallable());
     }
 
     private Long workspaceId() {
