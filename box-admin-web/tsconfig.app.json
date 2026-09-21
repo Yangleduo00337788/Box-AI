@@ -21,6 +21,12 @@
       "@box/ui/*": ["../box-ui/src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "env.d.ts"],
-  "exclude": ["../box-ui"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "env.d.ts",
+    "../box-ui/src/**/*.ts",
+    "../box-ui/src/**/*.vue"
+  ]
 }
