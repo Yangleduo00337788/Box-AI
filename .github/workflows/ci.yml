@@ -41,6 +41,7 @@ jobs:
           cache: npm
           cache-dependency-path: box-web/package-lock.json
       - run: npm ci
+      - run: npx vue-tsc -p ../box-ui/tsconfig.json --noEmit
       - run: npm run test
       - run: npm run build
 
@@ -58,4 +59,5 @@ jobs:
           cache: npm
           cache-dependency-path: box-admin-web/package-lock.json
       - run: npm ci
+      - run: npx vue-tsc -p ../box-ui/tsconfig.json --noEmit
       - run: npm run build
