@@ -145,7 +145,86 @@ files["flow-lifecycle.svg"] = f"""<?xml version="1.0" encoding="UTF-8"?>
 </svg>
 """
 
-del files["architecture.svg"]
+files["flow-product.svg"] = f"""<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480" role="img" aria-labelledby="prodTitle">
+  <title id="prodTitle">Box \u4ea7\u54c1\u80fd\u529b\u5168\u666f</title>
+  <rect width="1200" height="480" rx="20" fill="#fafafa"/>
+  <text x="60" y="48" fill="#222222" font-family="{FONT_ESC}" font-size="24" font-weight="700">\u4ea7\u54c1\u80fd\u529b\u5168\u666f</text>
+  <text x="60" y="76" fill="#777777" font-family="{FONT_ESC}" font-size="16">C \u7aef\u5de5\u4f5c\u53f0 + \u5e73\u53f0\u7ba1\u7406 + \u5f00\u653e\u96c6\u6210\uff0c\u8986\u76d6 Agent \u5168\u751f\u547d\u5468\u671f</text>
+
+  <g transform="translate(60 110)">
+    <rect x="0" y="0" width="340" height="320" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="24" y="32" fill="#8b8b8b" font-family="Consolas, monospace" font-size="12">BOX-WEB</text>
+    <text x="24" y="58" fill="#222222" font-family="{FONT_ESC}" font-size="18" font-weight="600">C \u7aef\u5de5\u4f5c\u53f0</text>
+    <rect x="24" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="104" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u5bf9\u8bdd\u5de5\u4f5c\u53f0 /chat</text>
+    <rect x="176" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="104" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">Agent Builder</text>
+    <rect x="24" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="160" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u5de5\u4f5c\u6d41\u7f16\u6392\u5668</text>
+    <rect x="176" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="160" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u63d2\u4ef6\u5e02\u573a</text>
+    <rect x="24" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="216" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u77e5\u8bc6\u5e93 / \u5de5\u5177</text>
+    <rect x="176" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="216" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u6267\u884c\u4e0e\u8c03\u8bd5</text>
+    <rect x="24" y="246" width="292" height="52" rx="10" fill="#222222"/><text x="170" y="276" fill="#ffffff" text-anchor="middle" font-family="{FONT_ESC}" font-size="14">\u8bbe\u7f6e\uff1aRBAC / API Key / \u5957\u9910\u4e0e\u5ba1\u8ba1</text>
+  </g>
+
+  <g transform="translate(430 110)">
+    <rect x="0" y="0" width="340" height="320" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="24" y="32" fill="#8b8b8b" font-family="Consolas, monospace" font-size="12">BOX-ADMIN-WEB</text>
+    <text x="24" y="58" fill="#222222" font-family="{FONT_ESC}" font-size="18" font-weight="600">\u5e73\u53f0\u7ba1\u7406</text>
+    <rect x="24" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="104" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u79df\u6237\u4e0e\u6210\u5458</text>
+    <rect x="176" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="104" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u5957\u9910\u4e0e\u8ba1\u8d39</text>
+    <rect x="24" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="160" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u6a21\u677f\u4e0e\u63d2\u4ef6\u5ba1\u6838</text>
+    <rect x="176" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="160" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u5e73\u53f0\u5206\u6790</text>
+    <rect x="24" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="216" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u8fd0\u8425\u4f4d\u914d\u7f6e</text>
+    <rect x="176" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="216" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">\u5168\u5e73\u53f0\u5ba1\u8ba1</text>
+    <rect x="24" y="246" width="292" height="52" rx="10" fill="#222222"/><text x="170" y="276" fill="#ffffff" text-anchor="middle" font-family="{FONT_ESC}" font-size="14">SUPER_ADMIN / OPS / FINANCE / CONTENT</text>
+  </g>
+
+  <g transform="translate(800 110)">
+    <rect x="0" y="0" width="340" height="320" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="24" y="32" fill="#8b8b8b" font-family="Consolas, monospace" font-size="12">OPEN DELIVERY</text>
+    <text x="24" y="58" fill="#222222" font-family="{FONT_ESC}" font-size="18" font-weight="600">\u5f00\u653e\u4e0e\u96c6\u6210</text>
+    <rect x="24" y="78" width="292" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="170" y="104" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">REST API /api/v1</text>
+    <rect x="24" y="134" width="292" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="170" y="160" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">SSE \u6d41\u5f0f\u5bf9\u8bdd</text>
+    <rect x="24" y="190" width="292" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="170" y="216" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="13">API Key + box-sdk (JS / Python)</text>
+    <rect x="24" y="246" width="292" height="52" rx="10" fill="#48c79c" fill-opacity="0.12" stroke="#48c79c" stroke-width="2"/><text x="170" y="276" fill="#222222" text-anchor="middle" font-family="{FONT_ESC}" font-size="14">Embed Web Chat + \u81ea\u5b9a\u4e49\u57df\u540d</text>
+  </g>
+</svg>
+"""
+
+files["flow-agent-chat.svg"] = f"""<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="chatTitle">
+  <title id="chatTitle">Agent \u5bf9\u8bdd\u65f6\u5e8f</title>
+  <rect width="1200" height="360" rx="20" fill="#fafafa"/>
+  <text x="60" y="48" fill="#222222" font-family="{FONT_ESC}" font-size="24" font-weight="700">Agent \u5bf9\u8bdd\u65f6\u5e8f\uff08SSE\uff09</text>
+  <text x="60" y="76" fill="#777777" font-family="{FONT_ESC}" font-size="16">POST /api/v1/agents/{{id}}/chat \u00b7 \u751f\u4ea7\u73af\u5883\u8bfb\u53d6 Published Version</text>
+  <g transform="translate(60 110)">
+    <rect x="0" y="0" width="1080" height="56" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="24" y="34" fill="#484848" font-family="{FONT_ESC}" font-size="14">1. \u7528\u6237\u8bf7\u6c42</text>
+    <path d="M200 28h40" stroke="#c5c5c5" stroke-width="2"/><polygon points="240,28 232,24 232,32" fill="#c5c5c5"/>
+    <text x="280" y="34" fill="#484848" font-family="{FONT_ESC}" font-size="14">2. \u9274\u6743\uff08JWT / API Key\uff09</text>
+    <path d="M480 28h40" stroke="#c5c5c5" stroke-width="2"/><polygon points="520,28 512,24 512,32" fill="#c5c5c5"/>
+    <text x="560" y="34" fill="#484848" font-family="{FONT_ESC}" font-size="14">3. \u52a0\u8f7d\u5df2\u53d1\u5e03\u914d\u7f6e</text>
+    <path d="M760 28h40" stroke="#c5c5c5" stroke-width="2"/><polygon points="800,28 792,24 792,32" fill="#c5c5c5"/>
+    <text x="840" y="34" fill="#484848" font-family="{FONT_ESC}" font-size="14">4. \u6784\u5efa ExecutionContext</text>
+  </g>
+  <g transform="translate(60 186)">
+    <rect x="0" y="0" width="250" height="56" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="125" y="34" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="14">5. RAG \u6df7\u5408\u68c0\u7d22\uff08\u53ef\u9009\uff09</text>
+    <path d="M258 28h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="290,28 282,24 282,32" fill="#c5c5c5"/>
+    <rect x="298" y="0" width="220" height="56" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="408" y="34" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="14">6. Tool \u6267\u884c\uff08\u53ef\u9009\uff09</text>
+    <path d="M526 28h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="558,28 550,24 550,32" fill="#c5c5c5"/>
+    <rect x="566" y="0" width="220" height="56" rx="12" fill="#222222"/>
+    <text x="676" y="34" fill="#ffffff" text-anchor="middle" font-family="{FONT_ESC}" font-size="14">7. LangChain4j \u2192 LLM</text>
+    <path d="M794 28h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="826,28 818,24 818,32" fill="#c5c5c5"/>
+    <rect x="834" y="0" width="246" height="56" rx="12" fill="#ffffff" stroke="#48c79c" stroke-width="2"/>
+    <text x="957" y="34" fill="#484848" text-anchor="middle" font-family="{FONT_ESC}" font-size="14">8. SSE delta / done</text>
+  </g>
+  <g transform="translate(60 262)">
+    <rect x="0" y="0" width="1080" height="56" rx="12" fill="#ffffff" stroke="#e7e7e7"/>
+    <text x="24" y="34" fill="#8b8b8b" font-family="{FONT_ESC}" font-size="13">\u5e76\u884c\u843d\u5e93\uff1aMessage \u00b7 Trace Span \u00b7 Token \u7528\u91cf \u00b7 \u6267\u884c\u72b6\u6001</text>
+  </g>
+</svg>
+"""
 
 for name, content in files.items():
     (OUT / name).write_text(content, encoding="utf-8")

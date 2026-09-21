@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480" role="img" aria-labelledby="prodTitle">
+  <title id="prodTitle">Box 产品能力全景</title>
+  <rect width="1200" height="480" rx="20" fill="#fafafa"/>
+  <text x="60" y="48" fill="#222222" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="24" font-weight="700">产品能力全景</text>
+  <text x="60" y="76" fill="#777777" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="16">C 端工作台 + 平台管理 + 开放集成，覆盖 Agent 全生命周期</text>
+
+  <g transform="translate(60 110)">
+    <rect x="0" y="0" width="340" height="320" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="24" y="32" fill="#8b8b8b" font-family="Consolas, monospace" font-size="12">BOX-WEB</text>
+    <text x="24" y="58" fill="#222222" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="18" font-weight="600">C 端工作台</text>
+    <rect x="24" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="104" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">对话工作台 /chat</text>
+    <rect x="176" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="104" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">Agent Builder</text>
+    <rect x="24" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="160" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">工作流编排器</text>
+    <rect x="176" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="160" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">插件市场</text>
+    <rect x="24" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="216" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">知识库 / 工具</text>
+    <rect x="176" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="216" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">执行与调试</text>
+    <rect x="24" y="246" width="292" height="52" rx="10" fill="#222222"/><text x="170" y="276" fill="#ffffff" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">设置：RBAC / API Key / 套餐与审计</text>
+  </g>
+
+  <g transform="translate(430 110)">
+    <rect x="0" y="0" width="340" height="320" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="24" y="32" fill="#8b8b8b" font-family="Consolas, monospace" font-size="12">BOX-ADMIN-WEB</text>
+    <text x="24" y="58" fill="#222222" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="18" font-weight="600">平台管理</text>
+    <rect x="24" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="104" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">租户与成员</text>
+    <rect x="176" y="78" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="104" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">套餐与计费</text>
+    <rect x="24" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="160" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">模板与插件审核</text>
+    <rect x="176" y="134" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="160" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">平台分析</text>
+    <rect x="24" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="94" y="216" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">运营位配置</text>
+    <rect x="176" y="190" width="140" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="246" y="216" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">全平台审计</text>
+    <rect x="24" y="246" width="292" height="52" rx="10" fill="#222222"/><text x="170" y="276" fill="#ffffff" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">SUPER_ADMIN / OPS / FINANCE / CONTENT</text>
+  </g>
+
+  <g transform="translate(800 110)">
+    <rect x="0" y="0" width="340" height="320" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="24" y="32" fill="#8b8b8b" font-family="Consolas, monospace" font-size="12">OPEN DELIVERY</text>
+    <text x="24" y="58" fill="#222222" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="18" font-weight="600">开放与集成</text>
+    <rect x="24" y="78" width="292" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="170" y="104" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">REST API /api/v1</text>
+    <rect x="24" y="134" width="292" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="170" y="160" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">SSE 流式对话</text>
+    <rect x="24" y="190" width="292" height="44" rx="10" fill="#f3f3f3" stroke="#e7e7e7"/><text x="170" y="216" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">API Key + box-sdk (JS / Python)</text>
+    <rect x="24" y="246" width="292" height="52" rx="10" fill="#48c79c" fill-opacity="0.12" stroke="#48c79c" stroke-width="2"/><text x="170" y="276" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">Embed Web Chat + 自定义域名</text>
+  </g>
+</svg>

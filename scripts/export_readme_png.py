@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Rasterize assets/readme/*.svg to PNG for Gitee/GitHub (avoids SVG img squashing)."""
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -11,16 +12,25 @@ WIDTH = 1200
 svgs = [
     "hero.svg",
     "architecture.svg",
+    "flow-product.svg",
+    "flow-agent-chat.svg",
+    "flow-lifecycle.svg",
     "flow-rag.svg",
     "flow-workflow.svg",
-    "flow-lifecycle.svg",
 ]
+
+npx = shutil.which("npx") or shutil.which("npx.cmd")
+if not npx:
+    sys.exit("npx not found; install Node.js 20+")
 
 for name in svgs:
     svg = readme / name
+    if not svg.exists():
+        print("skip (missing):", svg)
+        continue
     png = readme / name.replace(".svg", ".png")
     cmd = [
-        "npx",
+        npx,
         "--yes",
         "@resvg/resvg-js-cli",
         "--fit-width",
