@@ -40,8 +40,10 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: box-web/package-lock.json
+      - name: Install and typecheck box-ui
+        run: npm ci && npm run typecheck
+        working-directory: box-ui
       - run: npm ci
-      - run: npx vue-tsc -p ../box-ui/tsconfig.json --noEmit
       - run: npm run test
       - run: npm run build
 
@@ -58,6 +60,8 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: box-admin-web/package-lock.json
+      - name: Install and typecheck box-ui
+        run: npm ci && npm run typecheck
+        working-directory: box-ui
       - run: npm ci
-      - run: npx vue-tsc -p ../box-ui/tsconfig.json --noEmit
       - run: npm run build

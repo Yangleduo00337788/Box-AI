@@ -8,7 +8,7 @@
 
     <div class="auth-shell">
       <portal-badge v-if="props.portalLabel" :label="props.portalLabel" :theme="props.portalTheme" />
-      <img v-if="props.showMascot" :src="logoMascot" alt="" class="auth-mascot" />
+      <img v-if="props.showMascot" :src="mascotSrc" alt="" class="auth-mascot" />
       <p v-if="props.slogan" class="auth-slogan">{{ props.slogan }}</p>
 
       <div class="auth-card">
@@ -22,7 +22,9 @@
 
 <script setup lang="ts">
 import PortalBadge from '../components/PortalBadge.vue'
-import logoMascot from '../assets/logo-mascot.png'
+import mascotUrl from '../assets/logo-mascot.png'
+
+const mascotSrc = mascotUrl
 
 const props = withDefaults(
   defineProps<{

@@ -1,7 +1,7 @@
 <template>
-  <t-layout class="app-layout" :class="`app-layout--${shellVariant}`">
+  <t-layout class="app-layout" :class="`app-layout--${props.shellVariant}`">
     <t-aside
-      v-if="!hideSidebar"
+      v-if="!props.hideSidebar"
       :width="asideWidth"
       class="app-aside"
       :class="{ 'app-aside--consumer-collapsed': isConsumerCollapsed }"
@@ -16,7 +16,7 @@
             :class="{ 'sidebar-header__inner--collapsed': isAdminIconRail }"
           >
             <router-link
-              v-if="shellVariant === 'consumer'"
+              v-if="props.shellVariant === 'consumer'"
               to="/chat"
               class="sidebar-brand-link"
               aria-label="返回对话"
@@ -38,7 +38,7 @@
               class="sidebar-brand"
             />
             <div
-              v-if="shellVariant === 'consumer'"
+              v-if="props.shellVariant === 'consumer'"
               class="sidebar-header__actions"
             >
               <t-tooltip content="折叠导航" placement="bottom" theme="light" :show-arrow="false" attach="body">
@@ -84,14 +84,14 @@
 
         <nav class="sidebar-nav">
           <slot name="sidebar-nav" :collapsed="isAdminIconRail">
-            <section v-for="group in menuGroups" :key="group.title" class="nav-group">
+            <section v-for="group in props.menuGroups" :key="group.title" class="nav-group">
               <h3 v-if="!isAdminIconRail" class="nav-group__title">{{ group.title }}</h3>
               <router-link
                 v-for="item in group.items"
                 :key="item.value"
                 :to="item.value"
                 class="nav-item"
-                :class="{ 'nav-item--active': active === item.value }"
+                :class="{ 'nav-item--active': props.active === item.value }"
                 :title="isAdminIconRail ? item.label : undefined"
               >
                 <t-icon :name="item.icon" class="nav-item__icon" />
@@ -106,16 +106,16 @@
           <slot
             name="sidebar-footer"
             :collapsed="isAdminIconRail"
-            :user-name="userName"
-            :user-hint="userHint"
+            :user-name="props.userName"
+            :user-hint="props.userHint"
             :avatar-text="avatarText"
           >
             <t-dropdown :options="resolvedUserMenu" @click="onUserMenu">
               <div class="sidebar-user" :class="{ 'sidebar-user--collapsed': isAdminIconRail }">
                 <t-avatar size="small" shape="round">{{ avatarText }}</t-avatar>
                 <div v-if="!isAdminIconRail" class="sidebar-user__meta">
-                  <span class="sidebar-user__name">{{ userName }}</span>
-                  <span class="sidebar-user__hint">{{ userHint }}</span>
+                  <span class="sidebar-user__name">{{ props.userName }}</span>
+                  <span class="sidebar-user__hint">{{ props.userHint }}</span>
                 </div>
                 <t-icon v-if="!isAdminIconRail" name="chevron-down" class="sidebar-user__arrow" />
               </div>
@@ -128,20 +128,20 @@
     <t-content
       class="app-content"
       :class="{
-        'app-content--panel': contentPanel,
-        'app-content--panel-padded': contentPanel && contentPadded,
+        'app-content--panel': props.contentPanel,
+        'app-content--panel-padded': props.contentPanel && props.contentPadded,
       }"
     >
       <div
         class="page-container"
         :class="{
-          'page-container--panel': contentPanel,
-          'page-container--panel-padded': contentPanel && contentPadded,
+          'page-container--panel': props.contentPanel,
+          'page-container--panel-padded': props.contentPanel && props.contentPadded,
         }"
       >
         <Transition name="sidebar-expand">
           <t-tooltip
-            v-if="isConsumerCollapsed && !hideSidebar"
+            v-if="isConsumerCollapsed && !props.hideSidebar"
             content="展开导航"
             placement="right"
             theme="light"

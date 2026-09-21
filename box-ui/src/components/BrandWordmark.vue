@@ -10,14 +10,14 @@
   >
     <img
       v-if="props.collapsed || props.mode === 'mascot'"
-      :src="props.mode === 'mascot' ? logoSidebar : logoMascot"
+      :src="props.mode === 'mascot' ? logos.sidebar : logos.mascot"
       alt="盒子"
       class="brand-wordmark__mascot"
     />
     <span v-else-if="props.mode === 'text'" class="brand-wordmark__text">盒子</span>
     <img
       v-else
-      :src="logoWordmark"
+      :src="logos.wordmark"
       alt="盒子"
       class="brand-wordmark__img"
     />
@@ -25,9 +25,15 @@
 </template>
 
 <script setup lang="ts">
-import logoWordmark from '../assets/logo.png'
-import logoMascot from '../assets/logo-mascot.png'
-import logoSidebar from '../assets/logo-sidebar.png'
+import wordmarkUrl from '../assets/logo.png'
+import mascotUrl from '../assets/logo-mascot.png'
+import sidebarUrl from '../assets/logo-sidebar.png'
+
+const logos = {
+  wordmark: wordmarkUrl,
+  mascot: mascotUrl,
+  sidebar: sidebarUrl,
+}
 
 const props = withDefaults(
   defineProps<{
