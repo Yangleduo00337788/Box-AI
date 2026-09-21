@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Generate assets/readme/hero.svg (no embedded logo; use README logo.png separately)."""
+"""Generate assets/readme/hero.svg (no embedded logo; README uses logo-readme.png separately)."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
