@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">Box - 企业级 AI Agent 与工作流平台</title>
+  <desc id="heroDesc">构建、编排、发布 AI 智能体，支持 RAG、工具与工作流。</desc>
+  <defs>
+    <linearGradient id="boxGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f3f3f3"/>
+    </linearGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#ececec" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="400" rx="20" fill="#fafafa"/>
+  <rect width="1200" height="400" rx="20" fill="url(#grid)" opacity="0.45"/>
+  <rect x="28" y="28" width="1144" height="344" rx="16" fill="none" stroke="#e7e7e7" stroke-width="1.5"/>
+
+  <text x="72" y="88" fill="#8b8b8b" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="16" letter-spacing="0.1em">ENTERPRISE AI AGENT PLATFORM</text>
+  <text x="72" y="128" fill="#222222" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="52" font-weight="700">Box</text>
+  <text x="72" y="158" fill="#5e5e5e" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="18">AI Agent &amp; Workflow Orchestration</text>
+
+  <text x="72" y="218" fill="#484848" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="26" font-weight="600">企业级 AI Agent 创建、编排、运行与发布平台</text>
+  <text x="72" y="252" fill="#777777" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="18">统一承载模型、知识库、工具链与工作流，支持从原型验证到生产发布的全生命周期。</text>
+
+  <g transform="translate(72 288)">
+    <rect x="0" y="0" width="118" height="32" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="59" y="21" fill="#5e5e5e" text-anchor="middle" font-family="Consolas, Monaco, monospace" font-size="13">Java 21</text>
+    <rect x="128" y="0" width="150" height="32" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="203" y="21" fill="#5e5e5e" text-anchor="middle" font-family="Consolas, Monaco, monospace" font-size="13">Spring Boot 3</text>
+    <rect x="288" y="0" width="96" height="32" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="336" y="21" fill="#5e5e5e" text-anchor="middle" font-family="Consolas, Monaco, monospace" font-size="13">Vue 3</text>
+    <rect x="394" y="0" width="140" height="32" rx="16" fill="#ffffff" stroke="#dcdcdc"/>
+    <text x="464" y="21" fill="#5e5e5e" text-anchor="middle" font-family="Consolas, Monaco, monospace" font-size="13">LangChain4j</text>
+    <rect x="544" y="0" width="168" height="32" rx="16" fill="#222222"/>
+    <text x="628" y="21" fill="#ffffff" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">Modular Monolith</text>
+  </g>
+
+  <g transform="translate(620 56)">
+    <rect x="0" y="0" width="508" height="264" rx="18" fill="url(#boxGlow)" stroke="#e7e7e7" stroke-width="1.5"/>
+    <text x="24" y="32" fill="#8b8b8b" font-family="Consolas, Monaco, monospace" font-size="13">AGENT RUNTIME</text>
+    <g transform="translate(24 52)">
+      <rect x="0" y="0" width="100" height="56" rx="10" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+      <text x="50" y="26" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">鉴权</text>
+      <text x="50" y="44" fill="#8b8b8b" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">JWT / API Key</text>
+      <path d="M104 28h20" stroke="#c5c5c5" stroke-width="2"/><polygon points="124,28 116,24 116,32" fill="#c5c5c5"/>
+      <rect x="128" y="0" width="100" height="56" rx="10" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+      <text x="178" y="26" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">上下文</text>
+      <text x="178" y="44" fill="#8b8b8b" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">已发布版本</text>
+      <path d="M232 28h20" stroke="#c5c5c5" stroke-width="2"/><polygon points="252,28 244,24 244,32" fill="#c5c5c5"/>
+      <rect x="256" y="0" width="88" height="56" rx="10" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+      <text x="300" y="26" fill="#222222" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600">RAG</text>
+      <text x="300" y="44" fill="#8b8b8b" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">混合检索</text>
+      <path d="M348 28h20" stroke="#c5c5c5" stroke-width="2"/><polygon points="368,28 360,24 360,32" fill="#c5c5c5"/>
+      <rect x="372" y="0" width="88" height="56" rx="10" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+      <text x="416" y="26" fill="#222222" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600">Tool</text>
+      <text x="416" y="44" fill="#8b8b8b" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">MCP</text>
+      <path d="M178 72h60" stroke="#c5c5c5" stroke-width="2"/>
+      <path d="M208 72v12" stroke="#c5c5c5" stroke-width="2"/>
+      <rect x="136" y="88" width="152" height="56" rx="10" fill="#222222"/>
+      <text x="212" y="114" fill="#ffffff" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">LangChain4j</text>
+      <text x="212" y="132" fill="#cbcbcb" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">模型调用与工具编排</text>
+      <path d="M292 116h24" stroke="#c5c5c5" stroke-width="2"/><polygon points="316,116 308,112 308,120" fill="#c5c5c5"/>
+      <rect x="320" y="88" width="120" height="56" rx="10" fill="#ffffff" stroke="#48c79c" stroke-width="2"/>
+      <text x="380" y="114" fill="#222222" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600">LLM</text>
+      <text x="380" y="132" fill="#8b8b8b" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">SSE 流式输出</text>
+      <path d="M120 144v20 M212 144v20 M380 144v20" stroke="#c5c5c5" stroke-width="2"/>
+      <rect x="64" y="168" width="112" height="48" rx="10" fill="#ffffff" stroke="#dcdcdc"/>
+      <text x="120" y="196" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">消息落库</text>
+      <rect x="192" y="168" width="112" height="48" rx="10" fill="#ffffff" stroke="#dcdcdc"/>
+      <text x="248" y="196" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">链路追踪</text>
+      <rect x="320" y="168" width="112" height="48" rx="10" fill="#ffffff" stroke="#dcdcdc"/>
+      <text x="376" y="196" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">用量统计</text>
+    </g>
+  </g>
+</svg>

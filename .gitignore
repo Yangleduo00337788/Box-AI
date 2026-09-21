@@ -4,8 +4,11 @@
 *.jar
 *.war
 *.ear
+*.hprof
 hs_err_pid*
 replay_pid*
+# 误用重定向产生的端口号文件（如 `> 2200`）
+box-server/[0-9][0-9][0-9][0-9]
 
 # IDE
 .idea/
@@ -52,9 +55,20 @@ e2e/
 playwright-report/
 test-results/
 
-# 一次性脚本 / 本地演示（任意目录下的 scripts）
-scripts/
-**/scripts/
+# scripts：默认忽略本地 E2E / 演示，放行 README 配图维护脚本
+scripts/*
+!scripts/build_readme_hero.py
+!scripts/build_readme_flow_svgs.py
+!scripts/export_readme_png.py
+!scripts/fix_readme_svg_dimensions.py
+scripts/e2e/
+scripts/demo/
+scripts/.e2e-*
+scripts/e2e-*
+scripts/run-e2e-*
+scripts/gen_phase*
+scripts/*.mjs
+scripts/*.ps1
 
 # Python 本地环境
 __pycache__/
@@ -90,3 +104,7 @@ skills-lock.json
 
 # Docker 本地数据卷（如有）
 deploy/data/
+
+# README 生成中间文件
+assets/readme/*.b64.txt
+assets/readme/logo.b64.txt

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="wfTitle">
+  <title id="wfTitle">Box Workflow 执行流程</title>
+  <rect width="1200" height="300" rx="20" fill="#fafafa"/>
+  <text x="60" y="48" fill="#222222" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="24" font-weight="700">Workflow 执行引擎</text>
+  <text x="60" y="76" fill="#777777" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="16">定义与运行时分离，节点执行采用 Strategy + Registry 扩展</text>
+  <g transform="translate(60 110)">
+    <rect x="0" y="0" width="120" height="64" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="60" y="28" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">图校验</text>
+    <text x="60" y="46" fill="#8b8b8b" text-anchor="middle" font-family="Consolas, monospace" font-size="11">Start / Output</text>
+    <path d="M128 32h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="160,32 152,28 152,36" fill="#c5c5c5"/>
+    <rect x="168" y="0" width="120" height="64" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="228" y="28" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">创建执行</text>
+    <text x="228" y="46" fill="#8b8b8b" text-anchor="middle" font-family="Consolas, monospace" font-size="11">Execution</text>
+    <path d="M296 32h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="328,32 320,28 320,36" fill="#c5c5c5"/>
+    <rect x="336" y="0" width="120" height="64" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="396" y="28" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">定位起点</text>
+    <text x="396" y="46" fill="#8b8b8b" text-anchor="middle" font-family="Consolas, monospace" font-size="11">Start Node</text>
+    <path d="M464 32h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="496,32 488,28 488,36" fill="#c5c5c5"/>
+    <rect x="504" y="0" width="140" height="64" rx="12" fill="#222222"/>
+    <text x="574" y="28" fill="#ffffff" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">节点执行器</text>
+    <text x="574" y="46" fill="#cbcbcb" text-anchor="middle" font-family="Consolas, monospace" font-size="11">LLM / HTTP / Code</text>
+    <path d="M652 32h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="684,32 676,28 676,36" fill="#c5c5c5"/>
+    <rect x="692" y="0" width="120" height="64" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="752" y="28" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">路由边</text>
+    <text x="752" y="46" fill="#8b8b8b" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">条件分支</text>
+    <path d="M820 32h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="852,32 844,28 844,36" fill="#c5c5c5"/>
+    <rect x="860" y="0" width="120" height="64" rx="12" fill="#ffffff" stroke="#48c79c" stroke-width="2"/>
+    <text x="920" y="28" fill="#222222" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14" font-weight="600">输出结果</text>
+    <text x="920" y="46" fill="#8b8b8b" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="11">Trace 落库</text>
+  </g>
+  <g transform="translate(60 200)">
+    <rect x="0" y="0" width="1080" height="72" rx="14" fill="#ffffff" stroke="#e7e7e7"/>
+    <text x="24" y="28" fill="#8b8b8b" font-family="Consolas, Monaco, monospace" font-size="12">NODE TYPES</text>
+    <text x="24" y="52" fill="#484848" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">Start / Input / Output / LLM / Agent / Knowledge / HTTP / Condition / Switch / Loop / Code / Variable / Template</text>
+  </g>
+</svg>
