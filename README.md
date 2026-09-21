@@ -31,6 +31,7 @@
 - [为什么选择 Box](#为什么选择-box)
 - [特性](#-特性)
 - [产品能力全景](#产品能力全景)
+- [产品界面](#产品界面)
 - [技术栈](#技术栈)
 - [安装与运行](#-安装与运行)
 - [快速体验](#-快速体验)
@@ -113,7 +114,41 @@ HTTP / Database / Function / **MCP** 统一抽象为 `AgentTool`，支持流式 
 | 租户与用户 | ✅ 工作空间成员 | ✅ 租户 / 套餐 / 审计 | — |
 | 嵌入站点 | ✅ Embed 配置 | — | ✅ iframe / SDK |
 
-> 产品界面截图将在后续版本补充；当前以架构与流程图说明能力边界。
+---
+
+## 产品界面
+
+### 对话工作台 · `box-web` `/chat`
+
+统一入口：新任务、历史会话、模型与智能体切换，支持流式对话与多模态输入。
+
+<p align="center">
+  <img src="./assets/readme/screenshots/chat-workspace.png" alt="Box 对话工作台" width="960" />
+</p>
+
+### Agent Builder · 配置与调试
+
+左侧模块导航（Prompt / 模型 / 记忆 / 知识库 / 工具 / 变量），右侧实时调试预览，支持版本管理与发布。
+
+<p align="center">
+  <img src="./assets/readme/screenshots/agent-builder.png" alt="Box Agent Builder 配置页" width="960" />
+</p>
+
+### 工作流编辑器 · 可视化编排
+
+节点库拖拽编排，支持 LLM / Agent / 知识库 / HTTP / 条件分支等；右侧节点配置，一键校验、调试与发布。
+
+<p align="center">
+  <img src="./assets/readme/screenshots/workflow-editor.png" alt="Box 工作流编辑器" width="960" />
+</p>
+
+### 平台管理台 · `box-admin-web` 租户管理
+
+多租户运营：个人/企业租户、套餐分配、成员与空间管理、启停控制与审计入口。
+
+<p align="center">
+  <img src="./assets/readme/screenshots/admin-tenants.png" alt="Box 管理台租户管理" width="960" />
+</p>
 
 ---
 

@@ -31,6 +31,7 @@
 - [Why Box](#why-box)
 - [Features](#-features)
 - [Product capabilities](#product-capabilities)
+- [Product UI](#product-ui)
 - [Tech stack](#tech-stack)
 - [Install & run](#-install--run)
 - [Quick start](#-quick-start)
@@ -112,7 +113,41 @@ Workspace RBAC, plans & quotas, audit logs, execution traces, and token usage—
 | Tenants & users | ✅ Workspace members | ✅ Tenants / plans / audit | — |
 | Embed | ✅ Embed settings | — | ✅ iframe / SDK |
 
-> Product screenshots will be added later; diagrams above describe capability boundaries for now.
+---
+
+## Product UI
+
+### Chat workspace · `box-web` `/chat`
+
+Unified entry for new tasks, session history, model and agent switching, with streaming chat and multimodal input.
+
+<p align="center">
+  <img src="./assets/readme/screenshots/chat-workspace.png" alt="Box chat workspace" width="960" />
+</p>
+
+### Agent Builder · configure & debug
+
+Module navigation (Prompt / Model / Memory / Knowledge / Tools / Variables) on the left; live debug preview on the right, with versioning and publish.
+
+<p align="center">
+  <img src="./assets/readme/screenshots/agent-builder.png" alt="Box Agent Builder" width="960" />
+</p>
+
+### Workflow editor · visual orchestration
+
+Drag-and-drop node library (LLM / Agent / Knowledge / HTTP / branches, etc.); per-node config panel; validate, debug, and publish in one place.
+
+<p align="center">
+  <img src="./assets/readme/screenshots/workflow-editor.png" alt="Box workflow editor" width="960" />
+</p>
+
+### Admin console · `box-admin-web` tenant management
+
+Multi-tenant operations: individual/enterprise tenants, plan assignment, members and workspaces, enable/disable, and audit access.
+
+<p align="center">
+  <img src="./assets/readme/screenshots/admin-tenants.png" alt="Box admin tenant management" width="960" />
+</p>
 
 ---
 
