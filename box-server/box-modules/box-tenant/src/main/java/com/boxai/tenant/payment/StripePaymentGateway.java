@@ -2,6 +2,8 @@ package com.boxai.tenant.payment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 @Component
 public class StripePaymentGateway implements PaymentGateway {
 
+    private static final Logger log = LoggerFactory.getLogger(StripePaymentGateway.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -108,7 +111,8 @@ public class StripePaymentGateway implements PaymentGateway {
             if (clientRef != null && !clientRef.isBlank()) {
                 return Optional.of(Long.parseLong(clientRef));
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.warn("Failed to parse Stripe webhook payment id: {}", ex.getMessage());
             return Optional.empty();
         }
         return Optional.empty();

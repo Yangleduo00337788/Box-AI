@@ -31,7 +31,7 @@
         hover
         :pagination="pagination"
         @page-change="onPageChange"
-        @row-click="({ row }) => openDetail(row as AdminMessageFeedbackVO)"
+        @row-click="onFeedbackRowClick"
       >
         <template #empty>
           <t-empty description="暂无反馈" />
@@ -283,6 +283,10 @@ const columns: PrimaryTableCol<AdminMessageFeedbackVO>[] = [
     cell: (_, { row }) => renderActions(row),
   },
 ]
+
+function onFeedbackRowClick(context: { row: AdminMessageFeedbackVO }) {
+  openDetail(context.row)
+}
 
 async function openDetail(row: AdminMessageFeedbackVO) {
   detailVisible.value = true

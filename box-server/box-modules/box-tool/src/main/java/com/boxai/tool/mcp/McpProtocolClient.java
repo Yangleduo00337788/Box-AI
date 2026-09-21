@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -23,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class McpProtocolClient {
 
+    private static final Logger log = LoggerFactory.getLogger(McpProtocolClient.class);
     private static final String PROTOCOL_VERSION = "2024-11-05";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
 
@@ -278,8 +281,8 @@ public class McpProtocolClient {
                 if (token != null && !String.valueOf(token).isBlank()) {
                     builder.header("Authorization", "Bearer " + String.valueOf(token).trim());
                 }
-            } catch (Exception ignored) {
-                // ignore malformed auth config
+            } catch (Exception ex) {
+                log.warn("Ignoring malformed MCP bearer auth config for server {}: {}", server.getId(), ex.getMessage());
             }
         }
     }

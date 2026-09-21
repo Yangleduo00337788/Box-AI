@@ -5,6 +5,8 @@ import com.boxai.domain.config.SystemConfigRepository;
 import com.boxai.user.api.SystemContentVO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class SystemContentApplicationService {
+
+    private static final Logger log = LoggerFactory.getLogger(SystemContentApplicationService.class);
 
     private static final List<String> CONFIG_KEYS = List.of(
             "support.email",
@@ -90,8 +94,8 @@ public class SystemContentApplicationService {
                     html.append("<p>").append(escapeHtml(paragraph)).append("</p>");
                 }
                 return html.toString();
-            } catch (Exception ignored) {
-                // fall through
+            } catch (Exception ex) {
+                log.debug("Legal content is not JSON array, rendering as plain text: {}", ex.getMessage());
             }
         }
         StringBuilder html = new StringBuilder();

@@ -120,7 +120,7 @@
                 v-else-if="item.uiRole === 'assistant'"
                 role="assistant"
                 :content="{ type: 'markdown', data: item.plainText || '' }"
-                :status="item.uiStatus === 'streaming' ? 'streaming' : 'complete'"
+                :status="item.uiStatus === 'error' ? 'error' : undefined"
               />
               <box-chat-tool-runs
                 v-if="item.uiRole === 'assistant' && item.toolRuns?.length"

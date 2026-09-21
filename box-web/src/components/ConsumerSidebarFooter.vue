@@ -71,7 +71,7 @@
                   trigger="click"
                   placement="right-top"
                   :popup-props="{ zIndex: 5700, attach: 'body' }"
-                  @click="(option) => onWorkspaceAction(item, option)"
+                  @click="(option: DropdownOption) => onWorkspaceAction(item, option)"
                 >
                   <button type="button" class="user-menu__more" aria-label="工作空间操作" @click.stop>
                     <t-icon name="more" />

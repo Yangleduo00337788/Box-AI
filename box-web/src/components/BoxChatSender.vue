@@ -47,7 +47,7 @@
               class="box-chat-sender__tool"
               :class="{ 'box-chat-sender__tool--active': attachMenuOpen }"
               aria-label="添加附件或插件"
-              aria-expanded="attachMenuOpen"
+              :aria-expanded="attachMenuOpen"
               @click="toggleAttachMenu"
             >
               <t-icon name="add" />

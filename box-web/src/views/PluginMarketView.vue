@@ -407,7 +407,6 @@ const skillCount = computed(
 )
 
 const installedCount = computed(() => plugins.value.filter((item) => item.installed).length)
-const workspaceCount = computed(() => plugins.value.filter((item) => item.sourceType === 'USER').length)
 
 const hasActiveFilters = computed(
   () =>

@@ -2,6 +2,8 @@ package com.boxai.tool.application;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -10,6 +12,8 @@ import java.util.Map;
 
 @Component
 public class McpToolCatalogParser {
+
+    private static final Logger log = LoggerFactory.getLogger(McpToolCatalogParser.class);
 
     private final ObjectMapper objectMapper;
 
@@ -34,7 +38,8 @@ public class McpToolCatalogParser {
                 tools.add(new McpCatalogTool(name.trim(), description == null ? name.trim() : description.trim()));
             }
             return tools;
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.warn("Failed to parse MCP tool catalog JSON: {}", ex.getMessage());
             return List.of();
         }
     }

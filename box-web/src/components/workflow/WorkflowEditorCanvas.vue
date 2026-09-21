@@ -370,6 +370,7 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 import WorkflowFlowNode from '@/components/workflow/WorkflowFlowNode.vue'
+import type { ConnectionLineOptions, DefaultEdgeOptions } from '@vue-flow/core'
 import {
   createFlowNode,
   defaultWorkflowDefinition,
@@ -420,13 +421,18 @@ const autoSave = useWorkflowAutoSave(
 )
 
 const nodeTypes = { workflow: markRaw(WorkflowFlowNode) } as NodeTypesObject
-const defaultEdgeOptions = styledFlowEdge({
-  source: '',
-  target: '',
-})
+const defaultEdgeOptions: DefaultEdgeOptions = {
+  type: 'default',
+  animated: true,
+  selectable: true,
+  focusable: true,
+  style: {
+    stroke: FLOW_EDGE_COLOR,
+    strokeWidth: 2,
+  },
+}
 
-const connectionLineOptions = {
-  type: 'default' as const,
+const connectionLineOptions: ConnectionLineOptions = {
   style: {
     stroke: FLOW_EDGE_COLOR,
     strokeWidth: 2,

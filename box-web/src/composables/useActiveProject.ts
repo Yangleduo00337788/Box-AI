@@ -38,7 +38,8 @@ export function useActiveProject() {
   watch(
     () => auth.currentWorkspaceId,
     (workspaceId) => {
-      loadFromStorage(workspaceId)
+      const id = workspaceId ? Number(workspaceId) : null
+      loadFromStorage(Number.isFinite(id) ? id : null)
     },
     { immediate: true },
   )
@@ -47,7 +48,8 @@ export function useActiveProject() {
 
   function selectProject(projectId: number | null) {
     activeProjectId.value = projectId
-    persist(auth.currentWorkspaceId)
+    const workspaceId = auth.currentWorkspaceId ? Number(auth.currentWorkspaceId) : null
+    persist(Number.isFinite(workspaceId) ? workspaceId : null)
   }
 
   function clearProject() {

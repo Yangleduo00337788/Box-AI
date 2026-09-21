@@ -159,6 +159,28 @@
                   <t-icon name="folder" class="sidebar-task-row__icon" />
                   <span class="sidebar-task-row__label">{{ project.name }}</span>
                 </button>
+                <div class="sidebar-task-row__actions">
+                  <t-tooltip content="改名" placement="top" theme="light" :show-arrow="false" attach="body">
+                    <button
+                      type="button"
+                      class="sidebar-task-row__action"
+                      aria-label="改名"
+                      @click.stop="openRenameProject(project)"
+                    >
+                      <t-icon name="edit-1" />
+                    </button>
+                  </t-tooltip>
+                  <t-tooltip content="删除" placement="top" theme="light" :show-arrow="false" attach="body">
+                    <button
+                      type="button"
+                      class="sidebar-task-row__action"
+                      aria-label="删除"
+                      @click.stop="handleDeleteProject(project)"
+                    >
+                      <t-icon name="delete" />
+                    </button>
+                  </t-tooltip>
+                </div>
               </div>
               <template #content>
                 <project-conversation-panel

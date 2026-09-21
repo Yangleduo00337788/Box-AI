@@ -521,14 +521,13 @@ import type { FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import ImagePicker from '@/components/ImagePicker.vue'
 import { extractApiError } from '@/api/apiError'
+import { parseAgentVariablesJson } from '@/utils/agentConfigBuilder'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import {
   archiveAgentVersion,
   bindAgentKnowledge,
   bindAgentWorkflow,
   bindAgentSubAgent,
-  bindAgentTool,
-  updateAgentToolBinding,
   chatAgent,
   chatAgentStream,
   compareAgentVersions,
@@ -537,10 +536,8 @@ import {
   getAgentPublishStatus,
   listAgentKnowledge,
   listAgentWorkflows,
-  listAgentMcp,
   listAgentLongTermMemories,
   listAgentSubAgents,
-  listAgentTools,
   listAgentVersions,
   listAgents,
   deleteAgentLongTermMemory,
@@ -549,9 +546,9 @@ import {
   unbindAgentKnowledge,
   unbindAgentWorkflow,
   unbindAgentSubAgent,
-  unbindAgentTool,
   unpublishAgent,
   getAgentEmbedConfig,
+  type AgentEmbedConfigVO,
   updateAgent,
   updateAgentConfig,
   updateAgentEmbedConfig,
@@ -562,17 +559,13 @@ import {
   type AgentKnowledgeBindingVO,
   type AgentWorkflowBindingVO,
   type AgentLongTermMemoryVO,
-  type AgentMcpBindingVO,
   type AgentPublishVO,
   type AgentSubAgentBindingVO,
-  type AgentToolBindingVO,
   type AgentVersionDiffVO,
   type AgentVersionVO,
   type AgentVO,
 } from '@/api/agent'
 import { listKnowledgeBases, type KnowledgeBaseVO } from '@/api/knowledge'
-import { listMcpServers, type McpServerVO } from '@/api/mcp'
-import { listTools, type ToolVO } from '@/api/tool'
 import { listWorkflows, type WorkflowVO } from '@/api/workflow'
 import { listModels, type ModelVO } from '@/api/model'
 import { groupedPlatformModelOptions } from '@/utils/modelOptions'
@@ -655,26 +648,18 @@ const navItems = [
 
 const knowledgeBases = ref<KnowledgeBaseVO[]>([])
 const workflows = ref<WorkflowVO[]>([])
-const tools = ref<ToolVO[]>([])
-const mcpServers = ref<McpServerVO[]>([])
 const knowledgeBindings = ref<AgentKnowledgeBindingVO[]>([])
 const workflowBindings = ref<AgentWorkflowBindingVO[]>([])
-const toolBindings = ref<AgentToolBindingVO[]>([])
-const mcpBindings = ref<AgentMcpBindingVO[]>([])
 const subAgentBindings = ref<AgentSubAgentBindingVO[]>([])
 const allAgents = ref<AgentVO[]>([])
 const publishInfo = ref<AgentPublishVO | null>(null)
 const selectedKnowledgeId = ref<number | undefined>()
 const selectedWorkflowId = ref<number | undefined>()
-const selectedToolId = ref<number | undefined>()
-const selectedMcpId = ref<number | undefined>()
 const selectedSubAgentId = ref<number | undefined>()
 const bindWorkflowDefault = ref(false)
 const bindWorkflowCallable = ref(true)
 const bindingKnowledge = ref(false)
 const bindingWorkflow = ref(false)
-const bindingTool = ref(false)
-const bindingMcp = ref(false)
 const bindingSubAgent = ref(false)
 const savingMemory = ref(false)
 const savingConfig = ref(false)
@@ -715,10 +700,6 @@ const workflowOptions = computed(() =>
   workflows.value
     .filter((item) => !workflowBindings.value.some((binding) => binding.workflowId === item.id))
     .map((item) => ({ label: item.name, value: item.id })),
-)
-const toolOptions = computed(() => tools.value.map((item) => ({ label: `${item.name} (${item.toolKey})`, value: item.id })))
-const mcpOptions = computed(() =>
-  mcpServers.value.map((item) => ({ label: `${item.name} (${item.serverKey})`, value: item.id })),
 )
 const subAgentOptions = computed(() =>
   allAgents.value
@@ -788,19 +769,6 @@ const workflowColumns = [
   { colKey: 'workflowId', title: 'ID', width: 90 },
   { colKey: 'defaultWorkflow', title: '默认', width: 80 },
   { colKey: 'callable', title: '可调用', width: 80 },
-  { colKey: 'op', title: '操作', width: 100 },
-]
-const bindToolRequireConfirm = ref(false)
-const toolColumns = [
-  { colKey: 'toolId', title: '工具 ID' },
-  { colKey: 'requireConfirmation', title: '需确认', width: 90 },
-  { colKey: 'enabled', title: '启用', width: 80 },
-  { colKey: 'op', title: '操作', width: 100 },
-]
-const mcpColumns = [
-  { colKey: 'mcpServerName', title: 'MCP Server' },
-  { colKey: 'serverKey', title: 'Key', width: 120 },
-  { colKey: 'tools', title: '工具数', width: 80 },
   { colKey: 'op', title: '操作', width: 100 },
 ]
 const subAgentColumns = [
@@ -1049,15 +1017,7 @@ function parseSuggestedQuestions(text: string) {
 }
 
 function buildConfigJson() {
-  let variables: unknown[] = []
-  try {
-    variables = JSON.parse(configForm.variablesJson || '[]')
-    if (!Array.isArray(variables)) {
-      throw new Error('variables must be array')
-    }
-  } catch {
-    throw new Error('变量 JSON 格式无效，请使用数组格式')
-  }
+  const variables = parseAgentVariablesJson(configForm.variablesJson || '[]')
   const payload: AgentConfigPayload = {
     variables,
     advanced: {
@@ -1084,16 +1044,7 @@ function buildConfigJson() {
   return JSON.stringify(payload)
 }
 
-function applyEmbedVo(data: {
-  themeColor?: string
-  logoUrl?: string
-  welcomeMessage?: string
-  suggestedQuestions?: string[]
-  customDomain?: string
-  domainVerified?: boolean
-  domainVerifyToken?: string | null
-  domainVerifySkipped?: boolean
-}) {
+function applyEmbedVo(data: AgentEmbedConfigVO) {
   embedForm.themeColor = data.themeColor || '#0052d9'
   embedForm.logoUrl = data.logoUrl || ''
   embedForm.welcomeMessage = data.welcomeMessage || ''
@@ -1186,15 +1137,6 @@ function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
 }
 
-function parseMcpToolCount(catalog?: string) {
-  if (!catalog) return 0
-  try {
-    const items = JSON.parse(catalog)
-    return Array.isArray(items) ? items.length : 0
-  } catch {
-    return 0
-  }
-}
 
 async function loadAgent() {
   loading.value = true
@@ -1215,13 +1157,9 @@ async function loadAgent() {
         { data: capRes },
         { data: kbRes },
         { data: wfRes },
-        { data: toolRes },
-        { data: mcpRes },
         { data: agentsRes },
         { data: bindKbRes },
         { data: bindWorkflowRes },
-        { data: bindToolRes },
-        { data: bindMcpRes },
         { data: bindSubAgentRes },
         { data: publishRes },
       ] = await Promise.all([
@@ -1230,13 +1168,9 @@ async function loadAgent() {
         fetchPlatformCapabilities(),
         listKnowledgeBases(),
         listWorkflows(),
-        listTools(),
-        listMcpServers(),
         listAgents(),
         listAgentKnowledge(agentId.value),
         listAgentWorkflows(agentId.value),
-        listAgentTools(agentId.value),
-        listAgentMcp(agentId.value),
         listAgentSubAgents(agentId.value),
         getAgentPublishStatus(agentId.value),
       ])
@@ -1245,13 +1179,9 @@ async function loadAgent() {
       byokEnabled.value = capRes.data?.byokEnabled === true
       knowledgeBases.value = kbRes.data || []
       workflows.value = wfRes.data || []
-      tools.value = toolRes.data || []
-      mcpServers.value = mcpRes.data || []
       allAgents.value = agentsRes.data || []
       knowledgeBindings.value = bindKbRes.data || []
       workflowBindings.value = bindWorkflowRes.data || []
-      toolBindings.value = bindToolRes.data || []
-      mcpBindings.value = bindMcpRes.data || []
       subAgentBindings.value = bindSubAgentRes.data || []
       publishInfo.value = publishRes.data || null
     } catch (error) {

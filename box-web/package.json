@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "build:share-mascot": "python scripts/build-share-mascot-gif.py"
   },
@@ -32,9 +34,12 @@
     "@types/dompurify": "^3.0.5",
     "@types/node": "^22.13.10",
     "@vitejs/plugin-vue": "^5.2.3",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.0.0",
     "typescript": "~5.8.2",
     "unplugin-vue-components": "^28.4.1",
     "vite": "^6.2.5",
+    "vitest": "^3.0.9",
     "vue-tsc": "^2.2.8"
   }
 }

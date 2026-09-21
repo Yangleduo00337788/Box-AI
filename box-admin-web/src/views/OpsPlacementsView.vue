@@ -308,10 +308,10 @@ const rules: FormProps['rules'] = {
   imageUrl: [
     {
       validator: () => {
-        if (!isCreativeSlot.value) return { result: true as const }
+        if (!isCreativeSlot.value) return { result: true, message: '' }
         return form.imageUrl.trim()
-          ? { result: true as const }
-          : { result: false as const, message: '请上传投放图片', type: 'error' as const }
+          ? { result: true, message: '' }
+          : { result: false, message: '请上传投放图片', type: 'error' }
       },
     },
   ],

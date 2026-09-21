@@ -26,6 +26,8 @@ import com.boxai.workflow.application.WorkflowApplicationService;
 import com.boxai.workflow.application.WorkflowDefinitionValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,6 +46,8 @@ import java.util.concurrent.Executors;
 
 @Service
 public class WorkflowExecutionApplicationService {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkflowExecutionApplicationService.class);
 
     private static final long STREAM_TIMEOUT_MS = 120_000L;
     private static final ExecutorService STREAM_EXECUTOR = Executors.newFixedThreadPool(
@@ -287,8 +291,8 @@ public class WorkflowExecutionApplicationService {
                 : "工作流调试失败";
         try {
             sendStreamEvent(emitter, WorkflowStreamEvent.error(message));
-        } catch (Exception ignored) {
-            // ignore secondary send failure
+        } catch (Exception ex) {
+            log.debug("Failed to send workflow debug error event to client: {}", ex.getMessage());
         }
         emitter.completeWithError(error);
     }

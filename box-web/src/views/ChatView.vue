@@ -211,7 +211,6 @@ import { getAvatarColor } from '@/utils/format'
 import { classifyModelChatKind } from '@/utils/modelCapability'
 import {
   createConversation,
-  deleteMessage,
   getConversation,
   listMessages,
   regenerateMessageStream,
@@ -219,7 +218,6 @@ import {
   parseMessageCitations,
   createConversationShare,
   submitMessageFeedback,
-  type MessageVO,
 } from '@/api/conversation'
 import type { KnowledgeCitation } from '@/api/agent'
 import {
@@ -582,28 +580,6 @@ async function loadLatestTrace(convId: number, executionId?: number) {
     traceSpans.value = []
   } finally {
     traceLoading.value = false
-  }
-}
-
-async function onDeleteMessage(index: number) {
-  const item = messages.value[index]
-  if (!item) return
-  await removeMessage(item, index)
-}
-
-async function removeMessage(item: MessageVO, index: number) {
-  if (chatting.value) return
-  const targetId = conversationId.value
-  if (!targetId) return
-  try {
-    if (item.id && item.id > 0) {
-      await deleteMessage(targetId, item.id)
-    }
-    messages.value.splice(index, 1)
-    MessagePlugin.success('消息已删除')
-    await refreshConversationNav()
-  } catch (error) {
-    MessagePlugin.error(extractApiError(error, '删除失败'))
   }
 }
 

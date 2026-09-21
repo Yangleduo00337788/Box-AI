@@ -1,5 +1,7 @@
 package com.boxai.infrastructure.elasticsearch;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.net.ssl.SSLContext;
@@ -17,6 +19,8 @@ import java.util.Base64;
 
 @Component
 public class ElasticsearchHttpClient {
+
+    private static final Logger log = LoggerFactory.getLogger(ElasticsearchHttpClient.class);
 
     private final ElasticsearchProperties properties;
     private final HttpClient httpClient;
@@ -105,8 +109,8 @@ public class ElasticsearchHttpClient {
                 SSLContext sslContext = SSLContext.getInstance("TLS");
                 sslContext.init(null, trustAll, new SecureRandom());
                 builder.sslContext(sslContext);
-            } catch (Exception ignored) {
-                // fall back to default trust store
+            } catch (Exception ex) {
+                log.warn("Failed to configure insecure Elasticsearch TLS, using default trust store: {}", ex.getMessage());
             }
         }
         return builder.build();

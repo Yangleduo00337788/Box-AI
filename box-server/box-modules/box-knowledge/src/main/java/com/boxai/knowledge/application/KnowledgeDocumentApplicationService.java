@@ -16,6 +16,8 @@ import com.boxai.knowledge.support.KnowledgeDocumentProgress;
 import com.boxai.common.security.FileSafetyPolicy;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.security.permission.WorkspacePermissionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,8 @@ import java.util.Locale;
 
 @Service
 public class KnowledgeDocumentApplicationService {
+
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeDocumentApplicationService.class);
 
     private final KnowledgeBaseApplicationService knowledgeBaseApplicationService;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
@@ -219,8 +223,13 @@ public class KnowledgeDocumentApplicationService {
         if (document.getStorageBucket() != null && document.getStorageKey() != null) {
             try {
                 objectStorage.delete(document.getStorageBucket(), document.getStorageKey());
-            } catch (Exception ignored) {
-                // ignore storage cleanup failure
+            } catch (Exception ex) {
+                log.warn(
+                        "Failed to delete object storage for document {} (bucket={}, key={}): {}",
+                        documentId,
+                        document.getStorageBucket(),
+                        document.getStorageKey(),
+                        ex.getMessage());
             }
         }
         knowledgeDocumentRepository.delete(documentId);

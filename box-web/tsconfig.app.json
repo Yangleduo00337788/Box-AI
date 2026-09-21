@@ -22,5 +22,5 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "env.d.ts"],
-  "exclude": ["../box-ui"]
+  "exclude": ["../box-ui", "src/**/*.spec.ts", "src/test/**"]
 }

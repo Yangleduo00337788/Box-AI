@@ -5,12 +5,17 @@ import javax.naming.directory.Attribute;
 import javax.naming.directory.Attributes;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 
 public final class EmbedDomainTxtLookup {
+
+    private static final Logger log = LoggerFactory.getLogger(EmbedDomainTxtLookup.class);
 
     private EmbedDomainTxtLookup() {
     }
@@ -69,7 +74,8 @@ public final class EmbedDomainTxtLookup {
             } finally {
                 context.close();
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.debug("DNS TXT lookup failed for {}: {}", name, ex.getMessage());
             return List.of();
         }
     }
