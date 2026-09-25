@@ -1,6 +1,7 @@
 package com.boxai.tenant.application;
 
 import com.boxai.common.constant.OveragePolicies;
+import com.boxai.common.constant.PlanAudiences;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.plan.Plan;
@@ -50,6 +51,7 @@ public class PlanApplicationService {
         plan.setQuotaMembers(request.quotaMembers());
         plan.setQuotaWorkspaces(request.quotaWorkspaces());
         plan.setQuotaKnowledgeBases(request.quotaKnowledgeBases());
+        plan.setAudience(normalizeAudience(request.audience()));
         plan.setOveragePolicy(normalizeOveragePolicy(request.overagePolicy()));
         plan.setStatus(1);
         planRepository.save(plan);
@@ -67,6 +69,7 @@ public class PlanApplicationService {
         plan.setQuotaMembers(request.quotaMembers());
         plan.setQuotaWorkspaces(request.quotaWorkspaces());
         plan.setQuotaKnowledgeBases(request.quotaKnowledgeBases());
+        plan.setAudience(normalizeAudience(request.audience()));
         plan.setOveragePolicy(normalizeOveragePolicy(request.overagePolicy()));
         if (request.status() != 0 && request.status() != 1) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "状态值无效");
@@ -103,9 +106,42 @@ public class PlanApplicationService {
                 plan.getQuotaMembers(),
                 plan.getQuotaWorkspaces(),
                 plan.getQuotaKnowledgeBases() == null ? 0 : plan.getQuotaKnowledgeBases(),
+                resolveAudience(plan),
                 plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy(),
+                plan.getByokEnabled() == null ? 0 : plan.getByokEnabled(),
                 plan.getStatus(),
                 plan.getCreatedAt());
+    }
+
+    private String resolveAudience(Plan plan) {
+        String stored = plan.getAudience();
+        if (PlanAudiences.TEAM.equalsIgnoreCase(stored)) {
+            return PlanAudiences.TEAM;
+        }
+        String blob = ((plan.getCode() == null ? "" : plan.getCode()) + " " + (plan.getName() == null ? "" : plan.getName()))
+                .toLowerCase(Locale.ROOT);
+        if (blob.contains("enterprise")
+                || blob.contains("team")
+                || blob.contains("org")
+                || blob.contains("企业")
+                || blob.contains("团队")) {
+            return PlanAudiences.TEAM;
+        }
+        if (PlanAudiences.PERSONAL.equalsIgnoreCase(stored)) {
+            return PlanAudiences.PERSONAL;
+        }
+        return normalizeAudience(stored);
+    }
+
+    private String normalizeAudience(String value) {
+        if (value == null || value.isBlank()) {
+            return PlanAudiences.PERSONAL;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!PlanAudiences.PERSONAL.equals(normalized) && !PlanAudiences.TEAM.equals(normalized)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "套餐分类无效");
+        }
+        return normalized;
     }
 
     private String normalizeOveragePolicy(String value) {

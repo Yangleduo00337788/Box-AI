@@ -30,6 +30,7 @@ public class PlanDO {
     private Integer quotaWorkspaces;
     @Column("quota_knowledge_bases")
     private Integer quotaKnowledgeBases;
+    private String audience;
     @Column("overage_policy")
     private String overagePolicy;
     @Column("byok_enabled")

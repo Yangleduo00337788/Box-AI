@@ -14,7 +14,9 @@ public record PlanVO(
         Integer quotaMembers,
         Integer quotaWorkspaces,
         Integer quotaKnowledgeBases,
+        String audience,
         String overagePolicy,
+        Integer byokEnabled,
         Integer status,
         LocalDateTime createdAt
 ) {}
