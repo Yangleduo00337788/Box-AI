@@ -2,6 +2,9 @@ package com.boxai.knowledge.support;
 
 public final class KnowledgeDocumentProgress {
 
+    /** 处理失败时 progress 归零，与 {@code KnowledgeDocumentProcessingService} 一致 */
+    public static final int FAILED = 0;
+
     public static final int UPLOADING = 5;
     public static final int QUEUED = 10;
     public static final int PARSING = 20;
