@@ -28,6 +28,12 @@
         <t-form-item label="名称" name="name">
           <t-input v-model="form.name" />
         </t-form-item>
+        <t-form-item label="分类" name="audience">
+          <t-radio-group v-model="form.audience">
+            <t-radio value="PERSONAL">个人工作</t-radio>
+            <t-radio value="TEAM">团队协作</t-radio>
+          </t-radio-group>
+        </t-form-item>
         <t-form-item label="描述" name="description">
           <t-textarea v-model="form.description" :autosize="{ minRows: 2, maxRows: 4 }" />
         </t-form-item>
@@ -89,6 +95,7 @@ const form = reactive({
   quotaMembers: 0,
   quotaWorkspaces: 0,
   quotaKnowledgeBases: 0,
+  audience: 'PERSONAL',
   overagePolicy: 'REJECT',
   status: 1,
 })
@@ -113,6 +120,12 @@ const rules: FormProps['rules'] = {
 const columns: PrimaryTableCol<PlanVO>[] = [
   { colKey: 'name', title: '名称', minWidth: 140 },
   { colKey: 'code', title: '编码', width: 160 },
+  {
+    colKey: 'audience',
+    title: '分类',
+    width: 100,
+    cell: (_, { row }) => (row.audience === 'TEAM' ? '团队协作' : '个人工作'),
+  },
   {
     colKey: 'priceMonthly',
     title: '月费',
@@ -181,6 +194,7 @@ function resetForm() {
   form.quotaMembers = 1
   form.quotaWorkspaces = 1
   form.quotaKnowledgeBases = 1
+  form.audience = 'PERSONAL'
   form.overagePolicy = 'REJECT'
   form.status = 1
 }
@@ -203,6 +217,7 @@ function openEdit(row: PlanVO) {
   form.quotaMembers = row.quotaMembers
   form.quotaWorkspaces = row.quotaWorkspaces
   form.quotaKnowledgeBases = row.quotaKnowledgeBases ?? 0
+  form.audience = row.audience === 'TEAM' ? 'TEAM' : 'PERSONAL'
   form.overagePolicy = row.overagePolicy || 'REJECT'
   form.status = row.status
   dialogVisible.value = true
@@ -223,6 +238,7 @@ async function onSave() {
         quotaMembers: form.quotaMembers,
         quotaWorkspaces: form.quotaWorkspaces,
         quotaKnowledgeBases: form.quotaKnowledgeBases,
+        audience: form.audience,
         overagePolicy: form.overagePolicy,
         status: form.status,
       })
@@ -238,6 +254,7 @@ async function onSave() {
         quotaMembers: form.quotaMembers,
         quotaWorkspaces: form.quotaWorkspaces,
         quotaKnowledgeBases: form.quotaKnowledgeBases,
+        audience: form.audience,
         overagePolicy: form.overagePolicy,
       })
       MessagePlugin.success('套餐已创建')

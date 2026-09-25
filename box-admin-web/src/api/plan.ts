@@ -11,7 +11,9 @@ export interface PlanVO {
   quotaMembers: number
   quotaWorkspaces: number
   quotaKnowledgeBases: number
+  audience?: string
   overagePolicy?: string
+  byokEnabled?: number
   status: number
   createdAt?: string
 }
@@ -26,6 +28,7 @@ export interface CreatePlanRequest {
   quotaMembers: number
   quotaWorkspaces: number
   quotaKnowledgeBases: number
+  audience?: string
   overagePolicy?: string
 }
 
@@ -38,6 +41,7 @@ export interface UpdatePlanRequest {
   quotaMembers: number
   quotaWorkspaces: number
   quotaKnowledgeBases: number
+  audience?: string
   overagePolicy?: string
   status: number
 }
