@@ -39,3 +39,14 @@ export function installPlugin(id: number) {
 export function uninstallPlugin(id: number) {
   return http.delete<Result<null>>(`/market/plugins/${id}/install`)
 }
+
+export interface CreateWorkspacePluginPayload {
+  category: string
+  title: string
+  description?: string
+  manifestJson: string
+}
+
+export function createWorkspacePlugin(payload: CreateWorkspacePluginPayload) {
+  return http.post<Result<PluginCatalogVO>>('/market/workspace-plugins', payload)
+}

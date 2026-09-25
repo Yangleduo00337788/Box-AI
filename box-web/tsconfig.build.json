@@ -3,6 +3,7 @@
   "compilerOptions": {
     "paths": {
       "@/*": ["src/*"],
+      "@box/ui/*": ["../box-ui/src/*"],
       "@box/ui/types/*": ["../box-ui/src/types/*"],
       "@box/ui/setup/*": ["../box-ui/src/setup/*"]
     }

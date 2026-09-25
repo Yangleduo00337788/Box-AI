@@ -19,6 +19,13 @@
       </template>
     </page-header>
 
+    <workspace-plugin-create-dialog
+      v-model:visible="createDialogVisible"
+      :categories="categories"
+      :initial-category="createDialogCategory"
+      @created="onWorkspacePluginCreated"
+    />
+
     <div class="plugin-market__layout">
       <aside class="plugin-market__nav" aria-label="市场分类">
         <p class="plugin-market__nav-label">发现</p>
@@ -277,6 +284,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import WorkspacePluginCreateDialog from '@/components/WorkspacePluginCreateDialog.vue'
 import ResourceItemCard from '@/components/ResourceItemCard.vue'
 import KnowledgeView from '@/views/KnowledgeView.vue'
 import McpView from '@/views/McpView.vue'
@@ -302,7 +310,6 @@ import { RESOURCE_MANAGE_CATEGORIES } from '@/constants/resourceManage'
 import {
   PLUGIN_CATEGORY_CREATE_LABELS,
   PLUGIN_CATEGORY_MANAGE_PATHS,
-  createPathForCategory,
   isPluginMineCategory,
   resolvePluginOpenPath,
 } from '@/constants/resourceRoutes'
@@ -337,6 +344,8 @@ const categories = ref<PluginCategoryVO[]>([])
 const keyword = ref('')
 const detailItem = ref<PluginCatalogVO | null>(null)
 const detailVisible = ref(false)
+const createDialogVisible = ref(false)
+const createDialogCategory = ref('')
 
 const mineNavItems = RESOURCE_MANAGE_CATEGORIES
 const mineCounts = ref<Record<string, number>>({
@@ -394,7 +403,7 @@ const createOptions = computed<DropdownOption[]>(() =>
     .filter(([category]) => can(CREATE_PERMISSIONS[category] || PermissionCodes.TOOL_CREATE))
     .map(([category]) => ({
       content: PLUGIN_CATEGORY_CREATE_LABELS[category] || `新建${category}`,
-      value: createPathForCategory(category) || '',
+      value: category,
     })),
 )
 
@@ -543,8 +552,15 @@ function detailStatus(item: PluginCatalogVO) {
 }
 
 function onManageSelect(option: DropdownOption) {
-  const path = String(option.value || '')
-  if (path) router.push(path)
+  const category = String(option.value || '')
+  if (!category) return
+  createDialogCategory.value = category
+  createDialogVisible.value = true
+}
+
+async function onWorkspacePluginCreated() {
+  await Promise.all([loadPlugins(), loadMineCounts()])
+  // 工作流类插件在创建弹窗内会跳转到 /workflows/:id/editor
 }
 
 function marketQuery(tab: MarketTab, category: string, extra: Record<string, string> = {}) {

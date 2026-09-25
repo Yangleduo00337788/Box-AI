@@ -724,13 +724,17 @@ const publishEmbedCode = computed(
   allow="clipboard-write"
 ></iframe>`,
 )
-const publishApiExample = computed(
-  () => `curl -X POST \\
+const publishApiExample = computed(() => {
+  const base =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'http://127.0.0.1:8080'
+  const url = `${base}${publishEndpoint.value}`
+  return `curl -X POST "${url}" \\
   -H "Authorization: Bearer ax_live_你的密钥" \\
   -H "Content-Type: application/json" \\
-  -d '{"message":"你好","stream":false}' \\
-  ${publishEndpoint.value}`,
-)
+  -d '{"message":"你好","stream":false}'`
+})
 const publishJsExample = computed(
   () => `import { BoxClient } from '@box/sdk'
 

@@ -37,6 +37,7 @@ declare module 'vue' {
     OpsGlobalAlert: typeof import('./src/components/OpsGlobalAlert.vue')['default']
     OpsPlacementIcon: typeof import('./src/components/OpsPlacementIcon.vue')['default']
     PageHeader: typeof import('./src/components/PageHeader.vue')['default']
+    PluginWorkflowDesignerDialog: typeof import('./src/components/PluginWorkflowDesignerDialog.vue')['default']
     ProjectConversationPanel: typeof import('./src/components/ProjectConversationPanel.vue')['default']
     QuotaDonutChart: typeof import('./src/components/QuotaDonutChart.vue')['default']
     ResourceItemCard: typeof import('./src/components/ResourceItemCard.vue')['default']
@@ -67,6 +68,7 @@ declare module 'vue' {
     TInput: typeof import('tdesign-vue-next')['Input']
     TInputNumber: typeof import('tdesign-vue-next')['InputNumber']
     TLayout: typeof import('tdesign-vue-next')['Layout']
+    TLink: typeof import('tdesign-vue-next')['Link']
     TList: typeof import('tdesign-vue-next')['List']
     TListItem: typeof import('tdesign-vue-next')['ListItem']
     TLoading: typeof import('tdesign-vue-next')['Loading']
@@ -91,7 +93,10 @@ declare module 'vue' {
     TTag: typeof import('tdesign-vue-next')['Tag']
     TTextarea: typeof import('tdesign-vue-next')['Textarea']
     TTooltip: typeof import('tdesign-vue-next')['Tooltip']
+    TUpload: typeof import('tdesign-vue-next')['Upload']
     WorkflowEditorCanvas: typeof import('./src/components/workflow/WorkflowEditorCanvas.vue')['default']
     WorkflowFlowNode: typeof import('./src/components/workflow/WorkflowFlowNode.vue')['default']
+    WorkspacePluginCreateDialog: typeof import('./src/components/WorkspacePluginCreateDialog.vue')['default']
+    WorkspacePluginManifestFields: typeof import('./src/components/WorkspacePluginManifestFields.vue')['default']
   }
 }
