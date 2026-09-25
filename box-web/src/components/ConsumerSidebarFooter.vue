@@ -206,6 +206,12 @@
     >
       <team-view v-if="teamVisible && canOpenTeam" compact />
     </t-dialog>
+
+    <plan-upgrade-dialog
+      v-model:visible="planUpgradeVisible"
+      :current-plan-id="planUpgradePlanId"
+      @success="onPlanUpgradeSuccess"
+    />
   </div>
 </template>
 
@@ -219,6 +225,9 @@ import { deleteWorkspace } from '@/api/workspace'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
 import { useWorkspacePins } from '@/composables/useWorkspacePins'
 import ConsumerSidebarQuota from '@/components/ConsumerSidebarQuota.vue'
+import PlanUpgradeDialog from '@/components/PlanUpgradeDialog.vue'
+import { usePlanUpgradeDialog } from '@/composables/usePlanUpgradeDialog'
+import { useTenantQuota } from '@/composables/useTenantQuota'
 import AnalyticsView from '@/views/AnalyticsView.vue'
 import CreateWorkspaceDialog from '@/components/CreateWorkspaceDialog.vue'
 import DashboardView from '@/views/DashboardView.vue'
@@ -230,6 +239,15 @@ import TeamView from '@/views/TeamView.vue'
 import { useNotificationUnread } from '@/composables/useNotificationUnread'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionStore } from '@/stores/permission'
+
+const { upgradeVisible: planUpgradeVisible, onPlanUpgradeSuccess: notifyPlanUpgradeSuccess } =
+  usePlanUpgradeDialog()
+const { quota: footerQuota } = useTenantQuota()
+const planUpgradePlanId = computed(() => footerQuota.value?.planId ?? null)
+
+function onPlanUpgradeSuccess() {
+  notifyPlanUpgradeSuccess()
+}
 
 defineProps<{
   collapsed?: boolean

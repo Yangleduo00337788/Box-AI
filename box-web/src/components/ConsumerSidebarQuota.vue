@@ -52,10 +52,15 @@
                 </li>
               </ul>
 
-              <button type="button" class="quota-popover__link" @click="goPlan">
-                套餐与额度详情
-                <t-icon name="chevron-right" />
-              </button>
+              <div class="quota-popover__footer">
+                <button type="button" class="quota-popover__link" @click="goPlan">
+                  套餐与额度详情
+                  <t-icon name="chevron-right" />
+                </button>
+                <button type="button" class="quota-popover__upgrade" @click="openUpgrade">
+                  立即升级
+                </button>
+              </div>
             </template>
             <p v-else class="quota-popover__empty">暂无额度数据</p>
           </t-loading>
@@ -66,17 +71,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   formatQuotaNumber,
   quotaUsagePercent,
   useTenantQuota,
 } from '@/composables/useTenantQuota'
+import { usePlanUpgradeDialog } from '@/composables/usePlanUpgradeDialog'
 
 const router = useRouter()
 const visible = ref(false)
+const { openPlanUpgrade, subscribePlanUpgradeSuccess } = usePlanUpgradeDialog()
 const { quota, loading, tokenPercent, refreshQuota } = useTenantQuota()
+
+const unsubscribeUpgradeSuccess = subscribePlanUpgradeSuccess(() => {
+  void refreshQuota()
+})
+onUnmounted(() => {
+  unsubscribeUpgradeSuccess()
+})
 
 const warnLevel = computed(() => {
   const p = tokenPercent.value
@@ -111,6 +125,11 @@ function onVisibleChange(open: boolean) {
 function goPlan() {
   visible.value = false
   void router.push('/settings/plan')
+}
+
+function openUpgrade() {
+  visible.value = false
+  openPlanUpgrade()
 }
 </script>
 
@@ -242,12 +261,21 @@ function goPlan() {
   background: var(--td-error-color);
 }
 
+.quota-popover__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--box-border);
+}
+
 .quota-popover__link {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  margin-top: 4px;
-  padding: 6px 0 0;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--td-brand-color);
@@ -257,6 +285,23 @@ function goPlan() {
 
 .quota-popover__link:hover {
   opacity: 0.85;
+}
+
+.quota-popover__upgrade {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--td-brand-color);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.quota-popover__upgrade:hover {
+  opacity: 0.92;
 }
 
 .quota-popover__empty {

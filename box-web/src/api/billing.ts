@@ -43,7 +43,9 @@ export interface PlanVO {
   quotaMembers: number
   quotaWorkspaces: number
   quotaKnowledgeBases?: number
+  audience?: 'PERSONAL' | 'TEAM' | string
   overagePolicy?: string
+  byokEnabled?: number
   status: number
 }
 

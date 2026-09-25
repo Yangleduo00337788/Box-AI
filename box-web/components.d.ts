@@ -37,6 +37,7 @@ declare module 'vue' {
     OpsGlobalAlert: typeof import('./src/components/OpsGlobalAlert.vue')['default']
     OpsPlacementIcon: typeof import('./src/components/OpsPlacementIcon.vue')['default']
     PageHeader: typeof import('./src/components/PageHeader.vue')['default']
+    PlanUpgradeDialog: typeof import('./src/components/PlanUpgradeDialog.vue')['default']
     PluginWorkflowDesignerDialog: typeof import('./src/components/PluginWorkflowDesignerDialog.vue')['default']
     ProjectConversationPanel: typeof import('./src/components/ProjectConversationPanel.vue')['default']
     QuotaDonutChart: typeof import('./src/components/QuotaDonutChart.vue')['default']

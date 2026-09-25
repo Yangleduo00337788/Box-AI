@@ -33,21 +33,6 @@
           <t-empty v-else description="暂无额度数据" />
         </t-loading>
       </t-tab-panel>
-      <t-tab-panel value="plans" label="换套餐" :destroy-on-hide="false">
-        <t-loading :loading="plansLoading" size="small">
-          <div v-if="plans.length" class="plan-grid">
-            <t-card v-for="plan in plans" :key="plan.id" :bordered="true" class="plan-offer">
-              <h3>{{ plan.name }}</h3>
-              <p class="plan-offer__price">{{ plan.priceMonthly }} CNY / 月</p>
-              <p class="plan-offer__desc">{{ plan.description || '—' }}</p>
-              <t-button theme="primary" variant="outline" :loading="subscribingId === plan.id" @click="onSubscribe(plan.id)">
-                {{ overview?.paymentEnabled ? '订阅并支付' : '订阅并模拟支付' }}
-              </t-button>
-            </t-card>
-          </div>
-          <t-empty v-else description="暂无可用套餐" />
-        </t-loading>
-      </t-tab-panel>
       <t-tab-panel value="billing" label="账单" :destroy-on-hide="false">
         <t-loading :loading="billingLoading" size="small">
           <section v-if="overview" class="settings-card plan-card">
@@ -72,6 +57,17 @@
         </t-loading>
       </t-tab-panel>
     </t-tabs>
+
+    <div class="plan-upgrade-entry">
+      <p>需要更换套餐？</p>
+      <t-button theme="primary" variant="outline" @click="upgradeVisible = true">立即升级</t-button>
+    </div>
+
+    <plan-upgrade-dialog
+      v-model:visible="upgradeVisible"
+      :current-plan-id="quota?.planId"
+      @success="onUpgradeSuccess"
+    />
   </div>
 </template>
 
@@ -83,20 +79,17 @@ import type { ECharts } from 'echarts'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol, TabValue } from 'tdesign-vue-next'
 import {
-  confirmPayment,
   fetchBillingOverview,
   fetchInvoices,
-  listPlans,
-  subscribePlan,
   type BillingInvoiceVO,
   type BillingOverviewVO,
-  type PlanVO,
 } from '@/api/billing'
 import { fetchQuota, type QuotaSnapshotVO } from '@/api/quota'
 import { useAuthStore } from '@/stores/auth'
 import { appPreferences } from '@/composables/useAppPreferences'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import QuotaDonutChart from '@/components/QuotaDonutChart.vue'
+import PlanUpgradeDialog from '@/components/PlanUpgradeDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -104,13 +97,13 @@ const auth = useAuthStore()
 
 const quotaLoading = ref(false)
 const billingLoading = ref(false)
-const plansLoading = ref(false)
 const quota = ref<QuotaSnapshotVO | null>(null)
 const overview = ref<BillingOverviewVO | null>(null)
-const plans = ref<PlanVO[]>([])
 const invoices = ref<BillingInvoiceVO[]>([])
-const subscribingId = ref<number | null>(null)
-const tab = ref<'usage' | 'billing' | 'plans'>(route.query.tab === 'billing' ? 'billing' : route.query.tab === 'plans' ? 'plans' : 'usage')
+const upgradeVisible = ref(false)
+const tab = ref<'usage' | 'billing'>(
+  route.query.tab === 'billing' || route.query.tab === 'plans' ? 'billing' : 'usage',
+)
 const usageBarRef = ref<HTMLElement | null>(null)
 const billingBarRef = ref<HTMLElement | null>(null)
 
@@ -285,11 +278,10 @@ const invoiceColumns: PrimaryTableCol<BillingInvoiceVO>[] = [
 ]
 
 function onTabChange(value: TabValue) {
-  const next = value === 'billing' ? 'billing' : value === 'plans' ? 'plans' : 'usage'
+  const next = value === 'billing' ? 'billing' : 'usage'
   tab.value = next
   const query = next === 'usage' ? {} : { tab: next }
   void router.replace({ query })
-  if (next === 'plans') void loadPlans()
   if (next === 'billing') void loadInvoices()
   void renderCharts()
 }
@@ -332,41 +324,14 @@ async function loadInvoices() {
   }
 }
 
-async function loadPlans() {
-  plansLoading.value = true
-  try {
-    const { data } = await listPlans()
-    plans.value = (data.data || []).filter((item) => item.status === 1)
-  } catch {
-    plans.value = []
-  } finally {
-    plansLoading.value = false
-  }
-}
-
-async function onSubscribe(planId: number) {
-  subscribingId.value = planId
-  try {
-    const { data } = await subscribePlan(planId)
-    const order = data.data
-    if (order?.paymentUrl) {
-      window.location.href = order.paymentUrl
-      return
-    }
-    if (order?.requiresClientConfirm && order?.paymentId) {
-      await confirmPayment(order.paymentId)
-    }
-    MessagePlugin.success('套餐已更新')
-    await loadAll()
-    tab.value = 'billing'
-  } finally {
-    subscribingId.value = null
-  }
-}
-
 async function loadAll() {
-  await Promise.all([loadQuota(), loadBilling(), loadPlans()])
+  await Promise.all([loadQuota(), loadBilling()])
   await renderCharts()
+}
+
+async function onUpgradeSuccess() {
+  await loadAll()
+  tab.value = 'usage'
 }
 
 function handleResize() {
@@ -377,7 +342,12 @@ function handleResize() {
 watch(
   () => route.query.tab,
   (value) => {
-    tab.value = value === 'billing' ? 'billing' : value === 'plans' ? 'plans' : 'usage'
+    if (value === 'plans') {
+      upgradeVisible.value = true
+      void router.replace({ path: route.path, query: {} })
+      return
+    }
+    tab.value = value === 'billing' ? 'billing' : 'usage'
     void renderCharts()
   },
 )
@@ -397,13 +367,17 @@ function handlePaymentReturn() {
     void router.replace({ path: route.path, query: { tab: 'billing' } })
   } else if (payment === 'cancel') {
     MessagePlugin.warning('已取消支付')
-    tab.value = 'plans'
-    void router.replace({ path: route.path, query: { tab: 'plans' } })
+    upgradeVisible.value = true
+    void router.replace({ path: route.path, query: {} })
   }
 }
 
 onMounted(() => {
   handlePaymentReturn()
+  if (route.query.tab === 'plans' || route.query.upgrade === '1') {
+    upgradeVisible.value = true
+    void router.replace({ path: route.path, query: {} })
+  }
   void loadAll()
   window.addEventListener('resize', handleResize)
 })
@@ -466,21 +440,21 @@ onBeforeUnmount(() => {
   height: 220px;
 }
 
-.plan-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+.plan-upgrade-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--box-border);
+  border-radius: 10px;
+  background: var(--td-bg-color-container);
 }
 
-.plan-offer__price {
-  margin: 8px 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.plan-offer__desc {
-  margin: 0 0 16px;
-  color: var(--box-muted);
+.plan-upgrade-entry p {
+  margin: 0;
   font-size: 13px;
+  color: var(--box-muted);
 }
 </style>
