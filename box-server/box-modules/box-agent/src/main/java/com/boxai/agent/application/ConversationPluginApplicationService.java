@@ -36,19 +36,22 @@ public class ConversationPluginApplicationService {
     private final McpServerRepository mcpServerRepository;
     private final McpToolCatalogParser mcpToolCatalogParser;
     private final ObjectMapper objectMapper;
+    private final PluginCatalogAssetApplicationService pluginCatalogAssetApplicationService;
 
     public ConversationPluginApplicationService(PluginCatalogRepository pluginCatalogRepository,
                                                 WorkspacePluginInstallRepository workspacePluginInstallRepository,
                                                 ToolRepository toolRepository,
                                                 McpServerRepository mcpServerRepository,
                                                 McpToolCatalogParser mcpToolCatalogParser,
-                                                ObjectMapper objectMapper) {
+                                                ObjectMapper objectMapper,
+                                                PluginCatalogAssetApplicationService pluginCatalogAssetApplicationService) {
         this.pluginCatalogRepository = pluginCatalogRepository;
         this.workspacePluginInstallRepository = workspacePluginInstallRepository;
         this.toolRepository = toolRepository;
         this.mcpServerRepository = mcpServerRepository;
         this.mcpToolCatalogParser = mcpToolCatalogParser;
         this.objectMapper = objectMapper;
+        this.pluginCatalogAssetApplicationService = pluginCatalogAssetApplicationService;
     }
 
     public ConversationPluginRound resolve(Long workspaceId, List<Long> pluginIds) {
@@ -93,7 +96,10 @@ public class ConversationPluginApplicationService {
 
     private void appendSkill(StringBuilder skills, PluginCatalog plugin) {
         JsonNode manifest = PluginManifest.parse(plugin.getManifestJson(), objectMapper);
-        String instructions = PluginManifest.text(manifest, "instructions", plugin.getDescription());
+        String instructions = PluginManifest.resolveSkillInstructions(manifest, pluginCatalogAssetApplicationService);
+        if (instructions == null || instructions.isBlank()) {
+            instructions = PluginManifest.text(manifest, "instructions", plugin.getDescription());
+        }
         if (instructions == null || instructions.isBlank()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "技能插件缺少说明内容");
         }

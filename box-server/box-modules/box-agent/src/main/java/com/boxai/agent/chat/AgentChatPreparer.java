@@ -311,8 +311,7 @@ public class AgentChatPreparer {
                     : systemPrompt + "\n\n" + workflowBlock;
         }
         if (pluginRound != null && pluginRound.skillPromptBlock() != null && !pluginRound.skillPromptBlock().isBlank()) {
-            String skillBlock = "以下为本次用户消息启用的技能说明，你必须严格遵守其中的格式与约束，不得忽略或仅用普通一句话概括：\n"
-                    + PromptInjectionGuard.wrapUntrustedContext("skill", pluginRound.skillPromptBlock());
+            String skillBlock = "【技能说明 · 必须遵守】\n" + pluginRound.skillPromptBlock().trim();
             systemPrompt = systemPrompt == null || systemPrompt.isBlank()
                     ? skillBlock
                     : systemPrompt + "\n\n" + skillBlock;
@@ -340,9 +339,17 @@ public class AgentChatPreparer {
         String userContent = enrichImagesWithOcr
                 ? chatUserMessageImageEnricher.enrichWithImageText(userMessage)
                 : userMessage;
-        String wrappedUserContent = sendImagesMultimodal && userContent.contains("[图片:")
-                ? PromptInjectionGuard.wrapUserMessageForVision(userContent)
-                : PromptInjectionGuard.wrapUserMessage(userContent);
+        boolean pluginToolsActive = pluginRound != null
+                && pluginRound.extraTools() != null
+                && !pluginRound.extraTools().isEmpty();
+        String wrappedUserContent;
+        if (sendImagesMultimodal && userContent.contains("[图片:")) {
+            wrappedUserContent = PromptInjectionGuard.wrapUserMessageForVision(userContent);
+        } else if (pluginToolsActive) {
+            wrappedUserContent = PromptInjectionGuard.wrapUserMessageForVision(userContent);
+        } else {
+            wrappedUserContent = PromptInjectionGuard.wrapUserMessage(userContent);
+        }
         turns.add(new ChatTurn("USER", wrappedUserContent));
         return turns;
     }

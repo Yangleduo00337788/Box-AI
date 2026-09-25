@@ -4,6 +4,7 @@ import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.Locale;
@@ -56,25 +57,98 @@ final class PluginManifest {
     }
 
     static String normalizeAndValidate(String category, String manifestJson, ObjectMapper objectMapper) {
-        String normalized = normalize(manifestJson, objectMapper);
-        JsonNode node = parse(normalized, objectMapper);
+        JsonNode node = parse(manifestJson, objectMapper);
+        if (!(node instanceof ObjectNode objectNode)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "manifest 必须是 JSON 对象");
+        }
         String key = category == null ? "" : category.trim().toLowerCase(Locale.ROOT);
         if (!RESOURCE_CATEGORIES.contains(key)) {
-            return normalized;
+            return objectNode.toString();
         }
-        if ("tools".equals(key) && text(node, "url", null) == null) {
+        if ("mcp".equals(key)) {
+            mergeMcpAliases(objectNode);
+        }
+        if ("tools".equals(key) && text(objectNode, "url", null) == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "工具插件需填写请求地址");
         }
-        if ("mcp".equals(key) && text(node, "endpointUrl", null) == null) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "MCP 插件需填写服务地址");
+        if ("mcp".equals(key) && text(objectNode, "endpointUrl", null) == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "MCP 插件需配置 endpointUrl 或 mcpServers JSON");
         }
-        if ("skills".equals(key) && text(node, "instructions", null) == null) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "Skill 插件需填写技能说明");
+        if ("skills".equals(key)) {
+            validateSkill(objectNode);
+        }
+        if ("knowledge".equals(key)) {
+            validateKnowledgeBundle(objectNode);
         }
         if ("workflows".equals(key)) {
-            resolveWorkflowDefinition(node, objectMapper, "{\"nodes\":[],\"edges\":[],\"variables\":[]}");
+            resolveWorkflowDefinition(objectNode, objectMapper, "{\"nodes\":[],\"edges\":[],\"variables\":[]}");
         }
-        return normalized;
+        return objectNode.toString();
+    }
+
+    static void mergeMcpAliases(ObjectNode objectNode) {
+        if (text(objectNode, "endpointUrl", null) != null) {
+            return;
+        }
+        JsonNode servers = objectNode.get("mcpServers");
+        if (servers == null || !servers.isObject() || servers.isEmpty()) {
+            return;
+        }
+        JsonNode first = servers.elements().next();
+        if (first == null || !first.isObject()) {
+            return;
+        }
+        String url = text(first, "url", text(first, "endpointUrl", null));
+        if (url == null) {
+            return;
+        }
+        objectNode.put("endpointUrl", url);
+        if (!objectNode.has("transportType")) {
+            objectNode.put("transportType", text(first, "transport", text(first, "transportType", "HTTP")).toUpperCase(Locale.ROOT));
+        }
+        if (!objectNode.has("authType")) {
+            objectNode.put("authType", text(first, "authType", "NONE"));
+        }
+        if (!objectNode.has("toolCatalogJson") && first.has("tools")) {
+            objectNode.put("toolCatalogJson", first.get("tools").toString());
+        }
+    }
+
+    private static void validateSkill(ObjectNode node) {
+        boolean hasText = text(node, "instructions", null) != null;
+        boolean hasMd = text(node, "skillMdStorageKey", null) != null;
+        boolean hasZip = text(node, "skillPackageStorageKey", null) != null;
+        if (!hasText && !hasMd && !hasZip) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "Skill 需填写说明、上传 SKILL.md 或上传 Skill 压缩包");
+        }
+    }
+
+    private static void validateKnowledgeBundle(ObjectNode node) {
+        JsonNode bundle = node.get("bundleDocuments");
+        if (bundle == null || !bundle.isArray() || bundle.isEmpty()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "知识库插件需至少上传 1 个文档到资源包");
+        }
+        for (JsonNode item : bundle) {
+            if (item == null || !item.isObject()) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "bundleDocuments 项格式错误");
+            }
+            if (text(item, "storageKey", null) == null || text(item, "fileName", null) == null) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "bundleDocuments 需包含 storageKey 与 fileName");
+            }
+        }
+    }
+
+    static String resolveSkillInstructions(JsonNode manifest, PluginCatalogAssetApplicationService assets) {
+        String inline = text(manifest, "instructions", null);
+        if (inline != null && !inline.isBlank()) {
+            return inline.trim();
+        }
+        String mdKey = text(manifest, "skillMdStorageKey", null);
+        String zipKey = text(manifest, "skillPackageStorageKey", null);
+        if (assets == null) {
+            return null;
+        }
+        return assets.resolveSkillInstructions(mdKey, zipKey);
     }
 
     static String resolveWorkflowDefinition(JsonNode manifest, ObjectMapper objectMapper, String defaultDefinition) {
@@ -107,5 +181,13 @@ final class PluginManifest {
         } catch (Exception ex) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "工作流定义不是合法的 JSON，请检查插件配置");
         }
+    }
+
+    static ArrayNode bundleDocuments(JsonNode manifest) {
+        JsonNode bundle = manifest.get("bundleDocuments");
+        if (bundle instanceof ArrayNode arrayNode) {
+            return arrayNode;
+        }
+        return null;
     }
 }

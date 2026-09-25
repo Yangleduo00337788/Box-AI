@@ -16,9 +16,11 @@ import com.boxai.domain.workflow.Workflow;
 import com.boxai.domain.workflow.WorkflowRepository;
 import com.boxai.domain.workflow.WorkflowVersion;
 import com.boxai.domain.workflow.WorkflowVersionRepository;
+import com.boxai.knowledge.application.KnowledgePluginBundleImportService;
 import com.boxai.tenant.application.QuotaApplicationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -36,6 +38,7 @@ public class PluginInstallProvisioner {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeDocumentRepository knowledgeDocumentRepository;
     private final KnowledgeChunkRepository knowledgeChunkRepository;
+    private final KnowledgePluginBundleImportService knowledgePluginBundleImportService;
     private final WorkflowRepository workflowRepository;
     private final WorkflowVersionRepository workflowVersionRepository;
     private final McpServerRepository mcpServerRepository;
@@ -47,6 +50,7 @@ public class PluginInstallProvisioner {
                                     KnowledgeBaseRepository knowledgeBaseRepository,
                                     KnowledgeDocumentRepository knowledgeDocumentRepository,
                                     KnowledgeChunkRepository knowledgeChunkRepository,
+                                    KnowledgePluginBundleImportService knowledgePluginBundleImportService,
                                     WorkflowRepository workflowRepository,
                                     WorkflowVersionRepository workflowVersionRepository,
                                     McpServerRepository mcpServerRepository,
@@ -57,6 +61,7 @@ public class PluginInstallProvisioner {
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
         this.knowledgeChunkRepository = knowledgeChunkRepository;
+        this.knowledgePluginBundleImportService = knowledgePluginBundleImportService;
         this.workflowRepository = workflowRepository;
         this.workflowVersionRepository = workflowVersionRepository;
         this.mcpServerRepository = mcpServerRepository;
@@ -70,8 +75,11 @@ public class PluginInstallProvisioner {
         if ("tools".equals(category)) {
             return provisionTool(plugin, manifest, workspaceId, userId);
         }
-        if ("knowledge".equals(category) || "skills".equals(category)) {
+        if ("knowledge".equals(category)) {
             return provisionKnowledge(plugin, manifest, workspaceId, userId);
+        }
+        if ("skills".equals(category)) {
+            return provisionSkill(plugin);
         }
         if ("workflows".equals(category)) {
             return provisionWorkflow(plugin, manifest, workspaceId, userId);
@@ -103,6 +111,10 @@ public class PluginInstallProvisioner {
         }
     }
 
+    private ProvisionResult provisionSkill(PluginCatalog plugin) {
+        return null;
+    }
+
     private ProvisionResult provisionTool(PluginCatalog plugin, JsonNode manifest, Long workspaceId, Long userId) {
         String url = PluginManifest.text(manifest, "url", "https://httpbin.org/get");
         Tool tool = new Tool();
@@ -121,6 +133,22 @@ public class PluginInstallProvisioner {
         config.setUrl(url);
         config.setTimeoutMs(PluginManifest.intValue(manifest, "timeoutMs", 10000));
         config.setAllowRedirect(PluginManifest.boolValue(manifest, "allowRedirect", false));
+        JsonNode headers = manifest.get("headers");
+        if (headers != null && !headers.isNull()) {
+            config.setHeadersJson(headers.isTextual() ? headers.asText() : headers.toString());
+        }
+        JsonNode queryParams = manifest.get("queryParams");
+        if (queryParams != null && !queryParams.isNull()) {
+            config.setQueryParamsJson(queryParams.isTextual() ? queryParams.asText() : queryParams.toString());
+        }
+        String bodyType = PluginManifest.text(manifest, "bodyType", null);
+        if (bodyType != null && !bodyType.isBlank()) {
+            config.setBodyType(bodyType);
+        }
+        String bodyTemplate = PluginManifest.text(manifest, "bodyTemplate", null);
+        if (bodyTemplate != null && !bodyTemplate.isBlank()) {
+            config.setBodyTemplate(bodyTemplate);
+        }
         toolHttpConfigRepository.save(config);
         return new ProvisionResult("tool", tool.getId());
     }
@@ -130,13 +158,22 @@ public class PluginInstallProvisioner {
         KnowledgeBase kb = new KnowledgeBase();
         kb.setWorkspaceId(workspaceId);
         kb.setName(plugin.getTitle());
-        String instructions = PluginManifest.text(manifest, "instructions", plugin.getDescription());
-        kb.setDescription(instructions);
+        kb.setDescription(plugin.getDescription());
         kb.setDocumentCount(0);
         kb.setChunkCount(0L);
         kb.setStatus("READY");
         kb.setCreatedBy(userId);
         knowledgeBaseRepository.save(kb);
+
+        ArrayNode bundle = PluginManifest.bundleDocuments(manifest);
+        if (bundle != null) {
+            for (JsonNode item : bundle) {
+                String storageKey = PluginManifest.text(item, "storageKey", null);
+                String fileName = PluginManifest.text(item, "fileName", null);
+                knowledgePluginBundleImportService.importFromCatalogAsset(
+                        kb.getId(), workspaceId, userId, storageKey, fileName);
+            }
+        }
         return new ProvisionResult("knowledge", kb.getId());
     }
 
@@ -165,6 +202,9 @@ public class PluginInstallProvisioner {
     }
 
     private ProvisionResult provisionMcp(PluginCatalog plugin, JsonNode manifest, Long workspaceId, Long userId) {
+        if (manifest instanceof com.fasterxml.jackson.databind.node.ObjectNode objectNode) {
+            PluginManifest.mergeMcpAliases(objectNode);
+        }
         String endpointUrl = PluginManifest.text(manifest, "endpointUrl", "https://example.com/mcp");
         McpServer server = new McpServer();
         server.setWorkspaceId(workspaceId);

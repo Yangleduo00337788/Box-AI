@@ -43,6 +43,15 @@ public class PluginMarketApplicationService {
         this.marketRolloutResolver = marketRolloutResolver;
     }
 
+    public PluginCatalogVO findVo(Long pluginId) {
+        workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
+        Long workspaceId = WorkspaceContext.require().workspaceId();
+        PluginCatalog plugin = pluginCatalogRepository.findById(pluginId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLUGIN_NOT_FOUND, "插件不存在"));
+        var install = workspacePluginInstallRepository.findByWorkspaceAndPlugin(workspaceId, pluginId).orElse(null);
+        return toVO(plugin, install);
+    }
+
     public List<PluginCatalogVO> list(String category) {
         workspacePermissionService.requirePermission(PermissionCodes.TOOL_EXECUTE);
         pluginCategoryApplicationService.requireActiveCategory(category);
