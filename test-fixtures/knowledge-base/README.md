@@ -1,5 +1,7 @@
 # 知识库测试样例文件
 
+> 上线验收：见 [../RELEASE-GATE.md](../RELEASE-GATE.md) Phase 4A。
+
 本目录由 `generate_samples.py` 生成，各文件包含**同一套事实**，便于 RAG 测试。
 
 ## 建议测试问题

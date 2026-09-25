@@ -1,5 +1,7 @@
 # 对话加号插件测试夹具
 
+> 上线验收：见 [../RELEASE-GATE.md](../RELEASE-GATE.md) Phase 4B。
+
 用于手工验证：**插件市场安装** → **对话页加号** → 发消息时 **Skill / HTTP 工具 / MCP** 是否按设计生效。
 
 与知识库、工作流无关（后者在 **智能体编排** 里绑定，不应出现在加号列表）。
@@ -23,7 +25,7 @@
 mysql -h 127.0.0.1 -u root -p box < test-fixtures/conversation-plugins/dev-insert-test-plugins.sql
 ```
 
-或在 **管理后台 → 插件目录** 新建 3 条记录，`category` 分别为 `tools` / `skills` / `mcp`，`manifest_json` 复制 `manifests/` 下对应文件，状态 **已审核 + 已上架**。
+或在 **管理后台 → 插件市场 → 新建插件**：按分类使用表单（工具 Headers/Body、Skill 上传 `SKILL.md` 或 zip、MCP 表单或 **mcpServers JSON**、知识库上传文档包、工作流粘贴/导入 JSON），保存后 **审核 + 上架**。也可将 `manifests/` 下 JSON 粘贴到 MCP「JSON 模式」。
 
 > 说明：迁移 `V48` 已把早期种子插件下架，请用本目录的 `fixture-chat-*` 编码，不要依赖 `tool-1` / `mcp-1` 等旧种子。
 
