@@ -11,6 +11,7 @@ declare module 'vue' {
     AdminNotificationCenter: typeof import('./src/components/AdminNotificationCenter.vue')['default']
     AdminOpsHeaderAlert: typeof import('./src/components/AdminOpsHeaderAlert.vue')['default']
     LegalSplitEditor: typeof import('./src/components/LegalSplitEditor.vue')['default']
+    PlatformObjectStorageBackendForm: typeof import('./src/components/PlatformObjectStorageBackendForm.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TAside: typeof import('tdesign-vue-next')['Aside']

@@ -31,6 +31,8 @@ public class KnowledgeDocumentDO {
     private String storageBucket;
     @Column("storage_key")
     private String storageKey;
+    @Column("storage_backend")
+    private String storageBackend;
     private String md5;
     @Column("page_count")
     private Integer pageCount;

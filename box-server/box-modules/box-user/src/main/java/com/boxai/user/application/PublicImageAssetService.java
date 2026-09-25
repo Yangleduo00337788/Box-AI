@@ -5,7 +5,6 @@ import com.boxai.common.exception.ErrorCode;
 import com.boxai.common.security.FileSafetyPolicy;
 import com.boxai.domain.storage.ObjectStorage;
 import com.boxai.user.api.ImageAssetVO;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,12 +23,9 @@ public class PublicImageAssetService {
     private static final Set<String> IMAGE_EXT = Set.of("png", "jpg", "jpeg", "svg");
 
     private final ObjectStorage objectStorage;
-    private final String storageBucket;
 
-    public PublicImageAssetService(ObjectStorage objectStorage,
-                                   @Value("${box.minio.bucket:box}") String storageBucket) {
+    public PublicImageAssetService(ObjectStorage objectStorage) {
         this.objectStorage = objectStorage;
-        this.storageBucket = storageBucket;
     }
 
     public ImageAssetVO upload(MultipartFile file) {
@@ -47,7 +43,7 @@ public class PublicImageAssetService {
         String ext = FileSafetyPolicy.validateImage(originalName, file.getContentType(), file.getSize(), bytes);
         String fileName = UUID.randomUUID() + "." + ext;
         String key = objectKey(fileName);
-        objectStorage.put(storageBucket, key, new ByteArrayInputStream(bytes), bytes.length, contentType(ext));
+        objectStorage.put(objectStorage.defaultBucket(), key, new ByteArrayInputStream(bytes), bytes.length, contentType(ext));
         return new ImageAssetVO("/api/v1/public-assets/" + fileName);
     }
 
@@ -60,11 +56,24 @@ public class PublicImageAssetService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "图片不存在");
         }
         try {
-            InputStream stream = objectStorage.get(storageBucket, objectKey(fileName));
+            InputStream stream = openObject(objectKey(fileName));
             return new LoadedImage(stream, contentType(ext));
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "图片不存在");
         }
+    }
+
+    private InputStream openObject(String key) {
+        String bucket = objectStorage.defaultBucket();
+        try {
+            return objectStorage.get(objectStorage.activeBackend(), bucket, key);
+        } catch (Exception ignored) {
+            // 历史资源在 MinIO
+        }
+        if (!"MINIO".equalsIgnoreCase(objectStorage.activeBackend())) {
+            return objectStorage.get("MINIO", bucket, key);
+        }
+        throw new BusinessException(ErrorCode.NOT_FOUND, "图片不存在");
     }
 
     private static String objectKey(String fileName) {

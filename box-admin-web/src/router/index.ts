@@ -101,6 +101,11 @@ const router = createRouter({
           meta: { title: 'OCR 默认模型' },
         },
         {
+          path: 'platform-object-storage',
+          component: () => import('@/views/PlatformObjectStorageView.vue'),
+          meta: { title: '对象存储' },
+        },
+        {
           path: 'forbidden',
           component: () => import('@/views/ForbiddenView.vue'),
           meta: { title: '无权限' },

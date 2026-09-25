@@ -19,6 +19,8 @@ public class KnowledgeDocument {
     private Long fileSize;
     private String storageBucket;
     private String storageKey;
+    /** MINIO / R2；历史数据为空表示 MinIO。 */
+    private String storageBackend;
     private String md5;
     private Integer pageCount;
     private Integer chunkCount;

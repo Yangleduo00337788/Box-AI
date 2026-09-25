@@ -147,7 +147,7 @@ public class KnowledgeDocumentProcessingService {
         updateStatus(document.getId(), "PARSING", KnowledgeDocumentProgress.PARSING);
         log.info("Knowledge document {}: reading from storage", documentId);
         byte[] bytes;
-        try (var input = objectStorage.get(document.getStorageBucket(), document.getStorageKey())) {
+        try (var input = objectStorage.get(document.getStorageBackend(), document.getStorageBucket(), document.getStorageKey())) {
             bytes = input.readAllBytes();
         } catch (Exception e) {
             markFailed(document.getId(), "读取文档失败");

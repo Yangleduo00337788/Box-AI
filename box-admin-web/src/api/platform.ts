@@ -136,6 +136,51 @@ export function updatePlatformOcrDefault(platformModelId?: number | null) {
   return http.put<Result<PlatformOcrDefaultVO>>('/platform/ocr-default', { platformModelId })
 }
 
+export interface PlatformObjectStorageBackendVO {
+  endpoint?: string
+  accessKey?: string
+  hasSecretKey: boolean
+  bucket?: string
+  useYamlFallback?: boolean
+  configured: boolean
+  reachable: boolean
+}
+
+export interface PlatformObjectStorageSettingsVO {
+  activeBackend: string
+  effectiveBucket?: string
+  minio: PlatformObjectStorageBackendVO
+  r2: PlatformObjectStorageBackendVO
+  resolutionHint?: string
+}
+
+export function fetchPlatformObjectStorage() {
+  return http.get<Result<PlatformObjectStorageSettingsVO>>('/platform/object-storage')
+}
+
+export function updatePlatformObjectStorage(payload: {
+  activeBackend: string
+  minio?: {
+    endpoint?: string
+    accessKey?: string
+    secretKey?: string
+    bucket?: string
+    useYamlFallback?: boolean
+  }
+  r2?: {
+    endpoint?: string
+    accessKey?: string
+    secretKey?: string
+    bucket?: string
+  }
+}) {
+  return http.put<Result<PlatformObjectStorageSettingsVO>>('/platform/object-storage', payload)
+}
+
+export function testPlatformObjectStorage(backend: string) {
+  return http.post<Result<{ ok: boolean }>>('/platform/object-storage/test', { backend })
+}
+
 export function createPlatformCredential(payload: {
   providerId: number
   credentialName: string

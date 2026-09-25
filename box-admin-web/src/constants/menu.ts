@@ -38,6 +38,7 @@ export const ADMIN_MENU_GROUPS: MenuGroup[] = [
     items: [
       { value: '/system-config', label: '系统配置', icon: 'setting', desc: '关于、协议与客服信息' },
       { value: '/platform-ocr', label: 'OCR 默认模型', icon: 'scan', desc: '知识库图片与扫描 PDF 识别' },
+      { value: '/platform-object-storage', label: '对象存储', icon: 'server', desc: 'MinIO / Cloudflare R2 热切换' },
     ],
   },
 ]

@@ -75,6 +75,7 @@ public class KnowledgeDocumentRepositoryImpl implements KnowledgeDocumentReposit
         doc.setFileSize(row.getFileSize());
         doc.setStorageBucket(row.getStorageBucket());
         doc.setStorageKey(row.getStorageKey());
+        doc.setStorageBackend(row.getStorageBackend());
         doc.setMd5(row.getMd5());
         doc.setPageCount(row.getPageCount());
         doc.setChunkCount(row.getChunkCount());
@@ -98,6 +99,7 @@ public class KnowledgeDocumentRepositoryImpl implements KnowledgeDocumentReposit
         row.setFileSize(doc.getFileSize());
         row.setStorageBucket(doc.getStorageBucket());
         row.setStorageKey(doc.getStorageKey());
+        row.setStorageBackend(doc.getStorageBackend());
         row.setMd5(doc.getMd5());
         row.setPageCount(doc.getPageCount());
         row.setChunkCount(doc.getChunkCount());

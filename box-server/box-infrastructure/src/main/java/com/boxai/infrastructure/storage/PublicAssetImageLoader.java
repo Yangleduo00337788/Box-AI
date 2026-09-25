@@ -3,7 +3,6 @@ package com.boxai.infrastructure.storage;
 import com.boxai.domain.storage.ObjectStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
@@ -23,12 +22,9 @@ public class PublicAssetImageLoader {
     private static final Set<String> IMAGE_EXT = Set.of("png", "jpg", "jpeg", "svg");
 
     private final ObjectStorage objectStorage;
-    private final String storageBucket;
 
-    public PublicAssetImageLoader(ObjectStorage objectStorage,
-                                  @Value("${box.minio.bucket:box}") String storageBucket) {
+    public PublicAssetImageLoader(ObjectStorage objectStorage) {
         this.objectStorage = objectStorage;
-        this.storageBucket = storageBucket;
     }
 
     public Optional<LoadedPublicImage> loadFromReference(String urlOrPath) {
@@ -44,12 +40,30 @@ public class PublicAssetImageLoader {
         if (!IMAGE_EXT.contains(ext)) {
             return Optional.empty();
         }
-        try (InputStream stream = objectStorage.get(storageBucket, "public-assets/" + fileName)) {
-            return Optional.of(new LoadedPublicImage(stream.readAllBytes(), contentType(ext)));
-        } catch (Exception e) {
-            log.warn("Failed to load public asset image {}: {}", fileName, e.getMessage());
+        String key = "public-assets/" + fileName;
+        String bucket = objectStorage.defaultBucket();
+        byte[] bytes = readBytes(bucket, key);
+        if (bytes == null) {
+            log.warn("Failed to load public asset image {}", fileName);
             return Optional.empty();
         }
+        return Optional.of(new LoadedPublicImage(bytes, contentType(ext)));
+    }
+
+    private byte[] readBytes(String bucket, String key) {
+        try (InputStream stream = objectStorage.get(objectStorage.activeBackend(), bucket, key)) {
+            return stream.readAllBytes();
+        } catch (Exception ignored) {
+            // 历史资源在 MinIO
+        }
+        if (!"MINIO".equalsIgnoreCase(objectStorage.activeBackend())) {
+            try (InputStream stream = objectStorage.get("MINIO", bucket, key)) {
+                return stream.readAllBytes();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static String contentType(String ext) {

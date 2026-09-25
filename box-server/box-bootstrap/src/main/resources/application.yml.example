@@ -80,6 +80,7 @@ box:
       alipay-public-key: ${BOX_ALIPAY_PUBLIC_KEY:}
       notify-url: http://127.0.0.1:8080/api/v1/billing/payments/notify/alipay
   minio:
+    # 默认对象存储（MinIO）；管理端可在「对象存储」中切换为 Cloudflare R2 并热更新，无需重启
     endpoint: http://127.0.0.1:9000
     access-key: box
     secret-key: boxsecret1

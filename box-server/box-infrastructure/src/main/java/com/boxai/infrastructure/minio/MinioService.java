@@ -1,30 +1,18 @@
 package com.boxai.infrastructure.minio;
 
-import io.minio.BucketExistsArgs;
-import io.minio.MakeBucketArgs;
-import io.minio.MinioClient;
+import com.boxai.domain.storage.ObjectStorage;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MinioService {
 
-    private final MinioClient minioClient;
-    private final MinioProperties properties;
+    private final ObjectStorage objectStorage;
 
-    public MinioService(MinioClient minioClient, MinioProperties properties) {
-        this.minioClient = minioClient;
-        this.properties = properties;
+    public MinioService(ObjectStorage objectStorage) {
+        this.objectStorage = objectStorage;
     }
 
     public boolean ping() {
-        try {
-            boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(properties.getBucket()).build());
-            if (!exists) {
-                minioClient.makeBucket(MakeBucketArgs.builder().bucket(properties.getBucket()).build());
-            }
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return objectStorage.ping(null);
     }
 }

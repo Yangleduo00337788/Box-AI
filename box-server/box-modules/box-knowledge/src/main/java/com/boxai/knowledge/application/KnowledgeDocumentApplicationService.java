@@ -18,7 +18,6 @@ import com.boxai.security.context.WorkspaceContext;
 import com.boxai.security.permission.WorkspacePermissionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,7 +38,6 @@ public class KnowledgeDocumentApplicationService {
     private final KnowledgeDocumentRepository knowledgeDocumentRepository;
     private final KnowledgeChunkRepository knowledgeChunkRepository;
     private final ObjectStorage objectStorage;
-    private final String storageBucket;
     private final KnowledgeDocumentProcessingService knowledgeDocumentProcessingService;
     private final WorkspacePermissionService workspacePermissionService;
     private final TransactionTemplate transactionTemplate;
@@ -51,8 +49,7 @@ public class KnowledgeDocumentApplicationService {
                                                ObjectStorage objectStorage,
                                                KnowledgeDocumentProcessingService knowledgeDocumentProcessingService,
                                                WorkspacePermissionService workspacePermissionService,
-                                               TransactionTemplate transactionTemplate,
-                                               @Value("${box.minio.bucket:box}") String storageBucket) {
+                                               TransactionTemplate transactionTemplate) {
         this.knowledgeBaseApplicationService = knowledgeBaseApplicationService;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
@@ -61,7 +58,6 @@ public class KnowledgeDocumentApplicationService {
         this.knowledgeDocumentProcessingService = knowledgeDocumentProcessingService;
         this.workspacePermissionService = workspacePermissionService;
         this.transactionTemplate = transactionTemplate;
-        this.storageBucket = storageBucket;
     }
 
     public List<KnowledgeDocumentVO> list(Long knowledgeBaseId) {
@@ -107,7 +103,9 @@ public class KnowledgeDocumentApplicationService {
         document.setFileType(fileType);
         document.setMimeType(file.getContentType());
         document.setFileSize(file.getSize());
+        String storageBucket = objectStorage.defaultBucket();
         document.setStorageBucket(storageBucket);
+        document.setStorageBackend(objectStorage.activeBackend());
         document.setChunkCount(0);
         document.setStatus("UPLOADING");
         document.setProgress(KnowledgeDocumentProgress.UPLOADING);
@@ -162,7 +160,9 @@ public class KnowledgeDocumentApplicationService {
         document.setFileType("HTML");
         document.setMimeType("text/html");
         document.setFileSize((long) bytes.length);
+        String storageBucket = objectStorage.defaultBucket();
         document.setStorageBucket(storageBucket);
+        document.setStorageBackend(objectStorage.activeBackend());
         document.setChunkCount(0);
         document.setStatus("UPLOADING");
         document.setProgress(KnowledgeDocumentProgress.UPLOADING);
@@ -222,7 +222,7 @@ public class KnowledgeDocumentApplicationService {
         knowledgeChunkRepository.deleteByDocument(document.getId());
         if (document.getStorageBucket() != null && document.getStorageKey() != null) {
             try {
-                objectStorage.delete(document.getStorageBucket(), document.getStorageKey());
+                objectStorage.delete(document.getStorageBackend(), document.getStorageBucket(), document.getStorageKey());
             } catch (Exception ex) {
                 log.warn(
                         "Failed to delete object storage for document {} (bucket={}, key={}): {}",
