@@ -12,8 +12,11 @@ declare module 'vue' {
     AdminOpsHeaderAlert: typeof import('./src/components/AdminOpsHeaderAlert.vue')['default']
     LegalSplitEditor: typeof import('./src/components/LegalSplitEditor.vue')['default']
     PlatformObjectStorageBackendForm: typeof import('./src/components/PlatformObjectStorageBackendForm.vue')['default']
+    PluginCatalogManifestFields: typeof import('./src/components/PluginCatalogManifestFields.vue')['default']
+    PluginWorkflowDesignerDialog: typeof import('./src/components/PluginWorkflowDesignerDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TAlert: typeof import('tdesign-vue-next')['Alert']
     TAside: typeof import('tdesign-vue-next')['Aside']
     TAvatar: typeof import('tdesign-vue-next')['Avatar']
     TBadge: typeof import('tdesign-vue-next')['Badge']
@@ -44,6 +47,7 @@ declare module 'vue' {
     TInput: typeof import('tdesign-vue-next')['Input']
     TInputNumber: typeof import('tdesign-vue-next')['InputNumber']
     TLayout: typeof import('tdesign-vue-next')['Layout']
+    TLink: typeof import('tdesign-vue-next')['Link']
     TLoading: typeof import('tdesign-vue-next')['Loading']
     TMenu: typeof import('tdesign-vue-next')['Menu']
     TMenuGroup: typeof import('tdesign-vue-next')['MenuGroup']
@@ -62,5 +66,6 @@ declare module 'vue' {
     TTag: typeof import('tdesign-vue-next')['Tag']
     TTextarea: typeof import('tdesign-vue-next')['Textarea']
     TTooltip: typeof import('tdesign-vue-next')['Tooltip']
+    TUpload: typeof import('tdesign-vue-next')['Upload']
   }
 }

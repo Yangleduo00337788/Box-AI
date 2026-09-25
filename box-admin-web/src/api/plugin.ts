@@ -90,3 +90,18 @@ export function updatePluginRollout(
 export function deletePlugin(id: number) {
   return http.delete<Result<void>>(`/plugins/${id}`)
 }
+
+export interface PluginCatalogAssetVO {
+  storageKey: string
+  fileName: string
+  size: number
+  contentType?: string
+}
+
+export function uploadPluginCatalogAsset(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return http.post<Result<PluginCatalogAssetVO>>('/plugins/catalog-assets', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}

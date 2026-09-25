@@ -55,72 +55,31 @@
     <t-dialog
       v-model:visible="pluginDialogVisible"
       :header="pluginEditing ? '编辑插件' : '新建插件'"
-      width="720px"
+      width="800px"
       :confirm-btn="{ content: pluginEditing ? '保存' : '创建', loading: pluginSaving }"
       @confirm="onSavePlugin"
     >
       <t-form ref="pluginFormRef" :data="pluginForm" :rules="pluginRules" label-width="108px">
-        <t-form-item v-if="!pluginEditing" label="编码" name="pluginCode">
-          <t-input v-model="pluginForm.pluginCode" placeholder="如 wf-custom-1" />
-        </t-form-item>
-        <t-form-item label="分类" name="category">
-          <t-select v-model="pluginForm.category" :options="categoryOptions" placeholder="选择分类" />
-        </t-form-item>
-        <t-form-item label="标题" name="title">
-          <t-input v-model="pluginForm.title" />
-        </t-form-item>
-        <t-form-item label="描述" name="description">
-          <t-textarea v-model="pluginForm.description" :autosize="{ minRows: 2, maxRows: 4 }" />
-        </t-form-item>
-        <t-form-item label="排序" name="sortOrder">
-          <t-input-number v-model="pluginForm.sortOrder" :min="0" theme="column" />
-        </t-form-item>
+        <plugin-resource-create-fields
+          v-model:category="pluginForm.category"
+          v-model:title="pluginForm.title"
+          v-model:description="pluginForm.description"
+          v-model:manifest="manifestDraft"
+          v-model:plugin-code="pluginForm.pluginCode"
+          v-model:sort-order="pluginForm.sortOrder"
+          :show-plugin-code="!pluginEditing"
+          show-sort-order
+          :category-options="categoryOptions"
+          :upload-asset="uploadCatalogAsset"
+          :workflow-editor-host="boxAdminWorkflowEditorHost"
+          :workflow-platform-models="workflowPlatformModels"
+        />
         <t-form-item v-if="pluginEditing" label="状态" name="status">
           <t-radio-group v-model="pluginForm.status" :disabled="pluginForm.reviewStatus !== 'APPROVED'">
             <t-radio value="LISTED">上架</t-radio>
             <t-radio value="UNLISTED">下架</t-radio>
           </t-radio-group>
         </t-form-item>
-
-        <template v-if="pluginForm.category === 'tools'">
-          <t-form-item label="请求方法" name="method">
-            <t-select v-model="pluginForm.method" :options="methodOptions" />
-          </t-form-item>
-          <t-form-item label="请求地址" name="url">
-            <t-input v-model="pluginForm.url" placeholder="https://api.example.com/..." />
-          </t-form-item>
-          <t-form-item label="超时(ms)" name="timeoutMs">
-            <t-input-number v-model="pluginForm.timeoutMs" :min="1000" :step="1000" theme="column" />
-          </t-form-item>
-        </template>
-        <template v-else-if="pluginForm.category === 'mcp'">
-          <t-form-item label="传输方式" name="transportType">
-            <t-select v-model="pluginForm.transportType" :options="transportOptions" />
-          </t-form-item>
-          <t-form-item label="服务地址" name="endpointUrl">
-            <t-input v-model="pluginForm.endpointUrl" placeholder="https://mcp.example.com" />
-          </t-form-item>
-          <t-form-item label="鉴权" name="authType">
-            <t-select v-model="pluginForm.authType" :options="authOptions" />
-          </t-form-item>
-        </template>
-        <t-form-item v-else-if="pluginForm.category === 'workflows'" label="工作流定义" name="definitionJson">
-          <t-textarea
-            v-model="pluginForm.definitionJson"
-            :autosize="{ minRows: 6, maxRows: 14 }"
-            placeholder="工作流 JSON，留空则使用默认开始/输出节点"
-          />
-        </t-form-item>
-        <t-form-item v-else-if="pluginForm.category === 'skills'" label="技能说明" name="instructions">
-          <t-textarea
-            v-model="pluginForm.instructions"
-            :autosize="{ minRows: 4, maxRows: 10 }"
-            placeholder="安装后写入知识库描述，供智能体按约定执行"
-          />
-        </t-form-item>
-        <p v-else-if="pluginForm.category === 'knowledge'" class="form-hint">
-          安装后会在工作空间创建一个同名知识库，可再上传文档。
-        </p>
       </t-form>
     </t-dialog>
 
@@ -181,12 +140,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref } from 'vue'
+import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { DialogPlugin, Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { FormInstanceFunctions, FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
+import PluginResourceCreateFields from '@box/ui/components/PluginResourceCreateFields.vue'
+import {
+  applyManifestJsonToDraft,
+  buildManifestJsonFromDraft,
+  emptyManifestDraft,
+  validateManifestDraft,
+} from '@box/ui/plugin/pluginCatalogManifest'
+import type { WorkflowEditorPlatformModel } from '@box/ui/workflow/workflowEditorHost'
+import { fetchPlatformModels } from '@/api/platform'
+import { boxAdminWorkflowEditorHost } from '@/utils/boxAdminWorkflowEditorHost'
 import {
   createPlugin,
+  uploadPluginCatalogAsset,
   createPluginCategory,
   deletePlugin,
   deletePluginCategory,
@@ -232,31 +202,22 @@ const rolloutForm = reactive({
   rolloutPercent: 100,
 })
 
-const methodOptions = [
-  { label: 'GET', value: 'GET' },
-  { label: 'POST', value: 'POST' },
-  { label: 'PUT', value: 'PUT' },
-  { label: 'DELETE', value: 'DELETE' },
-]
-const transportOptions = [
-  { label: 'HTTP', value: 'HTTP' },
-  { label: 'SSE', value: 'SSE' },
-]
-const authOptions = [
-  { label: '无', value: 'NONE' },
-  { label: 'Bearer', value: 'BEARER' },
-]
+const manifestDraft = ref(emptyManifestDraft())
+const workflowPlatformModels = ref<WorkflowEditorPlatformModel[]>([])
 
-const emptyManifest = {
-  method: 'GET',
-  url: '',
-  timeoutMs: 10000,
-  transportType: 'HTTP',
-  endpointUrl: '',
-  authType: 'NONE',
-  definitionJson: '',
-  instructions: '',
+async function ensureWorkflowEditorContext() {
+  if (workflowPlatformModels.value.length) return
+  try {
+    const { data } = await fetchPlatformModels()
+    workflowPlatformModels.value = (data.data || []).filter((item) => item.status === 1)
+  } catch {
+    workflowPlatformModels.value = []
+  }
 }
+
+watch(pluginDialogVisible, (open) => {
+  if (open) void ensureWorkflowEditorContext()
+})
 
 const pluginForm = reactive({
   pluginCode: '',
@@ -266,7 +227,6 @@ const pluginForm = reactive({
   sortOrder: 0,
   status: 'LISTED',
   reviewStatus: 'PENDING_REVIEW',
-  ...emptyManifest,
 })
 
 const categoryForm = reactive({
@@ -291,6 +251,11 @@ const categoryRules: FormProps['rules'] = {
 const categoryOptions = computed(() =>
   categories.value.map((item) => ({ label: item.label, value: item.value })),
 )
+
+async function uploadCatalogAsset(file: File) {
+  const { data } = await uploadPluginCatalogAsset(file)
+  return data.data
+}
 
 function categoryLabel(code?: string) {
   return categories.value.find((item) => item.value === code)?.label || code || '-'
@@ -384,56 +349,6 @@ const categoryColumns: PrimaryTableCol<PluginCategoryVO>[] = [
   },
 ]
 
-function parseManifest(raw?: string) {
-  if (!raw) return {}
-  try {
-    return JSON.parse(raw) as Record<string, unknown>
-  } catch {
-    return {}
-  }
-}
-
-function applyManifest(raw?: string) {
-  const data = parseManifest(raw)
-  pluginForm.method = String(data.method || 'GET')
-  pluginForm.url = String(data.url || '')
-  pluginForm.timeoutMs = Number(data.timeoutMs || 10000)
-  pluginForm.transportType = String(data.transportType || 'HTTP')
-  pluginForm.endpointUrl = String(data.endpointUrl || '')
-  pluginForm.authType = String(data.authType || 'NONE')
-  pluginForm.definitionJson = String(data.definitionJson || '')
-  pluginForm.instructions = String(data.instructions || '')
-}
-
-function buildManifestJson() {
-  const category = pluginForm.category
-  if (category === 'tools') {
-    return JSON.stringify({
-      type: 'HTTP',
-      method: pluginForm.method,
-      url: pluginForm.url.trim(),
-      timeoutMs: pluginForm.timeoutMs,
-    })
-  }
-  if (category === 'mcp') {
-    return JSON.stringify({
-      transportType: pluginForm.transportType,
-      endpointUrl: pluginForm.endpointUrl.trim(),
-      authType: pluginForm.authType,
-    })
-  }
-  if (category === 'workflows') {
-    const definition = pluginForm.definitionJson.trim()
-    return JSON.stringify(definition ? { definitionJson: definition } : {})
-  }
-  if (category === 'skills') {
-    return JSON.stringify({
-      instructions: pluginForm.instructions.trim(),
-    })
-  }
-  return JSON.stringify({})
-}
-
 async function loadPlugins() {
   loading.value = true
   try {
@@ -465,8 +380,8 @@ function openPluginCreate() {
     sortOrder: 0,
     status: 'LISTED',
     reviewStatus: 'PENDING_REVIEW',
-    ...emptyManifest,
   })
+  manifestDraft.value = emptyManifestDraft()
   pluginDialogVisible.value = true
 }
 
@@ -481,30 +396,28 @@ function openPluginEdit(row: AdminPluginCatalogVO) {
     sortOrder: row.sortOrder,
     status: row.status,
     reviewStatus: row.reviewStatus || 'PENDING_REVIEW',
-    ...emptyManifest,
   })
-  applyManifest(row.manifestJson)
+  manifestDraft.value = applyManifestJsonToDraft(row.manifestJson)
   pluginDialogVisible.value = true
 }
 
 async function onSavePlugin() {
   const valid = await pluginFormRef.value?.validate()
   if (valid !== true) return
-  if (pluginForm.category === 'tools' && !pluginForm.url.trim()) {
-    MessagePlugin.warning('工具插件需填写请求地址')
+  const manifestError = validateManifestDraft(pluginForm.category, manifestDraft.value)
+  if (manifestError) {
+    MessagePlugin.warning(manifestError)
     return
   }
-  if (pluginForm.category === 'mcp' && !pluginForm.endpointUrl.trim()) {
-    MessagePlugin.warning('MCP 插件需填写服务地址')
-    return
-  }
-  if (pluginForm.category === 'skills' && !pluginForm.instructions.trim()) {
-    MessagePlugin.warning('Skill 插件需填写技能说明')
+  let manifestJson: string
+  try {
+    manifestJson = buildManifestJsonFromDraft(pluginForm.category, manifestDraft.value)
+  } catch (e) {
+    MessagePlugin.warning(e instanceof Error ? e.message : '资源配置无效')
     return
   }
   pluginSaving.value = true
   try {
-    const manifestJson = buildManifestJson()
     if (pluginEditing.value && pluginEditingId.value) {
       await updatePlugin(pluginEditingId.value, {
         category: pluginForm.category,
