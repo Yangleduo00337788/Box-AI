@@ -14,6 +14,8 @@ import com.boxai.knowledge.api.KnowledgeChunkVO;
 import com.boxai.knowledge.api.KnowledgeDocumentVO;
 import com.boxai.knowledge.support.KnowledgeDocumentProgress;
 import com.boxai.common.security.FileSafetyPolicy;
+import com.boxai.common.security.SsrfGuard;
+import com.boxai.common.security.SsrfSafeHttpClient;
 import com.boxai.security.context.WorkspaceContext;
 import com.boxai.security.permission.WorkspacePermissionService;
 import org.slf4j.Logger;
@@ -24,6 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -139,12 +142,15 @@ public class KnowledgeDocumentApplicationService {
         if (url == null || url.isBlank()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写网页地址");
         }
+        String normalizedUrl = url.trim();
+        SsrfGuard.validateHttpUrl(normalizedUrl);
         KnowledgeBase kb = knowledgeBaseApplicationService.requireKnowledgeBase(knowledgeBaseId);
         Long userId = WorkspaceContext.require().userId();
-        String normalizedUrl = url.trim();
         byte[] bytes;
         try {
-            bytes = java.net.URI.create(normalizedUrl).toURL().openStream().readAllBytes();
+            bytes = SsrfSafeHttpClient.getBytes(normalizedUrl, Duration.ofSeconds(20), FileSafetyPolicy.MAX_SIZE_BYTES);
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "抓取网页失败");
         }

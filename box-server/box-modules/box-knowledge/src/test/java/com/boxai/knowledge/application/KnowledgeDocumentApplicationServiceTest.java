@@ -106,6 +106,28 @@ class KnowledgeDocumentApplicationServiceTest {
         WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
         BusinessException ex = assertThrows(BusinessException.class, () -> service.importFromUrl(4L, "  ", null));
         assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
+        verify(knowledgeBaseApplicationService, never()).requireKnowledgeBase(anyLong());
+    }
+
+    @Test
+    void importFromUrlRejectsLocalhostAndFileScheme() {
+        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
+        BusinessException loopback = assertThrows(BusinessException.class,
+                () -> service.importFromUrl(4L, "http://127.0.0.1/secret", null));
+        assertEquals(ErrorCode.BAD_REQUEST, loopback.getCode());
+        BusinessException file = assertThrows(BusinessException.class,
+                () -> service.importFromUrl(4L, "file:///etc/passwd", null));
+        assertEquals(ErrorCode.BAD_REQUEST, file.getCode());
+        verify(knowledgeBaseApplicationService, never()).requireKnowledgeBase(anyLong());
+    }
+
+    @Test
+    void importFromUrlRejectsCloudMetadata() {
+        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.importFromUrl(4L, "http://169.254.169.254/latest/meta-data", null));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
+        verify(knowledgeBaseApplicationService, never()).requireKnowledgeBase(anyLong());
     }
 
     @Test
