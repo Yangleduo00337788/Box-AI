@@ -102,6 +102,30 @@ jobs:
     defaults:
       run:
         working-directory: box-server
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: box
+          MYSQL_ROOT_PASSWORD: box
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pbox"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+    env:
+      BOX_IT_EXTERNAL: "true"
+      BOX_IT_JDBC_URL: jdbc:mysql://127.0.0.1:3306/box?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+      BOX_IT_JDBC_USER: root
+      BOX_IT_JDBC_PASSWORD: box
+      BOX_IT_REDIS_HOST: 127.0.0.1
+      BOX_IT_REDIS_PORT: "6379"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -110,4 +134,4 @@ jobs:
           java-version: "21"
           cache: maven
       - name: Run integration tests
-        run: mvn -B -pl box-bootstrap -Pintegration test
+        run: mvn -B -pl box-bootstrap -am -Pintegration test
