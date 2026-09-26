@@ -5,5 +5,8 @@
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --test index.test.js"
+  }
 }

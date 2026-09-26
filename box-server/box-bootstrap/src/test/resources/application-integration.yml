@@ -1,0 +1,28 @@
+spring:
+  main:
+    banner-mode: off
+
+box:
+  auth:
+    verification:
+      expose-code: true
+  elasticsearch:
+    enabled: false
+  payment:
+    enabled: false
+  security:
+    jwt:
+      secret: integration-test-jwt-secret-change-me-32b
+      expire-seconds: 86400
+    crypto:
+      aes-key: integration-test-aes-256-key-change!!
+  minio:
+    endpoint: http://127.0.0.1:1
+    access-key: box
+    secret-key: boxsecret1
+    bucket: box
+
+logging:
+  level:
+    com.boxai: WARN
+    org.springframework: WARN
