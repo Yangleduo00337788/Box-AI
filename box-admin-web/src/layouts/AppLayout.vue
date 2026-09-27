@@ -12,6 +12,7 @@
         :theme="appearance.menuTheme"
         :value="active"
         :collapsed="collapsed"
+        v-model:expanded="expanded"
         :width="['232px', '64px']"
         @change="onMenuChange"
       >
@@ -25,19 +26,24 @@
             />
           </div>
         </template>
-        <t-menu-group v-for="group in visibleMenuGroups" :key="group.title" :title="group.title">
+        <t-submenu
+          v-for="group in visibleMenuGroups"
+          :key="group.value || group.title"
+          :value="group.value || group.title"
+          :title="group.title"
+        >
+          <template #icon>
+            <t-icon :name="group.icon || 'view-module'" />
+          </template>
           <t-menu-item
             v-for="item in group.items"
             :key="item.value"
             :value="item.value"
             :to="item.value"
           >
-            <template #icon>
-              <t-icon :name="item.icon" />
-            </template>
             {{ item.label }}
           </t-menu-item>
-        </t-menu-group>
+        </t-submenu>
       </t-menu>
     </t-aside>
 
@@ -50,6 +56,7 @@
         </t-button>
         <t-breadcrumb class="admin-header__crumb">
           <t-breadcrumb-item>平台管理</t-breadcrumb-item>
+          <t-breadcrumb-item v-if="currentGroupTitle">{{ currentGroupTitle }}</t-breadcrumb-item>
           <t-breadcrumb-item>{{ currentTitle }}</t-breadcrumb-item>
         </t-breadcrumb>
         <t-space class="admin-header__ops" align="center" :size="4">
@@ -81,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption, MenuValue } from 'tdesign-vue-next'
@@ -113,12 +120,47 @@ const visibleMenuGroups = computed(() =>
   })).filter((group) => group.items.length),
 )
 
-const currentTitle = computed(() => {
-  for (const group of visibleMenuGroups.value) {
-    const hit = group.items.find((item) => item.value === route.path)
-    if (hit) return hit.label
+const expanded = ref<MenuValue[]>([])
+const expandedSeeded = ref(false)
+
+const currentGroup = computed(() =>
+  visibleMenuGroups.value.find((group) => group.items.some((item) => item.value === route.path)),
+)
+const currentGroupKey = computed(() => currentGroup.value?.value || currentGroup.value?.title || '')
+const currentGroupTitle = computed(() => currentGroup.value?.title || '')
+
+watch(
+  () => visibleMenuGroups.value.map((group) => group.value || group.title),
+  (keys) => {
+    if (!expandedSeeded.value) {
+      expanded.value = keys
+      expandedSeeded.value = true
+      return
+    }
+    const allowed = new Set(keys)
+    const next = expanded.value.filter((key) => allowed.has(String(key)))
+    for (const key of keys) {
+      if (!expanded.value.map(String).includes(key) && !next.includes(key)) {
+        next.push(key)
+      }
+    }
+    if (currentGroupKey.value && !next.includes(currentGroupKey.value)) {
+      next.push(currentGroupKey.value)
+    }
+    expanded.value = next
+  },
+  { immediate: true },
+)
+
+watch(currentGroupKey, (key) => {
+  if (key && !expanded.value.includes(key)) {
+    expanded.value = [...expanded.value, key]
   }
-  return String(route.meta.title || '控制台')
+})
+
+const currentTitle = computed(() => {
+  const hit = currentGroup.value?.items.find((item) => item.value === route.path)
+  return hit?.label || String(route.meta.title || '控制台')
 })
 
 const userMenu: DropdownOption[] = [{ content: '退出登录', value: 'logout' }]
@@ -178,37 +220,41 @@ function onUserMenu(data: { value?: string | number }) {
   display: none;
 }
 
-.admin-aside :deep(.t-default-menu__inner .t-menu-group__title) {
-  padding: 12px 16px 6px;
-  color: var(--td-text-color-placeholder);
-  text-align: left;
+.admin-aside :deep(.t-default-menu .t-submenu > .t-menu__item) {
+  margin: 2px 8px;
+  padding-left: 8px;
+  font-weight: 600;
 }
 
 .admin-aside :deep(.t-default-menu .t-menu__item) {
   margin: 2px 8px;
-  padding-left: 8px;
   justify-content: flex-start;
 }
 
-.admin-aside :deep(.t-default-menu .t-menu__item .t-icon) {
+.admin-aside :deep(.t-default-menu .t-submenu > .t-menu__item .t-icon) {
   margin-right: 8px;
+}
+
+.admin-aside :deep(.t-default-menu .t-menu__sub .t-menu__item) {
+  padding-left: 44px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--td-text-color-secondary);
+}
+
+.admin-aside :deep(.t-default-menu .t-menu__sub .t-menu__item .t-icon) {
+  display: none;
 }
 
 .admin-layout:not(.admin-layout--dark-aside) .admin-aside :deep(.t-default-menu .t-menu__item:hover:not(.t-is-active):not(.t-is-disabled)) {
   background: rgba(255, 255, 255, 0.55) !important;
 }
 
-.admin-layout:not(.admin-layout--dark-aside) .admin-aside :deep(.t-default-menu .t-menu__item.t-is-active:not(.t-is-opened)),
-.admin-layout:not(.admin-layout--dark-aside) .admin-aside :deep(.t-default-menu .t-submenu.t-is-active > .t-menu__item) {
+.admin-layout:not(.admin-layout--dark-aside) .admin-aside :deep(.t-default-menu .t-menu__sub .t-menu__item.t-is-active:not(.t-is-opened)) {
   background: var(--admin-candy-active-bg) !important;
   box-shadow: inset 3px 0 0 var(--td-text-color-primary);
   color: var(--td-text-color-primary) !important;
   font-weight: 600;
-}
-
-.admin-layout:not(.admin-layout--dark-aside) .admin-aside :deep(.t-default-menu .t-menu__item.t-is-active:not(.t-is-opened) .t-icon),
-.admin-layout:not(.admin-layout--dark-aside) .admin-aside :deep(.t-default-menu .t-submenu.t-is-active > .t-menu__item .t-icon) {
-  color: var(--td-text-color-primary) !important;
 }
 
 .admin-layout--dark-aside .admin-aside {
@@ -220,14 +266,8 @@ function onUserMenu(data: { value?: string | number }) {
   background: var(--td-gray-color-13);
 }
 
-.admin-layout--dark-aside .admin-aside :deep(.t-default-menu .t-menu__item.t-is-active:not(.t-is-opened)),
-.admin-layout--dark-aside .admin-aside :deep(.t-default-menu .t-submenu.t-is-active > .t-menu__item) {
+.admin-layout--dark-aside .admin-aside :deep(.t-default-menu .t-menu__sub .t-menu__item.t-is-active:not(.t-is-opened)) {
   background: var(--td-brand-color) !important;
-  color: #fff !important;
-}
-
-.admin-layout--dark-aside .admin-aside :deep(.t-default-menu .t-menu__item.t-is-active:not(.t-is-opened) .t-icon),
-.admin-layout--dark-aside .admin-aside :deep(.t-default-menu .t-submenu.t-is-active > .t-menu__item .t-icon) {
   color: #fff !important;
 }
 
@@ -235,8 +275,12 @@ function onUserMenu(data: { value?: string | number }) {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.admin-layout--dark-aside .admin-aside :deep(.t-menu-group__title) {
-  color: rgba(255, 255, 255, 0.4);
+.admin-layout--dark-aside .admin-aside :deep(.t-default-menu .t-submenu > .t-menu__item) {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.admin-layout--dark-aside .admin-aside :deep(.t-default-menu .t-menu__sub .t-menu__item) {
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .admin-main {

@@ -6,6 +6,8 @@ import type { MenuGroup } from '@box/ui/types/menu'
 export const ADMIN_MENU_GROUPS: MenuGroup[] = [
   {
     title: '工作台',
+    value: 'group-workbench',
+    icon: 'dashboard',
     items: [
       { value: '/dashboard', label: '概览', icon: 'dashboard', desc: '平台资源与快捷入口' },
       { value: '/analytics', label: '平台分析', icon: 'chart', desc: '执行量、Token 与租户用量' },
@@ -13,6 +15,8 @@ export const ADMIN_MENU_GROUPS: MenuGroup[] = [
   },
   {
     title: '运营',
+    value: 'group-ops',
+    icon: 'usergroup',
     items: [
       { value: '/tenants', label: '租户管理', icon: 'city', desc: '租户创建、启停与套餐分配' },
       { value: '/users', label: '用户管理', icon: 'user', desc: '新建平台管理员、启停账号' },
@@ -25,6 +29,8 @@ export const ADMIN_MENU_GROUPS: MenuGroup[] = [
   },
   {
     title: '资源',
+    value: 'group-resource',
+    icon: 'layers',
     items: [
       { value: '/platform-models', label: '平台模型池', icon: 'cpu', desc: '接入模型与平台密钥' },
       { value: '/agent-templates', label: '智能体市场', icon: 'shop', desc: '上架模板供 C 端启用' },
@@ -35,6 +41,8 @@ export const ADMIN_MENU_GROUPS: MenuGroup[] = [
   },
   {
     title: '系统',
+    value: 'group-system',
+    icon: 'setting',
     items: [
       { value: '/system-config', label: '系统配置', icon: 'setting', desc: '关于、协议与客服信息' },
       { value: '/platform-ocr', label: 'OCR 默认模型', icon: 'scan', desc: '知识库图片与扫描 PDF 识别' },
@@ -42,3 +50,7 @@ export const ADMIN_MENU_GROUPS: MenuGroup[] = [
     ],
   },
 ]
+
+export function adminMenuLeafPaths(groups: MenuGroup[] = ADMIN_MENU_GROUPS): string[] {
+  return groups.flatMap((group) => group.items.map((item) => item.value))
+}
