@@ -79,7 +79,7 @@
                   @click.stop="onSubscribePlan(plan)"
                 >
                   {{
-                    plan.id === currentPlanId ? '当前套餐' : paymentEnabled ? '订阅并支付' : '订阅（模拟支付）'
+                    plan.id === currentPlanId ? '当前套餐' : paymentSubscribeLabel(overview)
                   }}
                 </button>
 
@@ -191,6 +191,7 @@ import {
   isSelfServicePlan,
   planAudience,
   planQuotaMultiplier,
+  paymentSubscribeLabel,
   usePlanUpgrade,
 } from '@/composables/usePlanUpgrade'
 import { usePlanUpgradeDialog } from '@/composables/usePlanUpgradeDialog'
@@ -211,7 +212,6 @@ const audience = ref<'PERSONAL' | 'TEAM'>('PERSONAL')
 const { openSalesLead } = usePlanUpgradeDialog()
 
 const currentPlanId = computed(() => props.currentPlanId ?? null)
-const paymentEnabled = computed(() => overview.value?.paymentEnabled === true)
 const visiblePlans = computed(() => plans.value.filter((p) => planAudience(p) === audience.value))
 const selfServicePlans = computed(() => visiblePlans.value.filter((p) => isSelfServicePlan(p)))
 const enterprisePlan = computed(() =>

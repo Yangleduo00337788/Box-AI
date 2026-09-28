@@ -43,7 +43,8 @@ public class BillingApplicationService {
                 plan.getOveragePolicy(),
                 estimated,
                 "CNY",
-                paymentProperties.isEnabled() && paymentProperties.isRealGatewayConfigured());
+                paymentProperties.isEnabled() && paymentProperties.isRealGatewayConfigured(),
+                paymentProperties.resolvedProvider());
     }
 
     private BigDecimal calculateOverageAmount(Plan plan, QuotaSnapshotVO quota) {

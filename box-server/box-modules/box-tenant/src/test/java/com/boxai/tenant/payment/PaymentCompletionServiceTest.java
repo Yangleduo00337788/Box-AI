@@ -96,6 +96,36 @@ class PaymentCompletionServiceTest {
         verify(tenantApplicationService).assignPlan(1L, 9L);
     }
 
+    @Test
+    void expirePaymentVoidsOpenInvoiceAndCancelsPendingSubscription() {
+        PaymentRecord payment = payment("PENDING", "ALIPAY", BigDecimal.TEN);
+        BillingInvoice invoice = invoice(BigDecimal.TEN);
+        invoice.setStatus("OPEN");
+        Subscription subscription = new Subscription();
+        subscription.setId(11L);
+        subscription.setStatus(SubscriptionStatuses.PENDING_PAYMENT);
+        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment));
+        when(billingRepository.findInvoiceById(21L)).thenReturn(Optional.of(invoice));
+        when(billingRepository.listSubscriptionsByTenant(1L)).thenReturn(List.of(subscription));
+
+        service.expirePayment(31L);
+
+        assertEquals("EXPIRED", payment.getStatus());
+        assertEquals("VOID", invoice.getStatus());
+        assertEquals(SubscriptionStatuses.CANCELLED, subscription.getStatus());
+        verify(billingRepository).updatePayment(payment);
+        verify(billingRepository).updateInvoice(invoice);
+        verify(billingRepository).updateSubscription(subscription);
+        verify(tenantApplicationService, never()).assignPlan(anyLong(), any());
+    }
+
+    @Test
+    void expirePaymentIgnoresNonPending() {
+        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment("SUCCEEDED", "ALIPAY", BigDecimal.TEN)));
+        service.expirePayment(31L);
+        verify(billingRepository, never()).updatePayment(any());
+    }
+
     private static PaymentRecord payment(String status, String channel, BigDecimal amount) {
         PaymentRecord payment = new PaymentRecord();
         payment.setId(31L);

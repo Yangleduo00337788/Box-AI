@@ -79,7 +79,10 @@ public class WorkspaceInterceptor implements HandlerInterceptor {
     }
 
     private boolean isWebhookPath(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/api/v1/hooks/");
+        return request.getRequestURI().startsWith("/api/v1/hooks/")
+                || request.getRequestURI().startsWith("/api/v1/billing/payments/webhook/")
+                || request.getRequestURI().startsWith("/api/v1/billing/payments/notify/")
+                || request.getRequestURI().startsWith("/api/v1/billing/payments/return/");
     }
 
     private boolean isPublicPath(String uri) {

@@ -16,8 +16,11 @@ export interface PlatformUserContextVO {
   userId: number
   email?: string
   nickname?: string
+  primaryTenantId?: number
   primaryTenantName?: string
   tenantType?: string
+  planId?: number
+  planName?: string
   workspaceNames: string[]
   monthAiCalls: number
   monthTokens: number

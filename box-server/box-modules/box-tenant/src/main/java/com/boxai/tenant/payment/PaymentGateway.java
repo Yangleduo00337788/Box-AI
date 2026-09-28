@@ -14,4 +14,8 @@ public interface PaymentGateway {
     Optional<Long> resolvePaymentIdFromWebhook(String rawBody, Map<String, String> headers, PaymentProperties properties);
 
     Optional<Long> resolvePaymentIdFromNotify(Map<String, String> params, PaymentProperties properties);
+
+    default Optional<String> queryPaidExternalRef(String externalRef, Long paymentId, PaymentProperties properties) {
+        return Optional.empty();
+    }
 }

@@ -20,6 +20,7 @@ import com.boxai.tenant.payment.PaymentGateway;
 import com.boxai.tenant.payment.PaymentGatewayRegistry;
 import com.boxai.tenant.payment.PaymentProperties;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -36,7 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,6 +68,12 @@ class SubscriptionApplicationServiceTest {
 
     @InjectMocks
     private SubscriptionApplicationService service;
+
+    @BeforeEach
+    void stubPendingExpiry() {
+        lenient().when(paymentProperties.getPendingExpireMinutes()).thenReturn(10);
+        lenient().when(billingRepository.listPendingPaymentsCreatedBefore(any(), anyInt())).thenReturn(List.of());
+    }
 
     @AfterEach
     void tearDown() {
@@ -183,6 +192,91 @@ class SubscriptionApplicationServiceTest {
 
         assertEquals("SUCCEEDED", vo.status());
         assertEquals(31L, vo.id());
+    }
+
+    @Test
+    void getMyPaymentSyncsWhenGatewayReportsPaid() {
+        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "OWNER"));
+        stubWorkspace(7L, 1L);
+        PaymentRecord pending = payment(31L, 1L, "ALIPAY");
+        pending.setExternalRef("BOX-PAY-31");
+        PaymentRecord paid = payment(31L, 1L, "ALIPAY");
+        paid.setStatus("SUCCEEDED");
+        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(pending), Optional.of(paid));
+        when(paymentGatewayRegistry.findByChannel("ALIPAY")).thenReturn(Optional.of(paymentGateway));
+        when(paymentGateway.queryPaidExternalRef("BOX-PAY-31", 31L, paymentProperties))
+                .thenReturn(Optional.of("trade-1"));
+
+        var vo = service.getMyPayment(31L);
+
+        assertEquals("SUCCEEDED", vo.status());
+        verify(paymentCompletionService).completePayment(31L, "trade-1", "ALIPAY");
+    }
+
+    @Test
+    void syncPaymentFromGatewayCompletesPendingAlipayOrder() {
+        PaymentRecord pending = payment(12L, 1L, "ALIPAY");
+        pending.setExternalRef("BOX-PAY-12");
+        when(billingRepository.findPaymentById(12L)).thenReturn(Optional.of(pending));
+        when(paymentGatewayRegistry.findByChannel("ALIPAY")).thenReturn(Optional.of(paymentGateway));
+        when(paymentGateway.queryPaidExternalRef("BOX-PAY-12", 12L, paymentProperties))
+                .thenReturn(Optional.of("trade-paid"));
+
+        service.syncPaymentFromGateway(12L);
+
+        verify(paymentCompletionService).completePayment(12L, "trade-paid", "ALIPAY");
+    }
+
+    @Test
+    void listAllInvoicesForAdminDoesNotQueryPaymentGateways() {
+        BillingInvoice invoice = new BillingInvoice();
+        invoice.setId(1L);
+        invoice.setTenantId(1L);
+        invoice.setInvoiceNo("INV-1");
+        invoice.setPeriod("2026-09");
+        invoice.setPlanName("Pro");
+        invoice.setSubtotal(BigDecimal.TEN);
+        invoice.setOverageAmount(BigDecimal.ZERO);
+        invoice.setTotalAmount(BigDecimal.TEN);
+        invoice.setCurrency("CNY");
+        invoice.setStatus("OPEN");
+        when(billingRepository.listAllInvoices(200)).thenReturn(List.of(invoice));
+        when(tenantRepository.findById(1L)).thenReturn(Optional.empty());
+
+        var list = service.listAllInvoicesForAdmin();
+
+        assertEquals(1, list.size());
+        assertEquals("INV-1", list.get(0).invoiceNo());
+        verify(billingRepository, never()).listPendingPayments(anyInt());
+        verify(paymentGatewayRegistry, never()).findByChannel(any());
+    }
+
+    @Test
+    void expireStalePendingPaymentsClosesOldUnpaidOrders() {
+        PaymentRecord stale = payment(8L, 1L, "ALIPAY");
+        stale.setCreatedAt(LocalDateTime.now().minusMinutes(11));
+        when(billingRepository.listPendingPaymentsCreatedBefore(any(), anyInt())).thenReturn(List.of(stale));
+
+        service.expireStalePendingPayments();
+
+        verify(paymentCompletionService).expirePayment(8L);
+    }
+
+    @Test
+    void getMyPaymentExpiresStalePendingWithoutQueryingGateway() {
+        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "OWNER"));
+        stubWorkspace(7L, 1L);
+        PaymentRecord pending = payment(31L, 1L, "ALIPAY");
+        pending.setCreatedAt(LocalDateTime.now().minusMinutes(11));
+        PaymentRecord expired = payment(31L, 1L, "ALIPAY");
+        expired.setStatus("EXPIRED");
+        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(pending), Optional.of(expired));
+
+        var vo = service.getMyPayment(31L);
+
+        assertEquals("EXPIRED", vo.status());
+        verify(paymentCompletionService).expirePayment(31L);
+        verify(paymentGatewayRegistry, never()).findByChannel(any());
     }
 
     private void stubWorkspace(Long workspaceId, Long tenantId) {

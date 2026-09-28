@@ -10,28 +10,39 @@ import com.boxai.tenant.application.BillingApplicationService;
 import com.boxai.tenant.application.SubscriptionApplicationService;
 import com.boxai.tenant.payment.AlipayPaymentGateway;
 import com.boxai.tenant.payment.PaymentProperties;
+import com.boxai.tenant.payment.PaymentUrls;
 import com.boxai.tenant.payment.StripePaymentGateway;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/billing")
 public class BillingController {
+
+    private static final Logger log = LoggerFactory.getLogger(BillingController.class);
 
     private final BillingApplicationService billingApplicationService;
     private final SubscriptionApplicationService subscriptionApplicationService;
@@ -61,31 +72,77 @@ public class BillingController {
         return Result.success(subscriptionApplicationService.subscribe(request));
     }
 
+    @GetMapping("/payments/return/alipay")
+    public void alipayReturn(@RequestParam(required = false) Long paymentId,
+                             @RequestParam(value = "out_trade_no", required = false) String outTradeNo,
+                             HttpServletResponse response) throws IOException {
+        Long id = paymentId;
+        if (id == null) {
+            id = AlipayPaymentGateway.parsePaymentId(outTradeNo, null).orElse(null);
+        }
+        if (id != null) {
+            try {
+                subscriptionApplicationService.syncPaymentFromGateway(id);
+            } catch (Exception e) {
+                log.warn("支付宝回跳查单失败 paymentId={}: {}", id, e.getMessage());
+            }
+        }
+        String target = paymentProperties.getSuccessUrl();
+        if (id != null) {
+            target = PaymentUrls.withQuery(target, "paymentId", String.valueOf(id));
+        }
+        response.sendRedirect(target);
+    }
+
+    @GetMapping("/payments/{paymentId}")
+    public Result<PaymentRecordVO> payment(@PathVariable Long paymentId) {
+        return Result.success(subscriptionApplicationService.getMyPayment(paymentId));
+    }
+
     @PostMapping("/payments/{paymentId}/confirm")
     public Result<PaymentRecordVO> confirmPayment(@PathVariable Long paymentId) {
         return Result.success(subscriptionApplicationService.confirmPayment(paymentId));
     }
 
     @PostMapping(value = "/payments/webhook/stripe", consumes = MediaType.ALL_VALUE)
-    public Result<Void> stripeWebhook(HttpServletRequest request) throws Exception {
+    public ResponseEntity<Result<Void>> stripeWebhook(HttpServletRequest request) throws Exception {
         String rawBody = StreamUtils.copyToString(request.getInputStream(), StandardCharsets.UTF_8);
-        stripePaymentGateway.resolvePaymentIdFromWebhook(rawBody, readHeaders(request), paymentProperties)
-                .ifPresent(paymentId -> subscriptionApplicationService.completePaymentFromGateway(
-                        paymentId,
-                        "stripe-webhook",
-                        "STRIPE"));
-        return Result.success(null);
+        Map<String, String> headers = readHeaders(request);
+        if (!stripePaymentGateway.isWebhookAuthentic(rawBody, headers, paymentProperties)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Result.failure(400, "Stripe 签名无效"));
+        }
+        Optional<Long> paymentId = stripePaymentGateway.resolvePaymentIdFromWebhook(rawBody, headers, paymentProperties);
+        if (paymentId.isPresent()) {
+            try {
+                subscriptionApplicationService.completePaymentFromGateway(paymentId.get(), null, "STRIPE");
+            } catch (Exception e) {
+                log.warn("Stripe 回调入账失败 paymentId={}: {}", paymentId.get(), e.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Result.failure(400, "支付入账失败"));
+            }
+        }
+        return ResponseEntity.ok(Result.success(null));
     }
 
     @PostMapping(value = "/payments/notify/alipay", consumes = MediaType.ALL_VALUE)
     public String alipayNotify(HttpServletRequest request) {
         Map<String, String> params = readParams(request);
-        alipayPaymentGateway.resolvePaymentIdFromNotify(params, paymentProperties)
-                .ifPresent(paymentId -> subscriptionApplicationService.completePaymentFromGateway(
-                        paymentId,
+        try {
+            Optional<Long> paymentId = alipayPaymentGateway.resolvePaymentIdFromNotify(params, paymentProperties);
+            if (paymentId.isPresent()) {
+                subscriptionApplicationService.completePaymentFromGateway(
+                        paymentId.get(),
                         params.getOrDefault("trade_no", "alipay-notify"),
-                        "ALIPAY"));
-        return "success";
+                        "ALIPAY");
+                return "success";
+            }
+            if (alipayPaymentGateway.isVerifiedNonPaidNotify(params, paymentProperties)) {
+                return "success";
+            }
+            return "fail";
+        } catch (Exception e) {
+            log.warn("支付宝异步通知处理失败: {}", e.getMessage());
+            return "fail";
+        }
     }
 
     @GetMapping("/invoices")

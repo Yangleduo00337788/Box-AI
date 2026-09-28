@@ -93,6 +93,7 @@ import QuotaDonutChart from '@/components/QuotaDonutChart.vue'
 import PlanUpgradeDialog from '@/components/PlanUpgradeDialog.vue'
 import HelpFeedbackDialog from '@/components/HelpFeedbackDialog.vue'
 import { usePlanUpgradeDialog } from '@/composables/usePlanUpgradeDialog'
+import { waitForPaymentSuccess } from '@/composables/usePlanUpgrade'
 
 const { salesLeadVisible } = usePlanUpgradeDialog()
 
@@ -275,11 +276,22 @@ async function renderCharts() {
   }
 }
 
+const invoiceStatusLabel: Record<string, string> = {
+  OPEN: '待支付',
+  PAID: '已支付',
+  VOID: '已关闭',
+}
+
 const invoiceColumns: PrimaryTableCol<BillingInvoiceVO>[] = [
   { colKey: 'invoiceNo', title: '发票号', minWidth: 140 },
   { colKey: 'period', title: '账期', width: 90 },
   { colKey: 'totalAmount', title: '金额', width: 100 },
-  { colKey: 'status', title: '状态', width: 90 },
+  {
+    colKey: 'status',
+    title: '状态',
+    width: 90,
+    cell: (_, { row }) => invoiceStatusLabel[row.status] || row.status,
+  },
 ]
 
 function onTabChange(value: TabValue) {
@@ -364,12 +376,24 @@ watch(
   },
 )
 
-function handlePaymentReturn() {
+async function handlePaymentReturn() {
   const payment = route.query.payment
+  const paymentIdRaw = route.query.paymentId
+  const paymentId = Number(Array.isArray(paymentIdRaw) ? paymentIdRaw[0] : paymentIdRaw)
   if (payment === 'success') {
-    MessagePlugin.success('支付已完成，套餐已更新')
+    MessagePlugin.info('正在确认支付结果…')
     tab.value = 'billing'
+    let paid = false
+    if (Number.isFinite(paymentId) && paymentId > 0) {
+      paid = await waitForPaymentSuccess(paymentId)
+    }
+    if (paid) {
+      MessagePlugin.success('支付已完成，套餐已更新')
+    } else {
+      MessagePlugin.warning('已返回，支付结果仍在同步。可稍后刷新账单。')
+    }
     void router.replace({ path: route.path, query: { tab: 'billing' } })
+    await loadAll()
   } else if (payment === 'cancel') {
     MessagePlugin.warning('已取消支付')
     upgradeVisible.value = true
@@ -378,7 +402,7 @@ function handlePaymentReturn() {
 }
 
 onMounted(() => {
-  handlePaymentReturn()
+  void handlePaymentReturn()
   if (route.query.tab === 'plans' || route.query.upgrade === '1') {
     upgradeVisible.value = true
     void router.replace({ path: route.path, query: {} })

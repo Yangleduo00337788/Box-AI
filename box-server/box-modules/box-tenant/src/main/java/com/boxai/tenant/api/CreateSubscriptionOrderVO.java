@@ -1,6 +1,7 @@
 package com.boxai.tenant.api;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 public record CreateSubscriptionOrderVO(
         Long subscriptionId,
@@ -12,6 +13,8 @@ public record CreateSubscriptionOrderVO(
         String paymentStatus,
         String paymentChannel,
         String paymentUrl,
-        boolean requiresClientConfirm
+        boolean requiresClientConfirm,
+        String checkoutFormAction,
+        Map<String, String> checkoutForm
 ) {
 }

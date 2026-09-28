@@ -15,6 +15,7 @@ public record BillingOverviewVO(
         String overagePolicy,
         BigDecimal estimatedAmount,
         String currency,
-        boolean paymentEnabled
+        boolean paymentEnabled,
+        String paymentProvider
 ) {
 }

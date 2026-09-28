@@ -69,6 +69,34 @@ public class PaymentCompletionService {
         return payment;
     }
 
+    @Transactional
+    public void expirePayment(Long paymentId) {
+        PaymentRecord payment = billingRepository.findPaymentById(paymentId).orElse(null);
+        if (payment == null || !"PENDING".equalsIgnoreCase(payment.getStatus())) {
+            return;
+        }
+        payment.setStatus("EXPIRED");
+        billingRepository.updatePayment(payment);
+
+        billingRepository.findInvoiceById(payment.getInvoiceId()).ifPresent(invoice -> {
+            if ("OPEN".equalsIgnoreCase(invoice.getStatus())) {
+                invoice.setStatus("VOID");
+                billingRepository.updateInvoice(invoice);
+            }
+            if (invoice.getSubscriptionId() == null) {
+                return;
+            }
+            billingRepository.listSubscriptionsByTenant(payment.getTenantId()).stream()
+                    .filter(item -> invoice.getSubscriptionId().equals(item.getId()))
+                    .filter(item -> SubscriptionStatuses.PENDING_PAYMENT.equals(item.getStatus()))
+                    .findFirst()
+                    .ifPresent(subscription -> {
+                        subscription.setStatus(SubscriptionStatuses.CANCELLED);
+                        billingRepository.updateSubscription(subscription);
+                    });
+        });
+    }
+
     private void assertAmountMatches(BigDecimal paymentAmount, BigDecimal invoiceAmount) {
         BigDecimal paid = paymentAmount == null ? BigDecimal.ZERO : paymentAmount;
         BigDecimal expected = invoiceAmount == null ? BigDecimal.ZERO : invoiceAmount;

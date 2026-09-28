@@ -7,8 +7,10 @@ public class PaymentProperties {
 
     private boolean enabled = false;
     private String provider = "mock";
-    private String successUrl = "http://127.0.0.1:5173/settings/plan?tab=billing&payment=success";
-    private String cancelUrl = "http://127.0.0.1:5173/settings/plan?tab=plans&payment=cancel";
+    private String successUrl = "http://localhost:5173/settings/plan?tab=billing&payment=success";
+    private String cancelUrl = "http://localhost:5173/settings/plan?tab=plans&payment=cancel";
+    /** 未支付订单自动关闭分钟数，同时写入支付宝 timeout_express。 */
+    private int pendingExpireMinutes = 10;
     private final Stripe stripe = new Stripe();
     private final Alipay alipay = new Alipay();
 
@@ -44,6 +46,14 @@ public class PaymentProperties {
         this.cancelUrl = cancelUrl;
     }
 
+    public int getPendingExpireMinutes() {
+        return pendingExpireMinutes < 1 ? 10 : pendingExpireMinutes;
+    }
+
+    public void setPendingExpireMinutes(int pendingExpireMinutes) {
+        this.pendingExpireMinutes = pendingExpireMinutes;
+    }
+
     public Stripe getStripe() {
         return stripe;
     }
@@ -52,9 +62,12 @@ public class PaymentProperties {
         return alipay;
     }
 
+    public String resolvedProvider() {
+        return provider == null || provider.isBlank() ? "mock" : provider.trim().toLowerCase();
+    }
+
     public boolean isRealGatewayConfigured() {
-        String normalized = provider == null ? "mock" : provider.trim().toLowerCase();
-        return switch (normalized) {
+        return switch (resolvedProvider()) {
             case "stripe" -> stripe.getSecretKey() != null && !stripe.getSecretKey().isBlank();
             case "alipay" -> alipay.getAppId() != null && !alipay.getAppId().isBlank()
                     && alipay.getPrivateKey() != null && !alipay.getPrivateKey().isBlank();
@@ -63,8 +76,28 @@ public class PaymentProperties {
     }
 
     public static class Stripe {
+        /** Checkout 币种。测试账号常用 usd；需与 Stripe 后台已开通币种一致。 */
+        private String currency = "usd";
         private String secretKey = "";
         private String webhookSecret = "";
+
+        public String getCurrency() {
+            return currency;
+        }
+
+        public void setCurrency(String currency) {
+            this.currency = currency;
+        }
+
+        public String checkoutCurrency(String fallback) {
+            if (currency != null && !currency.isBlank()) {
+                return currency.trim().toLowerCase();
+            }
+            if (fallback != null && !fallback.isBlank()) {
+                return fallback.trim().toLowerCase();
+            }
+            return "usd";
+        }
 
         public String getSecretKey() {
             return secretKey;
@@ -84,11 +117,13 @@ public class PaymentProperties {
     }
 
     public static class Alipay {
-        private String gatewayUrl = "https://openapi.alipay.com/gateway.do";
+        private String gatewayUrl = "https://openapi-sandbox.dl.alipaydev.com/gateway.do";
         private String appId = "";
         private String privateKey = "";
         private String alipayPublicKey = "";
         private String notifyUrl = "";
+        /** 浏览器支付完成回跳，先打到后端查单再 302 到前端。 */
+        private String returnUrl = "";
 
         public String getGatewayUrl() {
             return gatewayUrl;
@@ -128,6 +163,14 @@ public class PaymentProperties {
 
         public void setNotifyUrl(String notifyUrl) {
             this.notifyUrl = notifyUrl;
+        }
+
+        public String getReturnUrl() {
+            return returnUrl;
+        }
+
+        public void setReturnUrl(String returnUrl) {
+            this.returnUrl = returnUrl;
         }
     }
 }

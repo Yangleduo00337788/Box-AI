@@ -1,5 +1,6 @@
 package com.boxai.domain.billing;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,4 +29,8 @@ public interface BillingRepository {
     void updatePayment(PaymentRecord payment);
 
     Optional<PaymentRecord> findPaymentById(Long id);
+
+    List<PaymentRecord> listPendingPayments(int limit);
+
+    List<PaymentRecord> listPendingPaymentsCreatedBefore(LocalDateTime cutoff, int limit);
 }

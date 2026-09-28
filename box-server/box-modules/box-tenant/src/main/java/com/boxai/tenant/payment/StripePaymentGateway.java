@@ -11,7 +11,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -21,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -28,6 +28,10 @@ public class StripePaymentGateway implements PaymentGateway {
 
     private static final Logger log = LoggerFactory.getLogger(StripePaymentGateway.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final long WEBHOOK_TOLERANCE_SECONDS = 300L;
+    private static final Set<String> ZERO_DECIMAL = Set.of(
+            "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf");
+
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
     @Override
@@ -45,27 +49,29 @@ public class StripePaymentGateway implements PaymentGateway {
     @Override
     public PaymentCheckoutResult createCheckout(PaymentCheckoutCommand command, PaymentProperties properties) {
         try {
-            long amountMinor = command.amount()
-                    .multiply(BigDecimal.valueOf(100))
-                    .setScale(0, RoundingMode.HALF_UP)
-                    .longValue();
-            String body = buildForm(Map.of(
-                    "mode", "payment",
-                    "success_url", properties.getSuccessUrl(),
-                    "cancel_url", properties.getCancelUrl(),
-                    "client_reference_id", String.valueOf(command.paymentId()),
-                    "metadata[payment_id]", String.valueOf(command.paymentId()),
-                    "metadata[invoice_id]", String.valueOf(command.invoiceId()),
-                    "line_items[0][price_data][currency]", command.currency().toLowerCase(Locale.ROOT),
-                    "line_items[0][price_data][product_data][name]", command.subject(),
-                    "line_items[0][price_data][unit_amount]", String.valueOf(amountMinor),
-                    "line_items[0][quantity]", "1"));
+            String currency = properties.getStripe().checkoutCurrency(command.currency());
+            long amountMinor = toStripeAmount(command.amount(), currency);
+            String successUrl = PaymentUrls.withQuery(
+                    properties.getSuccessUrl(), "paymentId", String.valueOf(command.paymentId()));
+            String cancelUrl = PaymentUrls.withQuery(
+                    properties.getCancelUrl(), "paymentId", String.valueOf(command.paymentId()));
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("mode", "payment");
+            fields.put("success_url", successUrl + "&session_id={CHECKOUT_SESSION_ID}");
+            fields.put("cancel_url", cancelUrl);
+            fields.put("client_reference_id", String.valueOf(command.paymentId()));
+            fields.put("metadata[payment_id]", String.valueOf(command.paymentId()));
+            fields.put("metadata[invoice_id]", String.valueOf(command.invoiceId()));
+            fields.put("line_items[0][price_data][currency]", currency);
+            fields.put("line_items[0][price_data][product_data][name]", command.subject());
+            fields.put("line_items[0][price_data][unit_amount]", String.valueOf(amountMinor));
+            fields.put("line_items[0][quantity]", "1");
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.stripe.com/v1/checkout/sessions"))
                     .timeout(Duration.ofSeconds(20))
                     .header("Authorization", "Bearer " + properties.getStripe().getSecretKey())
                     .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .POST(HttpRequest.BodyPublishers.ofString(buildForm(fields)))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 400) {
@@ -80,22 +86,19 @@ public class StripePaymentGateway implements PaymentGateway {
         }
     }
 
-    private static final long WEBHOOK_TOLERANCE_SECONDS = 300L;
+    public boolean isWebhookAuthentic(String rawBody, Map<String, String> headers, PaymentProperties properties) {
+        String webhookSecret = properties.getStripe().getWebhookSecret();
+        if (rawBody == null || webhookSecret == null || webhookSecret.isBlank()) {
+            return false;
+        }
+        String signature = header(headers, "Stripe-Signature");
+        return signature != null && !signature.isBlank()
+                && verifyStripeSignature(rawBody, signature, webhookSecret);
+    }
 
     @Override
     public Optional<Long> resolvePaymentIdFromWebhook(String rawBody, Map<String, String> headers, PaymentProperties properties) {
-        if (rawBody == null || rawBody.isBlank()) {
-            return Optional.empty();
-        }
-        String webhookSecret = properties.getStripe().getWebhookSecret();
-        if (webhookSecret == null || webhookSecret.isBlank()) {
-            return Optional.empty();
-        }
-        String signature = header(headers, "Stripe-Signature");
-        if (signature == null || signature.isBlank()) {
-            return Optional.empty();
-        }
-        if (!verifyStripeSignature(rawBody, signature, webhookSecret)) {
+        if (!isWebhookAuthentic(rawBody, headers, properties)) {
             return Optional.empty();
         }
         try {
@@ -104,6 +107,9 @@ public class StripePaymentGateway implements PaymentGateway {
                 return Optional.empty();
             }
             JsonNode session = event.path("data").path("object");
+            if (!isPaidSession(session)) {
+                return Optional.empty();
+            }
             if (session.hasNonNull("metadata") && session.get("metadata").hasNonNull("payment_id")) {
                 return Optional.of(session.get("metadata").get("payment_id").asLong());
             }
@@ -123,29 +129,54 @@ public class StripePaymentGateway implements PaymentGateway {
         return Optional.empty();
     }
 
-    private static String buildForm(Map<String, String> fields) {
-        return fields.entrySet().stream()
-                .map(entry -> encode(entry.getKey()) + "=" + encode(entry.getValue()))
-                .collect(Collectors.joining("&"));
-    }
-
-    private static String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
-    }
-
-    private static String header(Map<String, String> headers, String name) {
-        if (headers == null) {
-            return null;
+    @Override
+    public Optional<String> queryPaidExternalRef(String externalRef, Long paymentId, PaymentProperties properties) {
+        if (externalRef == null || !externalRef.startsWith("cs_")
+                || properties.getStripe().getSecretKey() == null
+                || properties.getStripe().getSecretKey().isBlank()) {
+            return Optional.empty();
         }
-        for (Map.Entry<String, String> entry : headers.entrySet()) {
-            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(name)) {
-                return entry.getValue();
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.stripe.com/v1/checkout/sessions/" + externalRef))
+                    .timeout(Duration.ofSeconds(20))
+                    .header("Authorization", "Bearer " + properties.getStripe().getSecretKey())
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                log.warn("Stripe 查单失败: HTTP {}", response.statusCode());
+                return Optional.empty();
             }
+            JsonNode session = MAPPER.readTree(response.body());
+            if (!isPaidSession(session)) {
+                return Optional.empty();
+            }
+            String id = session.path("id").asText(null);
+            return Optional.ofNullable(id == null || id.isBlank() ? externalRef : id);
+        } catch (Exception e) {
+            log.warn("Stripe 查单异常: {}", e.getMessage());
+            return Optional.empty();
         }
-        return null;
     }
 
-    private static boolean verifyStripeSignature(String payload, String signatureHeader, String secret) {
+    static long toStripeAmount(BigDecimal amount, String currency) {
+        BigDecimal value = amount == null ? BigDecimal.ZERO : amount;
+        if (ZERO_DECIMAL.contains(currency == null ? "" : currency.toLowerCase(Locale.ROOT))) {
+            return value.setScale(0, RoundingMode.HALF_UP).longValue();
+        }
+        return value.multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).longValue();
+    }
+
+    static boolean isPaidSession(JsonNode session) {
+        if (session == null || session.isMissingNode()) {
+            return false;
+        }
+        String status = session.path("payment_status").asText("");
+        return "paid".equalsIgnoreCase(status) || status.isBlank();
+    }
+
+    static boolean verifyStripeSignature(String payload, String signatureHeader, String secret) {
         try {
             String timestamp = null;
             String signature = null;
@@ -171,11 +202,28 @@ public class StripePaymentGateway implements PaymentGateway {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] digest = mac.doFinal((timestamp + "." + payload).getBytes(StandardCharsets.UTF_8));
-            String expected = bytesToHex(digest);
-            return expected.equalsIgnoreCase(signature);
+            return bytesToHex(digest).equalsIgnoreCase(signature);
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private static String buildForm(Map<String, String> fields) {
+        return fields.entrySet().stream()
+                .map(entry -> PaymentUrls.encode(entry.getKey()) + "=" + PaymentUrls.encode(entry.getValue()))
+                .collect(Collectors.joining("&"));
+    }
+
+    private static String header(Map<String, String> headers, String name) {
+        if (headers == null) {
+            return null;
+        }
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(name)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private static String bytesToHex(byte[] bytes) {

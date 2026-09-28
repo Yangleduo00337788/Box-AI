@@ -14,6 +14,7 @@ export interface BillingOverviewVO {
   estimatedAmount: number
   currency: string
   paymentEnabled?: boolean
+  paymentProvider?: string
 }
 
 export interface BillingInvoiceVO {
@@ -60,6 +61,18 @@ export interface CreateSubscriptionOrderVO {
   paymentChannel?: string
   paymentUrl?: string | null
   requiresClientConfirm?: boolean
+  checkoutFormAction?: string | null
+  checkoutForm?: Record<string, string> | null
+}
+
+export interface PaymentRecordVO {
+  id: number
+  invoiceId?: number
+  amount?: number
+  currency?: string
+  channel?: string
+  status: string
+  paidAt?: string
 }
 
 export function fetchBillingOverview() {
@@ -72,6 +85,10 @@ export function subscribePlan(planId: number) {
 
 export function confirmPayment(paymentId: number) {
   return http.post<Result<unknown>>(`/billing/payments/${paymentId}/confirm`)
+}
+
+export function fetchPayment(paymentId: number) {
+  return http.get<Result<PaymentRecordVO>>(`/billing/payments/${paymentId}`)
 }
 
 export function fetchInvoices() {

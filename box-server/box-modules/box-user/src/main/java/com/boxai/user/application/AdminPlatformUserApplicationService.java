@@ -5,6 +5,8 @@ import com.boxai.common.constant.UserTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.common.result.PageResult;
+import com.boxai.domain.plan.Plan;
+import com.boxai.domain.plan.PlanRepository;
 import com.boxai.domain.plan.TenantUsage;
 import com.boxai.domain.plan.TenantUsageRepository;
 import com.boxai.domain.tenant.Tenant;
@@ -38,6 +40,7 @@ public class AdminPlatformUserApplicationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TenantRepository tenantRepository;
+    private final PlanRepository planRepository;
     private final WorkspaceRepository workspaceRepository;
     private final TenantUsageRepository tenantUsageRepository;
     private final ExecutionRepository executionRepository;
@@ -45,12 +48,14 @@ public class AdminPlatformUserApplicationService {
     public AdminPlatformUserApplicationService(UserRepository userRepository,
                                                PasswordEncoder passwordEncoder,
                                                TenantRepository tenantRepository,
+                                               PlanRepository planRepository,
                                                WorkspaceRepository workspaceRepository,
                                                TenantUsageRepository tenantUsageRepository,
                                                ExecutionRepository executionRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tenantRepository = tenantRepository;
+        this.planRepository = planRepository;
         this.workspaceRepository = workspaceRepository;
         this.tenantUsageRepository = tenantUsageRepository;
         this.executionRepository = executionRepository;
@@ -117,12 +122,18 @@ public class AdminPlatformUserApplicationService {
                 .filter(item -> item.getStatus() != null && item.getStatus().toUpperCase().contains("FAIL"))
                 .count();
         double failureRate = executions.isEmpty() ? 0D : failed * 100D / executions.size();
+        Plan plan = tenant == null || tenant.getPlanId() == null
+                ? null
+                : planRepository.findById(tenant.getPlanId()).orElse(null);
         return new PlatformUserContextVO(
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
+                tenant == null ? null : tenant.getId(),
                 tenant == null ? null : tenant.getName(),
                 tenant == null ? null : tenant.getTenantType(),
+                tenant == null ? null : tenant.getPlanId(),
+                plan == null ? null : plan.getName(),
                 workspaceNames,
                 usage == null ? 0 : usage.getAiCalls(),
                 usage == null ? 0L : usage.getTokens(),

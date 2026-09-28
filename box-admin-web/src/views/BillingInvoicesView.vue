@@ -32,7 +32,7 @@ const statusTheme: Record<string, 'default' | 'success' | 'warning' | 'danger'> 
 const statusLabel: Record<string, string> = {
   PAID: '已支付',
   OPEN: '待支付',
-  VOID: '作废',
+  VOID: '已关闭',
 }
 
 const columns: PrimaryTableCol<BillingInvoiceVO>[] = [

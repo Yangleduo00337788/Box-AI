@@ -39,6 +39,9 @@ public class TenantStatusInterceptor implements HandlerInterceptor {
                 || uri.startsWith("/api/v1/auth/password/reset")
                 || uri.startsWith("/api/v1/published/")
                 || uri.startsWith("/api/v1/hooks/")
+                || uri.startsWith("/api/v1/billing/payments/webhook/")
+                || uri.startsWith("/api/v1/billing/payments/notify/")
+                || uri.startsWith("/api/v1/billing/payments/return/")
                 || uri.equals("/api/v1/system/health")
                 || uri.equals("/api/v1/system/content")
                 || uri.startsWith("/api/v1/public-assets/");

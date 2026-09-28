@@ -3,6 +3,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import {
   confirmPayment,
   fetchBillingOverview,
+  fetchPayment,
   listPlans,
   subscribePlan,
   type BillingOverviewVO,
@@ -108,6 +109,39 @@ export function planQuotaMultiplier(plan: PlanVO, baseline: PlanVO | undefined) 
 
 export { formatQuotaNumber }
 
+export function paymentSubscribeLabel(overview: BillingOverviewVO | null | undefined) {
+  if (!overview?.paymentEnabled) return '订阅（模拟支付）'
+  if (overview.paymentProvider === 'alipay') return '支付宝支付'
+  if (overview.paymentProvider === 'stripe') return 'Stripe 支付'
+  return '订阅并支付'
+}
+
+function postCheckoutForm(action: string, fields: Record<string, string>) {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = action
+  form.acceptCharset = 'UTF-8'
+  form.style.display = 'none'
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    form.appendChild(input)
+  })
+  document.body.appendChild(form)
+  form.submit()
+}
+
+export async function waitForPaymentSuccess(paymentId: number, attempts = 12) {
+  for (let i = 0; i < attempts; i++) {
+    const { data } = await fetchPayment(paymentId)
+    if (data.data?.status === 'SUCCEEDED') return true
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+  }
+  return false
+}
+
 export function usePlanUpgrade() {
   const plans = ref<PlanVO[]>([])
   const loading = ref(false)
@@ -139,6 +173,14 @@ export function usePlanUpgrade() {
     try {
       const { data } = await subscribePlan(planId)
       const order = data.data
+      if (order?.checkoutFormAction && order.checkoutForm && Object.keys(order.checkoutForm).length) {
+        postCheckoutForm(order.checkoutFormAction, order.checkoutForm)
+        return { redirected: true as const }
+      }
+      if (order?.paymentChannel === 'ALIPAY') {
+        MessagePlugin.error('无法打开支付宝收银台，请重试')
+        return { redirected: false as const, success: false as const }
+      }
       if (order?.paymentUrl) {
         window.location.href = order.paymentUrl
         return { redirected: true as const }

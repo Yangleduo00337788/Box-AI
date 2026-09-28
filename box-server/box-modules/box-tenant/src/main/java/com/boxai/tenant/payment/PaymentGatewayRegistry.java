@@ -25,4 +25,13 @@ public class PaymentGatewayRegistry {
                 .or(() -> mockPaymentGateway.supports(properties) ? Optional.of(mockPaymentGateway) : Optional.empty())
                 .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "支付网关未配置或不可用"));
     }
+
+    public Optional<PaymentGateway> findByChannel(String channel) {
+        if (channel == null || channel.isBlank()) {
+            return Optional.empty();
+        }
+        return gateways.stream()
+                .filter(gateway -> channel.equalsIgnoreCase(gateway.channel()))
+                .findFirst();
+    }
 }

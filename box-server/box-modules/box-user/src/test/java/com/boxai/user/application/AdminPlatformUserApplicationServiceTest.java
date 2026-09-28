@@ -4,7 +4,11 @@ import com.boxai.common.constant.PlatformAdminRoles;
 import com.boxai.common.constant.UserTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.plan.Plan;
+import com.boxai.domain.plan.PlanRepository;
 import com.boxai.domain.plan.TenantUsageRepository;
+import com.boxai.domain.tenant.Tenant;
+import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.trace.ExecutionRepository;
 import com.boxai.domain.user.User;
@@ -20,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +46,8 @@ class AdminPlatformUserApplicationServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private TenantRepository tenantRepository;
+    @Mock
+    private PlanRepository planRepository;
     @Mock
     private WorkspaceRepository workspaceRepository;
     @Mock
@@ -117,6 +125,36 @@ class AdminPlatformUserApplicationServiceTest {
 
         verify(userRepository).updateStatus(9L, 0);
         assertEquals(0, vo.status());
+    }
+
+    @Test
+    void contextIncludesPrimaryTenantPlan() {
+        User user = new User();
+        user.setId(3L);
+        user.setEmail("ada@example.com");
+        user.setNickname("Ada");
+        TenantMember member = new TenantMember();
+        member.setTenantId(11L);
+        Tenant tenant = new Tenant();
+        tenant.setId(11L);
+        tenant.setName("Ada 的个人空间");
+        tenant.setTenantType("PERSONAL");
+        tenant.setPlanId(22L);
+        Plan plan = new Plan();
+        plan.setId(22L);
+        plan.setName("团队入门");
+        when(userRepository.findById(3L)).thenReturn(Optional.of(user));
+        when(tenantRepository.findPrimaryByUserId(3L)).thenReturn(Optional.of(member));
+        when(tenantRepository.findById(11L)).thenReturn(Optional.of(tenant));
+        when(workspaceRepository.listByTenantId(11L)).thenReturn(List.of());
+        when(tenantUsageRepository.findByTenantAndPeriod(eq(11L), any())).thenReturn(Optional.empty());
+        when(planRepository.findById(22L)).thenReturn(Optional.of(plan));
+
+        var vo = service.context(3L);
+
+        assertEquals(11L, vo.primaryTenantId());
+        assertEquals(22L, vo.planId());
+        assertEquals("团队入门", vo.planName());
     }
 
     private static User admin(Long id, int status) {

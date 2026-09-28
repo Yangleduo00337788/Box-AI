@@ -1,6 +1,6 @@
 <template>
   <div class="users-page admin-page">
-    <page-header title="用户管理" desc="查看平台用户，新建平台管理员，启停账号。停用后无法登录。">
+    <page-header title="用户管理" desc="查看平台用户，新建平台管理员，启停账号，给租户用户更改套餐。停用后无法登录。">
       <template #actions>
         <t-button v-if="canManageAdmins" theme="primary" @click="openCreate">新建管理员</t-button>
       </template>
@@ -58,6 +58,7 @@
           <t-descriptions-item label="昵称">{{ context.nickname || '-' }}</t-descriptions-item>
           <t-descriptions-item label="主租户">{{ context.primaryTenantName || '-' }}</t-descriptions-item>
           <t-descriptions-item label="租户类型">{{ tenantTypeLabel(context.tenantType) }}</t-descriptions-item>
+          <t-descriptions-item label="当前套餐">{{ context.planName || '-' }}</t-descriptions-item>
           <t-descriptions-item label="工作空间">
             {{ context.workspaceNames?.length ? context.workspaceNames.join('、') : '-' }}
           </t-descriptions-item>
@@ -70,6 +71,16 @@
         <t-empty v-else-if="!contextLoading" description="暂无上下文数据" />
       </t-loading>
     </t-drawer>
+
+    <t-dialog
+      v-model:visible="planVisible"
+      header="更改套餐"
+      :confirm-btn="{ content: '保存', loading: assigningPlan }"
+      @confirm="onAssignPlan"
+    >
+      <p class="plan-dialog__user">{{ planUserLabel }}</p>
+      <t-select v-model="selectedPlanId" :options="planOptions" placeholder="选择套餐" />
+    </t-dialog>
   </div>
 </template>
 
@@ -78,6 +89,8 @@ import { computed, h, onMounted, reactive, ref } from 'vue'
 import { DialogPlugin, Link, MessagePlugin, Tag } from 'tdesign-vue-next'
 import type { FormInstanceFunctions, FormProps, PageInfo, PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@box/ui/components/PageHeader.vue'
+import { fetchPlans, type PlanVO } from '@/api/plan'
+import { assignTenantPlan } from '@/api/tenant'
 import {
   createPlatformAdmin,
   fetchUserContext,
@@ -108,6 +121,11 @@ const contextVisible = ref(false)
 const contextLoading = ref(false)
 const context = ref<PlatformUserContextVO | null>(null)
 const contextUser = ref<PlatformUserVO | null>(null)
+const planVisible = ref(false)
+const assigningPlan = ref(false)
+const selectedPlanId = ref<number | ''>('')
+const planList = ref<PlanVO[]>([])
+const planTarget = ref<{ user: PlatformUserVO; tenantId: number; planId?: number } | null>(null)
 const form = reactive({
   email: '',
   password: '',
@@ -156,6 +174,16 @@ const contextTitle = computed(() => {
   const user = contextUser.value
   if (!user) return '用户上下文'
   return `用户上下文 · ${user.nickname || user.email || user.id}`
+})
+
+const planOptions = computed(() =>
+  planList.value.map((item) => ({ label: `${item.name}（¥${item.priceMonthly}/月）`, value: item.id })),
+)
+
+const planUserLabel = computed(() => {
+  const target = planTarget.value
+  if (!target) return ''
+  return `${target.user.nickname || target.user.email || target.user.id} 的主租户套餐`
 })
 
 function tenantTypeLabel(value?: string) {
@@ -213,11 +241,20 @@ const columns = computed<PrimaryTableCol<PlatformUserVO>[]>(() => [
   {
     colKey: 'actions',
     title: '操作',
-    width: canManageAdmins.value ? 140 : 80,
+    width: canManageAdmins.value ? 200 : 140,
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openContext(row) }, () => '上下文'),
+        ...(row.userType !== 'PLATFORM_ADMIN'
+          ? [
+              h(
+                Link,
+                { theme: 'primary', hover: 'color', onClick: () => void openPlan(row) },
+                () => '改套餐',
+              ),
+            ]
+          : []),
         ...(canManageAdmins.value
           ? [
               h(
@@ -252,6 +289,49 @@ async function loadUsers() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadPlans() {
+  const { data } = await fetchPlans()
+  planList.value = data.data || []
+}
+
+async function openPlan(row: PlatformUserVO) {
+  if (row.userType === 'PLATFORM_ADMIN') {
+    MessagePlugin.warning('平台管理员没有租户套餐')
+    return
+  }
+  const { data } = await fetchUserContext(row.id)
+  const ctx = data.data
+  if (!ctx?.primaryTenantId) {
+    MessagePlugin.warning('该用户没有主租户，无法改套餐')
+    return
+  }
+  if (!planList.value.length) {
+    await loadPlans()
+  }
+  planTarget.value = { user: row, tenantId: ctx.primaryTenantId, planId: ctx.planId }
+  selectedPlanId.value = ctx.planId || ''
+  planVisible.value = true
+}
+
+async function onAssignPlan() {
+  if (!planTarget.value || !selectedPlanId.value) {
+    MessagePlugin.warning('请选择套餐')
+    return false
+  }
+  assigningPlan.value = true
+  try {
+    await assignTenantPlan(planTarget.value.tenantId, Number(selectedPlanId.value))
+    MessagePlugin.success('套餐已更新')
+    planVisible.value = false
+    if (contextVisible.value && contextUser.value?.id === planTarget.value.user.id) {
+      await openContext(planTarget.value.user)
+    }
+  } finally {
+    assigningPlan.value = false
+  }
+  return true
 }
 
 async function openContext(row: PlatformUserVO) {
@@ -334,5 +414,15 @@ async function onCreate() {
   return true
 }
 
-onMounted(loadUsers)
+onMounted(() => {
+  void loadUsers()
+  void loadPlans()
+})
 </script>
+
+<style scoped>
+.plan-dialog__user {
+  margin: 0 0 12px;
+  color: var(--td-text-color-secondary);
+}
+</style>

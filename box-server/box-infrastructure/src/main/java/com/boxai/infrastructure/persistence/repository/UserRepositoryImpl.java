@@ -8,6 +8,7 @@ import com.boxai.domain.user.UserRepository;
 import com.boxai.infrastructure.persistence.entity.UserDO;
 import com.boxai.infrastructure.persistence.mapper.UserMapper;
 import com.mybatisflex.core.paginate.Page;
+import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Repository;
 
@@ -61,8 +62,10 @@ public class UserRepositoryImpl implements UserRepository {
                 .eq("status", query.getStatus(), query.getStatus() != null)
                 .orderBy("created_at", false);
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
-            String like = "%" + query.getKeyword().trim() + "%";
-            wrapper.and("(email like {0} or nickname like {1} or username like {2})", like, like, like);
+            String keyword = query.getKeyword().trim();
+            wrapper.and(new QueryColumn("email").like(keyword)
+                    .or(new QueryColumn("nickname").like(keyword))
+                    .or(new QueryColumn("username").like(keyword)));
         }
         Page<UserDO> result = userMapper.paginate(page, pageSize, wrapper);
         List<User> records = result.getRecords().stream().map(this::toDomain).toList();

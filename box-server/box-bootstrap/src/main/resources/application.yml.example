@@ -55,19 +55,21 @@ box:
     gateway-host: ${BOX_EMBED_GATEWAY_HOST:embed.box.ai}
     gateway-tls-mode: ${BOX_EMBED_GATEWAY_TLS_MODE:platform}
   payment:
-    enabled: false
-    provider: mock
-    success-url: http://127.0.0.1:5173/settings/plan?tab=billing&payment=success
-    cancel-url: http://127.0.0.1:5173/settings/plan?tab=plans&payment=cancel
+    enabled: ${BOX_PAYMENT_ENABLED:false}
+    provider: ${BOX_PAYMENT_PROVIDER:mock}
+    success-url: ${BOX_PAYMENT_SUCCESS_URL:http://localhost:5173/settings/plan?tab=billing&payment=success}
+    cancel-url: ${BOX_PAYMENT_CANCEL_URL:http://localhost:5173/settings/plan?tab=plans&payment=cancel}
     stripe:
       secret-key: ${BOX_STRIPE_SECRET_KEY:}
       webhook-secret: ${BOX_STRIPE_WEBHOOK_SECRET:}
+      currency: ${BOX_STRIPE_CURRENCY:usd}
     alipay:
-      gateway-url: https://openapi.alipay.com/gateway.do
+      gateway-url: ${BOX_ALIPAY_GATEWAY_URL:https://openapi-sandbox.dl.alipaydev.com/gateway.do}
       app-id: ${BOX_ALIPAY_APP_ID:}
       private-key: ${BOX_ALIPAY_PRIVATE_KEY:}
       alipay-public-key: ${BOX_ALIPAY_PUBLIC_KEY:}
-      notify-url: http://127.0.0.1:8080/api/v1/billing/payments/notify/alipay
+      notify-url: ${BOX_ALIPAY_NOTIFY_URL:http://localhost:8080/api/v1/billing/payments/notify/alipay}
+      return-url: ${BOX_ALIPAY_RETURN_URL:http://localhost:8080/api/v1/billing/payments/return/alipay}
   minio:
     endpoint: ${BOX_MINIO_ENDPOINT}
     access-key: ${BOX_MINIO_ACCESS_KEY}

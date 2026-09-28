@@ -145,6 +145,34 @@ public class BillingRepositoryImpl implements BillingRepository {
         return Optional.ofNullable(paymentRecordMapper.selectOneById(id)).map(this::toPayment);
     }
 
+    @Override
+    public List<PaymentRecord> listPendingPayments(int limit) {
+        return paymentRecordMapper.selectListByQuery(
+                        QueryWrapper.create()
+                                .eq("status", "PENDING")
+                                .orderBy("id", false)
+                                .limit(limit))
+                .stream()
+                .map(this::toPayment)
+                .toList();
+    }
+
+    @Override
+    public List<PaymentRecord> listPendingPaymentsCreatedBefore(LocalDateTime cutoff, int limit) {
+        if (cutoff == null) {
+            return List.of();
+        }
+        return paymentRecordMapper.selectListByQuery(
+                        QueryWrapper.create()
+                                .eq("status", "PENDING")
+                                .le("created_at", cutoff)
+                                .orderBy("id", true)
+                                .limit(Math.min(Math.max(limit, 1), 200)))
+                .stream()
+                .map(this::toPayment)
+                .toList();
+    }
+
     private Subscription toSubscription(SubscriptionDO row) {
         Subscription subscription = new Subscription();
         subscription.setId(row.getId());

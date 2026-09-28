@@ -23,6 +23,7 @@ import com.boxai.tenant.payment.PaymentCompletionService;
 import com.boxai.tenant.payment.PaymentGateway;
 import com.boxai.tenant.payment.PaymentGatewayRegistry;
 import com.boxai.tenant.payment.PaymentProperties;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,6 +72,7 @@ public class SubscriptionApplicationService {
 
     @Transactional
     public CreateSubscriptionOrderVO subscribe(SubscribePlanRequest request) {
+        expireStalePendingPayments();
         Long workspaceId = WorkspaceContext.require().workspaceId();
         Long tenantId = resolveTenantId(workspaceId);
         Long userId = WorkspaceContext.require().userId();
@@ -142,7 +144,9 @@ public class SubscriptionApplicationService {
                 "PENDING",
                 checkout.channel(),
                 checkout.paymentUrl(),
-                checkout.requiresClientConfirm());
+                checkout.requiresClientConfirm(),
+                checkout.checkoutFormAction(),
+                checkout.checkoutForm());
     }
 
     @Transactional
@@ -166,8 +170,48 @@ public class SubscriptionApplicationService {
     }
 
     @Transactional
+    public PaymentRecordVO getMyPayment(Long paymentId) {
+        Long tenantId = resolveTenantId(WorkspaceContext.require().workspaceId());
+        PaymentRecord payment = billingRepository.findPaymentById(paymentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "支付记录不存在"));
+        if (!payment.getTenantId().equals(tenantId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作该支付");
+        }
+        if ("PENDING".equalsIgnoreCase(payment.getStatus())) {
+            if (isPendingExpired(payment)) {
+                paymentCompletionService.expirePayment(payment.getId());
+            } else {
+                syncPendingPayment(payment);
+            }
+            payment = billingRepository.findPaymentById(paymentId).orElse(payment);
+        }
+        return toPaymentVo(payment);
+    }
+
+    @Transactional
+    public void syncPaymentFromGateway(Long paymentId) {
+        PaymentRecord payment = billingRepository.findPaymentById(paymentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "支付记录不存在"));
+        if ("SUCCEEDED".equalsIgnoreCase(payment.getStatus())) {
+            return;
+        }
+        if (!"PENDING".equalsIgnoreCase(payment.getStatus())) {
+            return;
+        }
+        syncPendingPayment(payment);
+    }
+
+    @Transactional
     public void completePaymentFromGateway(Long paymentId, String externalRef, String expectedChannel) {
         paymentCompletionService.completePayment(paymentId, externalRef, expectedChannel);
+    }
+
+    private void syncPendingPayment(PaymentRecord payment) {
+        paymentGatewayRegistry.findByChannel(payment.getChannel())
+                .flatMap(gateway -> gateway.queryPaidExternalRef(
+                        payment.getExternalRef(), payment.getId(), paymentProperties))
+                .ifPresent(externalRef -> paymentCompletionService.completePayment(
+                        payment.getId(), externalRef, payment.getChannel()));
     }
 
     private void cancelOpenSubscriptions(Long tenantId) {
@@ -183,12 +227,37 @@ public class SubscriptionApplicationService {
     }
 
     public List<BillingInvoiceVO> listMyInvoices() {
+        expireStalePendingPayments();
         Long tenantId = resolveTenantId(WorkspaceContext.require().workspaceId());
         return billingRepository.listInvoicesByTenant(tenantId).stream().map(this::toInvoiceVo).toList();
     }
 
     public List<BillingInvoiceVO> listAllInvoicesForAdmin() {
+        expireStalePendingPayments();
         return billingRepository.listAllInvoices(200).stream().map(this::toInvoiceVo).toList();
+    }
+
+    @Scheduled(fixedDelay = 30_000)
+    public void expireStalePendingPaymentsJob() {
+        expireStalePendingPayments();
+    }
+
+    public void expireStalePendingPayments() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(paymentProperties.getPendingExpireMinutes());
+        for (PaymentRecord payment : billingRepository.listPendingPaymentsCreatedBefore(cutoff, 100)) {
+            try {
+                paymentCompletionService.expirePayment(payment.getId());
+            } catch (Exception ignored) {
+                // 单笔关闭失败不影响其它过期单
+            }
+        }
+    }
+
+    private boolean isPendingExpired(PaymentRecord payment) {
+        if (payment.getCreatedAt() == null) {
+            return false;
+        }
+        return payment.getCreatedAt().isBefore(LocalDateTime.now().minusMinutes(paymentProperties.getPendingExpireMinutes()));
     }
 
     private Long resolveTenantId(Long workspaceId) {
