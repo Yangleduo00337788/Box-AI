@@ -212,6 +212,7 @@
       :current-plan-id="planUpgradePlanId"
       @success="onPlanUpgradeSuccess"
     />
+    <help-feedback-dialog v-model:visible="salesLeadVisible" sales-lead :z-index="6200" />
   </div>
 </template>
 
@@ -240,8 +241,11 @@ import { useNotificationUnread } from '@/composables/useNotificationUnread'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionStore } from '@/stores/permission'
 
-const { upgradeVisible: planUpgradeVisible, onPlanUpgradeSuccess: notifyPlanUpgradeSuccess } =
-  usePlanUpgradeDialog()
+const {
+  upgradeVisible: planUpgradeVisible,
+  salesLeadVisible,
+  onPlanUpgradeSuccess: notifyPlanUpgradeSuccess,
+} = usePlanUpgradeDialog()
 const { quota: footerQuota } = useTenantQuota()
 const planUpgradePlanId = computed(() => footerQuota.value?.planId ?? null)
 

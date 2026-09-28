@@ -44,10 +44,10 @@
       </header>
 
       <t-loading :loading="loading" size="small">
-        <div v-if="visiblePlans.length" class="plan-upgrade__body">
+        <div v-if="displayPlans.length" class="plan-upgrade__body">
             <div class="plan-upgrade__cards">
               <article
-                v-for="plan in visiblePlans"
+                v-for="plan in selfServicePlans"
                 :key="plan.id"
                 class="plan-upgrade__plan-card"
                 :class="{
@@ -97,6 +97,36 @@
                   </li>
                 </ul>
               </article>
+
+              <article
+                v-if="enterprisePlan"
+                class="plan-upgrade__plan-card plan-upgrade__plan-card--enterprise"
+                :class="{ 'is-current': enterprisePlan.id === currentPlanId }"
+              >
+                <div class="plan-upgrade__plan-head">
+                  <h3 class="plan-upgrade__plan-name">{{ enterprisePlan.name }}</h3>
+                  <span v-if="enterprisePlan.id === currentPlanId" class="plan-upgrade__plan-tag">当前</span>
+                </div>
+                <div class="plan-upgrade__price-row plan-upgrade__price-row--custom">
+                  <span class="plan-upgrade__price-custom">定制报价</span>
+                </div>
+                <p class="plan-upgrade__price-note" :title="enterprisePlan.description">
+                  {{ enterprisePlan.description || '私有化部署、SLA、专属配额与安全审计' }}
+                </p>
+                <button
+                  type="button"
+                  class="plan-upgrade__cta plan-upgrade__cta--outline"
+                  @click.stop="onContactSales"
+                >
+                  联系销售
+                </button>
+                <ul class="plan-upgrade__features">
+                  <li v-for="row in PLAN_CARD_ROWS" :key="`ent-${row.key}`">
+                    <span class="plan-upgrade__check">✓</span>
+                    <span>{{ row.label }}：{{ row.text(enterprisePlan) }}</span>
+                  </li>
+                </ul>
+              </article>
             </div>
 
             <section class="plan-upgrade__compare-page">
@@ -108,7 +138,7 @@
                   <tr>
                     <th scope="col" class="plan-upgrade__table-corner">套餐版本</th>
                     <th
-                      v-for="plan in visiblePlans"
+                      v-for="plan in comparePlans"
                       :key="plan.id"
                       scope="col"
                       :class="{ 'is-selected': plan.id === selectedPlanId }"
@@ -121,12 +151,12 @@
                 <tbody>
                   <template v-for="group in PLAN_COMPARE_GROUPS" :key="group.title">
                     <tr class="plan-upgrade__group-row">
-                      <th :colspan="visiblePlans.length + 1">{{ group.title }}</th>
+                      <th :colspan="comparePlans.length + 1">{{ group.title }}</th>
                     </tr>
                     <tr v-for="row in group.rows" :key="row.key">
                       <th scope="row">{{ row.label }}</th>
                       <td
-                        v-for="plan in visiblePlans"
+                        v-for="plan in comparePlans"
                         :key="`${row.key}-${plan.id}`"
                         :class="{ 'is-selected': plan.id === selectedPlanId }"
                         :title="row.text(plan)"
@@ -156,11 +186,14 @@ import type { PlanVO } from '@/api/billing'
 import {
   PLAN_CARD_ROWS,
   PLAN_COMPARE_GROUPS,
+  PLAN_CODE_ENTERPRISE,
   formatQuotaLimit,
+  isSelfServicePlan,
   planAudience,
   planQuotaMultiplier,
   usePlanUpgrade,
 } from '@/composables/usePlanUpgrade'
+import { usePlanUpgradeDialog } from '@/composables/usePlanUpgradeDialog'
 
 const visible = defineModel<boolean>('visible', { default: false })
 
@@ -175,11 +208,20 @@ const emit = defineEmits<{
 const { plans, loading, overview, subscribingId, loadPlans, subscribe } = usePlanUpgrade()
 const selectedPlanId = ref<number | null>(null)
 const audience = ref<'PERSONAL' | 'TEAM'>('PERSONAL')
+const { openSalesLead } = usePlanUpgradeDialog()
 
 const currentPlanId = computed(() => props.currentPlanId ?? null)
 const paymentEnabled = computed(() => overview.value?.paymentEnabled === true)
 const visiblePlans = computed(() => plans.value.filter((p) => planAudience(p) === audience.value))
-const baselinePlan = computed(() => visiblePlans.value[0])
+const selfServicePlans = computed(() => visiblePlans.value.filter((p) => isSelfServicePlan(p)))
+const enterprisePlan = computed(() =>
+  audience.value === 'TEAM' ? plans.value.find((p) => p.code === PLAN_CODE_ENTERPRISE) : undefined,
+)
+const comparePlans = computed(() => visiblePlans.value)
+const displayPlans = computed(() =>
+  selfServicePlans.value.length > 0 || enterprisePlan.value ? comparePlans.value : [],
+)
+const baselinePlan = computed(() => selfServicePlans.value[0])
 
 function quotaMultiplier(plan: PlanVO) {
   const base = baselinePlan.value
@@ -200,8 +242,12 @@ watch(audience, () => {
   syncSelected()
 })
 
+function onContactSales() {
+  openSalesLead()
+}
+
 function syncSelected() {
-  const list = visiblePlans.value
+  const list = selfServicePlans.value
   if (!list.length) {
     selectedPlanId.value = null
     return
@@ -220,6 +266,7 @@ function onOpened() {
 }
 
 async function onSubscribePlan(plan: PlanVO) {
+  if (!isSelfServicePlan(plan)) return
   selectedPlanId.value = plan.id
   if (plan.id === currentPlanId.value) return
   const result = await subscribe(plan.id)
@@ -329,6 +376,33 @@ async function onSubscribePlan(plan: PlanVO) {
 .plan-upgrade__plan-card.is-selected {
   border-color: #1a1a1a;
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.06);
+}
+
+.plan-upgrade__plan-card--enterprise {
+  cursor: default;
+  background: linear-gradient(180deg, #faf8ff 0%, #fff 48%);
+  border-color: #e0d8ff;
+}
+
+.plan-upgrade__price-row--custom {
+  min-height: 36px;
+  align-items: baseline;
+}
+
+.plan-upgrade__price-custom {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.plan-upgrade__cta--outline {
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #1a1a1a;
+}
+
+.plan-upgrade__cta--outline:hover {
+  background: #f7f7f7;
 }
 
 .plan-upgrade__plan-head {

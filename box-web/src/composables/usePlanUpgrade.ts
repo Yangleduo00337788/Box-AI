@@ -10,6 +10,13 @@ import {
 } from '@/api/billing'
 import { formatQuotaNumber } from '@/composables/useTenantQuota'
 
+/** C 端仅展示、不可自助订阅；由 B 端分配或销售开通 */
+export const PLAN_CODE_ENTERPRISE = 'team_enterprise'
+
+export function isSelfServicePlan(plan: Pick<PlanVO, 'code'>) {
+  return plan.code !== PLAN_CODE_ENTERPRISE
+}
+
 export const OVERAGE_POLICY_LABEL: Record<string, string> = {
   REJECT: '超额拒绝',
   DEGRADE: '超额降级',
@@ -113,7 +120,11 @@ export function usePlanUpgrade() {
       const [plansRes, billingRes] = await Promise.all([listPlans(), fetchBillingOverview()])
       plans.value = (plansRes.data.data || [])
         .filter((item) => item.status === 1)
-        .sort((a, b) => Number(a.priceMonthly) - Number(b.priceMonthly))
+        .sort((a, b) => {
+          if (a.code === PLAN_CODE_ENTERPRISE) return 1
+          if (b.code === PLAN_CODE_ENTERPRISE) return -1
+          return Number(a.priceMonthly) - Number(b.priceMonthly)
+        })
       overview.value = billingRes.data.data
     } catch {
       plans.value = []

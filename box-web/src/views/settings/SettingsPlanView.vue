@@ -68,6 +68,7 @@
       :current-plan-id="quota?.planId"
       @success="onUpgradeSuccess"
     />
+    <help-feedback-dialog v-model:visible="salesLeadVisible" sales-lead :z-index="6200" />
   </div>
 </template>
 
@@ -90,6 +91,10 @@ import { appPreferences } from '@/composables/useAppPreferences'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import QuotaDonutChart from '@/components/QuotaDonutChart.vue'
 import PlanUpgradeDialog from '@/components/PlanUpgradeDialog.vue'
+import HelpFeedbackDialog from '@/components/HelpFeedbackDialog.vue'
+import { usePlanUpgradeDialog } from '@/composables/usePlanUpgradeDialog'
+
+const { salesLeadVisible } = usePlanUpgradeDialog()
 
 const route = useRoute()
 const router = useRouter()

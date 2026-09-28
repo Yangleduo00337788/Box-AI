@@ -3,13 +3,20 @@
     v-model:visible="visible"
     attach="body"
     placement="center"
-    header="帮助与反馈"
+    :z-index="props.zIndex"
+    :header="props.salesLead ? '企业版咨询' : '帮助与反馈'"
     :footer="false"
     width="480px"
   >
     <t-loading :loading="loading" size="small">
       <div v-if="content" class="help-dialog">
-        <section class="help-dialog__section">
+        <section v-if="props.salesLead" class="help-dialog__section help-dialog__section--lead">
+          <h3 class="help-dialog__title">企业定制</h3>
+          <p class="help-dialog__desc">
+            请通过邮件留下团队规模、部署方式（公有云 / 私有化）与合规需求，我们的销售会尽快联系你。
+          </p>
+        </section>
+        <section v-if="!props.salesLead" class="help-dialog__section">
           <h3 class="help-dialog__title">快捷操作</h3>
           <ul class="help-dialog__list">
             <li><kbd>Ctrl</kbd> + <kbd>K</kbd> 打开全局搜索</li>
@@ -17,7 +24,7 @@
           </ul>
         </section>
 
-        <section class="help-dialog__section">
+        <section v-if="!props.salesLead" class="help-dialog__section">
           <h3 class="help-dialog__title">常用入口</h3>
           <div class="help-dialog__links">
             <t-button variant="outline" @click="go('/chat')">开始对话</t-button>
@@ -47,12 +54,21 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { fetchSystemContent, type SystemContentVO } from '@/api/system'
 
 const visible = defineModel<boolean>('visible', { default: false })
+
+const props = withDefaults(
+  defineProps<{
+    salesLead?: boolean
+    zIndex?: number
+  }>(),
+  { salesLead: false, zIndex: 5500 },
+)
 const router = useRouter()
 const loading = ref(false)
 const content = ref<SystemContentVO | null>(null)
 
 watch(visible, async (open) => {
-  if (!open || content.value) return
+  if (!open) return
+  if (content.value) return
   loading.value = true
   try {
     const { data } = await fetchSystemContent()
