@@ -22,7 +22,7 @@ export const ADMIN_MENU_GROUPS: MenuGroup[] = [
       { value: '/users', label: '用户管理', icon: 'user', desc: '新建平台管理员、启停账号' },
       { value: '/plans', label: '套餐管理', icon: 'wallet', desc: '套餐方案与配额配置' },
       { value: '/billing-invoices', label: '账单对账', icon: 'money', desc: '订阅账单与超量费用' },
-      { value: '/ops-placements', label: '运营位', icon: 'notification', desc: 'C 端公告、Banner 与广告' },
+      { value: '/ops-placements', label: '运营位', icon: 'notification', desc: 'C/B 端公告、站内信、Banner 与广告' },
       { value: '/message-feedbacks', label: '消息反馈', icon: 'chat', desc: 'C 端点踩反馈与站内信回复' },
       { value: '/audit-logs', label: '审计日志', icon: 'history', desc: '全平台操作与安全审计' },
     ],

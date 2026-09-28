@@ -65,6 +65,38 @@ class OpsPlacementApplicationServiceTest {
     }
 
     @Test
+    void syncCrossAudienceCreatesConsumerInboxFromAdminHeader() {
+        OpsPlacement source = new OpsPlacement();
+        source.setId(10L);
+        source.setAudience("B");
+        source.setSlot("ADMIN_HEADER");
+        source.setKind("ANNOUNCEMENT");
+        source.setTitle("v1.0.0");
+        source.setBody("release");
+        source.setTheme("info");
+        source.setDismissible(1);
+        source.setStatus("LISTED");
+        source.setSortOrder(0);
+
+        when(opsPlacementRepository.findById(10L)).thenReturn(java.util.Optional.of(source));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            OpsPlacement peer = invocation.getArgument(0);
+            peer.setId(20L);
+            return null;
+        }).when(opsPlacementRepository).save(any(OpsPlacement.class));
+
+        var vo = service.syncCrossAudience(10L);
+
+        ArgumentCaptor<OpsPlacement> saveCaptor = ArgumentCaptor.forClass(OpsPlacement.class);
+        verify(opsPlacementRepository).save(saveCaptor.capture());
+        OpsPlacement peer = saveCaptor.getValue();
+        assertEquals("C", peer.getAudience());
+        assertEquals("CONSUMER_INBOX", peer.getSlot());
+        assertEquals("v1.0.0", peer.getTitle());
+        assertEquals(20L, vo.syncPeerId());
+    }
+
+    @Test
     void createPersistsChatHomeAnnouncement() {
         org.mockito.Mockito.doAnswer(invocation -> {
             OpsPlacement placement = invocation.getArgument(0);

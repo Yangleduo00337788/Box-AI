@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public record OpsPlacementVO(
         Long id,
         String audience,
+        Long syncPeerId,
         String slot,
         String kind,
         String title,

@@ -4,6 +4,9 @@ import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.notification.Notification;
 import com.boxai.domain.notification.NotificationRepository;
+import com.boxai.domain.ops.OpsPlacementRepository;
+import com.boxai.domain.user.ConsumerInboxDismissRepository;
+import com.boxai.domain.user.ConsumerInboxReadRepository;
 import com.boxai.security.context.WorkspaceContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +31,12 @@ class NotificationApplicationServiceTest {
 
     @Mock
     private NotificationRepository notificationRepository;
+    @Mock
+    private OpsPlacementRepository opsPlacementRepository;
+    @Mock
+    private ConsumerInboxReadRepository consumerInboxReadRepository;
+    @Mock
+    private ConsumerInboxDismissRepository consumerInboxDismissRepository;
 
     @InjectMocks
     private NotificationApplicationService service;
@@ -38,11 +49,15 @@ class NotificationApplicationServiceTest {
     @Test
     void listClampsLimitBetweenOneAndOneHundred() {
         WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
+        when(opsPlacementRepository.listActive(eq("CONSUMER_INBOX"), eq("C"), any()))
+                .thenReturn(java.util.List.of());
         when(notificationRepository.listByUser(3L, 7L, 20)).thenReturn(java.util.List.of());
         service.list(0);
         verify(notificationRepository).listByUser(3L, 7L, 20);
 
         when(notificationRepository.listByUser(3L, 7L, 100)).thenReturn(java.util.List.of());
+        when(opsPlacementRepository.listActive(eq("CONSUMER_INBOX"), eq("C"), any()))
+                .thenReturn(java.util.List.of());
         service.list(500);
         verify(notificationRepository).listByUser(3L, 7L, 100);
     }

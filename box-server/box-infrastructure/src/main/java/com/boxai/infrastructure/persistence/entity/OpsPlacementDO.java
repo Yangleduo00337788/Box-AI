@@ -15,6 +15,8 @@ public class OpsPlacementDO {
     @Id(keyType = KeyType.Auto)
     private Long id;
     private String audience;
+    @Column("sync_peer_id")
+    private Long syncPeerId;
     private String slot;
     private String kind;
     private String title;

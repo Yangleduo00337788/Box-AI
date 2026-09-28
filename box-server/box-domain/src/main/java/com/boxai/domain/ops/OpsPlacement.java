@@ -12,6 +12,8 @@ public class OpsPlacement {
     private Long id;
     /** C=消费者端，B=管理后台 */
     private String audience;
+    /** C/B 同步对端运营位 ID */
+    private Long syncPeerId;
     private String slot;
     private String kind;
     private String title;

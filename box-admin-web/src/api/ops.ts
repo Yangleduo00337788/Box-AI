@@ -1,7 +1,7 @@
 import http, { type Result } from './http'
 
 export type OpsAudience = 'C' | 'B'
-export type OpsSlot = 'CHAT_HOME' | 'GLOBAL_ALERT' | 'CHAT_BANNER' | 'CHAT_AD'
+export type OpsSlot = 'CHAT_HOME' | 'GLOBAL_ALERT' | 'CHAT_BANNER' | 'CHAT_AD' | 'CONSUMER_INBOX'
 export type AdminOpsSlot = 'ADMIN_HEADER' | 'ADMIN_BANNER'
 export type OpsSlotAny = OpsSlot | AdminOpsSlot
 export type OpsKind = 'ANNOUNCEMENT' | 'PROMO' | 'BANNER' | 'AD'
@@ -9,6 +9,7 @@ export type OpsKind = 'ANNOUNCEMENT' | 'PROMO' | 'BANNER' | 'AD'
 export interface OpsPlacementVO {
   id: number
   audience: OpsAudience
+  syncPeerId?: number | null
   slot: OpsSlotAny
   kind: OpsKind
   title: string
@@ -88,4 +89,8 @@ export function updateOpsPlacement(
 
 export function deleteOpsPlacement(id: number) {
   return http.delete<Result<void>>(`/ops/placements/${id}`)
+}
+
+export function syncOpsPlacementCrossAudience(id: number) {
+  return http.post<Result<OpsPlacementVO>>(`/ops/placements/${id}/sync-cross-audience`)
 }

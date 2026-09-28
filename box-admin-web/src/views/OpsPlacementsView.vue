@@ -2,7 +2,7 @@
   <div class="ops-placements-page admin-page">
     <page-header
       title="运营位"
-      desc="按投放端区分：C 端顶栏公告与右下角轮播；B 端管理后台顶栏公告与首页 Banner。消息通知会汇总待办与 B 端公告。"
+      desc="C 端支持顶栏、右下角与站内信；B 端支持顶栏与 Banner。可使用「同步 C/B」在两端消息位同时展示同一条运营内容。"
     >
       <template #actions>
         <t-button theme="primary" @click="openCreate">新建运营位</t-button>
@@ -178,6 +178,7 @@ import {
   createOpsPlacement,
   deleteOpsPlacement,
   fetchOpsPlacements,
+  syncOpsPlacementCrossAudience,
   updateOpsPlacement,
   type OpsAudience,
   type OpsKind,
@@ -219,6 +220,7 @@ const audienceOptions = [
   { label: 'B 端', value: 'B' },
 ]
 const cSlotOptions = [
+  { label: '站内信', value: 'CONSUMER_INBOX' },
   { label: '顶栏公告', value: 'CHAT_HOME' },
   { label: '全站顶栏', value: 'GLOBAL_ALERT' },
   { label: '右下角 Banner', value: 'CHAT_BANNER' },
@@ -244,6 +246,7 @@ const themeOptions = [
 ]
 const audienceLabel: Record<string, string> = { C: 'C 端', B: 'B 端' }
 const slotLabel: Record<string, string> = {
+  CONSUMER_INBOX: 'C 端站内信',
   CHAT_HOME: '顶栏公告',
   GLOBAL_ALERT: '全站顶栏',
   CHAT_BANNER: '右下角 Banner',
@@ -291,6 +294,9 @@ const slotHint = computed(() => {
   }
   if (form.slot === 'CHAT_AD') {
     return '与「右下角 Banner」合并为右下角小卡片轮播。类型固定为广告，需上传图片。'
+  }
+  if (form.slot === 'CONSUMER_INBOX') {
+    return '展示在 C 端侧栏底部「站内信」列表，与业务通知合并；支持已读与「不再提醒」。'
   }
   if (form.slot === 'ADMIN_HEADER') {
     return '展示在 B 端管理后台顶栏下方，并进入消息通知；多条可切换。'
@@ -403,16 +409,30 @@ const columns: PrimaryTableCol<OpsPlacementVO>[] = [
       ),
   },
   { colKey: 'sortOrder', title: '排序', width: 80 },
+  {
+    colKey: 'syncPeerId',
+    title: 'C/B 同步',
+    width: 96,
+    cell: (_, { row }) =>
+      row.syncPeerId
+        ? h(Tag, { theme: 'success', variant: 'light', size: 'small' }, () => '已同步')
+        : h(Tag, { theme: 'default', variant: 'light', size: 'small' }, () => '未同步'),
+  },
   { colKey: 'impressions', title: '曝光', width: 90 },
   { colKey: 'clicks', title: '点击', width: 90 },
   {
     colKey: 'actions',
     title: '操作',
-    width: 140,
+    width: 220,
     fixed: 'right',
     cell: (_, { row }) =>
       h('div', { class: 'admin-ops' }, [
         h(Link, { theme: 'primary', hover: 'color', onClick: () => openEdit(row) }, () => '编辑'),
+        h(
+          Link,
+          { theme: 'primary', hover: 'color', onClick: () => onSyncCrossAudience(row) },
+          () => (row.syncPeerId ? '重新同步' : '同步 C/B'),
+        ),
         h(Link, { theme: 'danger', hover: 'color', onClick: () => confirmDelete(row) }, () => '删除'),
       ]),
   },
@@ -580,6 +600,16 @@ async function onSave() {
     return false
   } finally {
     saving.value = false
+  }
+}
+
+async function onSyncCrossAudience(row: OpsPlacementVO) {
+  try {
+    await syncOpsPlacementCrossAudience(row.id)
+    MessagePlugin.success('已同步到另一端消息位（C 站内信 / B 顶栏公告，图片位为 Banner）')
+    await loadItems()
+  } catch {
+    MessagePlugin.error('同步失败，请检查内容是否完整')
   }
 }
 

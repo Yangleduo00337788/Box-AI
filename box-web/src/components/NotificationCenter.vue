@@ -13,21 +13,27 @@
     </div>
     <t-loading :loading="loading" size="small">
       <div v-if="items.length" class="notification-center__list">
-        <button
+        <div
           v-for="item in items"
-          :key="item.id"
-          type="button"
+          :key="notificationItemKey(item)"
           class="notification-item"
           :class="{ 'notification-item--unread': isNotificationUnread(item) }"
-          @click="openItem(item)"
         >
-          <div class="notification-item__main">
-            <div class="notification-item__title">{{ item.title }}</div>
-            <div class="notification-item__content">{{ item.content }}</div>
-            <div class="notification-item__time">{{ item.createdAt }}</div>
+          <button type="button" class="notification-item__open" @click="openItem(item)">
+            <div class="notification-item__main">
+              <div class="notification-item__title">
+                <span v-if="item.category === 'OPS_ANNOUNCEMENT'" class="notification-item__tag">公告</span>
+                {{ item.title }}
+              </div>
+              <div v-if="item.content" class="notification-item__content">{{ item.content }}</div>
+              <div class="notification-item__time">{{ item.createdAt }}</div>
+            </div>
+            <span v-if="isNotificationUnread(item)" class="notification-item__dot" aria-label="未读" />
+          </button>
+          <div v-if="item.key && item.dismissible" class="notification-item__actions">
+            <button type="button" class="notification-item__link" @click="dismissItem(item)">不再提醒</button>
           </div>
-          <span v-if="isNotificationUnread(item)" class="notification-item__dot" aria-label="未读" />
-        </button>
+        </div>
       </div>
       <p v-else-if="!loading" class="notification-center__empty">暂无站内信</p>
     </t-loading>
@@ -38,10 +44,13 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  dismissNotificationByKey,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationReadByKey,
   isNotificationUnread,
+  notificationItemKey,
   type NotificationVO,
 } from '@/api/notification'
 import { useNotificationUnread } from '@/composables/useNotificationUnread'
@@ -87,20 +96,41 @@ onMounted(() => {
   }
 })
 
+function navigateLink(url: string) {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return
+  }
+  void router.push(url)
+}
+
 async function openItem(item: NotificationVO) {
   if (isNotificationUnread(item)) {
-    await markNotificationRead(item.id)
+    if (item.key) {
+      await markNotificationReadByKey(item.key)
+    } else if (item.id != null) {
+      await markNotificationRead(item.id)
+    }
     item.read = true
     await refreshUnread()
   }
   if (item.linkUrl) {
-    router.push(item.linkUrl)
+    navigateLink(item.linkUrl)
   }
+}
+
+async function dismissItem(item: NotificationVO) {
+  if (!item.key) return
+  await dismissNotificationByKey(item.key)
+  items.value = items.value.filter((row) => notificationItemKey(row) !== notificationItemKey(item))
+  await refreshUnread()
 }
 
 async function markAllRead() {
   await markAllNotificationsRead()
-  items.value = items.value.map((item) => ({ ...item, read: true }))
+  items.value.forEach((item) => {
+    item.read = true
+  })
   await refreshUnread()
 }
 </script>
@@ -108,69 +138,71 @@ async function markAllRead() {
 <style scoped>
 .notification-center {
   width: 320px;
-  max-height: 360px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 8px 0 4px;
-  scrollbar-width: none;
+  max-height: 400px;
+  overflow: auto;
+  padding: 8px 0;
 }
 
 .notification-center::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+  width: 6px;
 }
 
 .notification-center__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 16px 8px;
+  padding: 4px 12px 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #1f2329;
 }
 
 .notification-center__read {
-  padding: 0;
   border: none;
   background: transparent;
   color: var(--td-brand-color);
   font-size: 12px;
-  font-weight: 400;
   cursor: pointer;
 }
 
 .notification-center__read:disabled {
-  color: #c0c4cc;
-  cursor: default;
+  color: var(--td-text-color-disabled);
+  cursor: not-allowed;
 }
 
 .notification-center :deep(.t-loading),
 .notification-center :deep(.t-loading__parent) {
-  width: 100%;
+  min-height: 80px;
 }
 
 .notification-center__empty {
   margin: 0;
-  padding: 16px;
-  font-size: 13px;
-  color: var(--box-muted);
+  padding: 24px 12px;
   text-align: center;
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
 }
 
 .notification-item {
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item__open {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
   width: 100%;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 10px 12px;
   border: none;
-  border-bottom: 1px solid #f0f1f2;
-  border-radius: 0;
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.notification-item:hover .notification-item__open {
+  background: var(--td-bg-color-container-hover);
 }
 
 .notification-item__main {
@@ -184,15 +216,7 @@ async function markAllRead() {
   height: 8px;
   margin-top: 6px;
   border-radius: 50%;
-  background: #e34d59;
-}
-
-.notification-item:last-child {
-  border-bottom: none;
-}
-
-.notification-item:hover {
-  background: #f7f8fa;
+  background: var(--td-error-color);
 }
 
 .notification-item--unread .notification-item__title {
@@ -201,20 +225,50 @@ async function markAllRead() {
 
 .notification-item__title {
   font-size: 13px;
-  font-weight: 600;
-  color: #1f2329;
+  line-height: 1.4;
+}
+
+.notification-item__tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--td-brand-color-light);
+  color: var(--td-brand-color);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .notification-item__content {
   margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.5;
   color: var(--td-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .notification-item__time {
-  margin-top: 4px;
-  font-size: 11px;
+  margin-top: 6px;
   color: var(--td-text-color-placeholder);
+  font-size: 11px;
+}
+
+.notification-item__actions {
+  padding: 0 12px 8px;
+}
+
+.notification-item__link {
+  border: none;
+  background: transparent;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.notification-item__link:hover {
+  color: var(--td-brand-color);
 }
 </style>

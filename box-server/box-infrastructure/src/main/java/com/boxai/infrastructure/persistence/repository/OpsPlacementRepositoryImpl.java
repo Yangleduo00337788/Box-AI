@@ -78,6 +78,7 @@ public class OpsPlacementRepositoryImpl implements OpsPlacementRepository {
         LocalDateTime now = LocalDateTime.now();
         UpdateChain<OpsPlacementDO> chain = UpdateChain.of(OpsPlacementDO.class)
                 .set("audience", placement.getAudience())
+                .set("sync_peer_id", placement.getSyncPeerId())
                 .set("slot", placement.getSlot())
                 .set("kind", placement.getKind())
                 .set("title", placement.getTitle())
@@ -107,6 +108,7 @@ public class OpsPlacementRepositoryImpl implements OpsPlacementRepository {
     private OpsPlacementDO toDo(OpsPlacement placement) {
         OpsPlacementDO row = new OpsPlacementDO();
         row.setAudience(placement.getAudience() == null ? "C" : placement.getAudience());
+        row.setSyncPeerId(placement.getSyncPeerId());
         row.setSlot(placement.getSlot());
         row.setKind(placement.getKind());
         row.setTitle(placement.getTitle());
@@ -130,6 +132,7 @@ public class OpsPlacementRepositoryImpl implements OpsPlacementRepository {
         OpsPlacement placement = new OpsPlacement();
         placement.setId(row.getId());
         placement.setAudience(row.getAudience() == null ? "C" : row.getAudience());
+        placement.setSyncPeerId(row.getSyncPeerId());
         placement.setSlot(row.getSlot());
         placement.setKind(row.getKind());
         placement.setTitle(row.getTitle());

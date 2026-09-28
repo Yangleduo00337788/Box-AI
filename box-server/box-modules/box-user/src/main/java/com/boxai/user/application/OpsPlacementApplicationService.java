@@ -20,8 +20,11 @@ import java.util.Set;
 @Service
 public class OpsPlacementApplicationService {
 
-    private static final Set<String> C_SLOTS = Set.of("CHAT_HOME", "GLOBAL_ALERT", "CHAT_BANNER", "CHAT_AD");
+    private static final Set<String> C_SLOTS = Set.of(
+            "CHAT_HOME", "GLOBAL_ALERT", "CHAT_BANNER", "CHAT_AD", "CONSUMER_INBOX");
     private static final Set<String> B_SLOTS = Set.of("ADMIN_HEADER", "ADMIN_BANNER");
+    private static final Set<String> C_IMAGE_SLOTS = Set.of("CHAT_BANNER", "CHAT_AD");
+    private static final Set<String> B_IMAGE_SLOTS = Set.of("ADMIN_BANNER");
     private static final Set<String> AUDIENCES = Set.of("C", "B");
     private static final Set<String> KINDS = Set.of("ANNOUNCEMENT", "PROMO", "BANNER", "AD");
     private static final Set<String> THEMES = Set.of("info", "success", "warning", "error");
@@ -148,13 +151,42 @@ public class OpsPlacementApplicationService {
         validateWindow(placement.getStartsAt(), placement.getEndsAt());
         requireCreativeImage(placement);
         opsPlacementRepository.update(placement);
+        syncToPeerIfLinked(placement);
         return toVo(placement);
     }
 
     @Transactional
-    public void delete(Long id) {
-        opsPlacementRepository.findById(id)
+    public OpsPlacementVO syncCrossAudience(Long id) {
+        OpsPlacement source = opsPlacementRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "运营位不存在"));
+        String peerAudience = "B".equals(source.getAudience()) ? "C" : "B";
+        String peerSlot = resolvePeerSlot(source);
+        OpsPlacement peer = resolveOrCreatePeer(source, peerAudience, peerSlot);
+        copySharedFields(source, peer);
+        applySlotKind(peer, peerAudience, peerSlot, source.getKind());
+        requireCreativeImage(peer);
+        if (peer.getId() == null) {
+            opsPlacementRepository.save(peer);
+        } else {
+            opsPlacementRepository.update(peer);
+        }
+        source.setSyncPeerId(peer.getId());
+        peer.setSyncPeerId(source.getId());
+        opsPlacementRepository.update(source);
+        opsPlacementRepository.update(peer);
+        return toVo(source);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        OpsPlacement placement = opsPlacementRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "运营位不存在"));
+        if (placement.getSyncPeerId() != null) {
+            opsPlacementRepository.findById(placement.getSyncPeerId()).ifPresent(peer -> {
+                peer.setSyncPeerId(null);
+                opsPlacementRepository.update(peer);
+            });
+        }
         opsPlacementRepository.delete(id);
     }
 
@@ -258,6 +290,7 @@ public class OpsPlacementApplicationService {
         return new OpsPlacementVO(
                 placement.getId(),
                 placement.getAudience() == null ? "C" : placement.getAudience(),
+                placement.getSyncPeerId(),
                 placement.getSlot(),
                 placement.getKind(),
                 placement.getTitle(),
@@ -301,5 +334,62 @@ public class OpsPlacementApplicationService {
 
     private Set<String> slotsForAudience(String audience) {
         return "B".equals(audience) ? B_SLOTS : C_SLOTS;
+    }
+
+    private OpsPlacement resolveOrCreatePeer(OpsPlacement source, String peerAudience, String peerSlot) {
+        if (source.getSyncPeerId() != null) {
+            return opsPlacementRepository.findById(source.getSyncPeerId())
+                    .orElseGet(() -> newPeer(peerAudience, peerSlot));
+        }
+        OpsPlacement peer = newPeer(peerAudience, peerSlot);
+        peer.setSyncPeerId(source.getId());
+        return peer;
+    }
+
+    private OpsPlacement newPeer(String peerAudience, String peerSlot) {
+        OpsPlacement peer = new OpsPlacement();
+        peer.setAudience(peerAudience);
+        peer.setSlot(peerSlot);
+        peer.setStatus("LISTED");
+        return peer;
+    }
+
+    private String resolvePeerSlot(OpsPlacement source) {
+        if (isImageSlot(source.getSlot())) {
+            return "C".equals(source.getAudience()) ? "ADMIN_BANNER" : "CHAT_BANNER";
+        }
+        return "C".equals(source.getAudience()) ? "ADMIN_HEADER" : "CONSUMER_INBOX";
+    }
+
+    private boolean isImageSlot(String slot) {
+        return C_IMAGE_SLOTS.contains(slot) || B_IMAGE_SLOTS.contains(slot);
+    }
+
+    private void copySharedFields(OpsPlacement from, OpsPlacement to) {
+        to.setTitle(from.getTitle());
+        to.setBody(from.getBody());
+        to.setLinkUrl(from.getLinkUrl());
+        to.setLinkLabel(from.getLinkLabel());
+        to.setIconName(from.getIconName());
+        to.setIconUrl(from.getIconUrl());
+        to.setIconSvg(from.getIconSvg());
+        to.setImageUrl(from.getImageUrl());
+        to.setTheme(from.getTheme());
+        to.setDismissible(from.getDismissible());
+        to.setStatus(from.getStatus());
+        to.setSortOrder(from.getSortOrder());
+        to.setStartsAt(from.getStartsAt());
+        to.setEndsAt(from.getEndsAt());
+    }
+
+    private void syncToPeerIfLinked(OpsPlacement source) {
+        if (source.getSyncPeerId() == null) {
+            return;
+        }
+        opsPlacementRepository.findById(source.getSyncPeerId()).ifPresent(peer -> {
+            copySharedFields(source, peer);
+            requireCreativeImage(peer);
+            opsPlacementRepository.update(peer);
+        });
     }
 }

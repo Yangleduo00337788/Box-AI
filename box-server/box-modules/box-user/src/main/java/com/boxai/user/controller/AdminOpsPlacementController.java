@@ -54,4 +54,9 @@ public class AdminOpsPlacementController {
         opsPlacementApplicationService.delete(id);
         return Result.success(null);
     }
+
+    @PostMapping("/{id}/sync-cross-audience")
+    public Result<OpsPlacementVO> syncCrossAudience(@PathVariable Long id) {
+        return Result.success(opsPlacementApplicationService.syncCrossAudience(id));
+    }
 }
