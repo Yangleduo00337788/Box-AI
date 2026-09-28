@@ -173,11 +173,13 @@ Multi-tenant operations: individual/enterprise tenants, plan assignment, members
 
 ```bash
 # 1. Infrastructure: MySQL / Redis / Elasticsearch / MinIO
-cd deploy && docker compose up -d
+cp .env.example .env
+cd deploy && docker compose --env-file ../.env up -d
 
 # 2. Backend (port 8080)
 cp box-server/box-bootstrap/src/main/resources/application.yml.example \
    box-server/box-bootstrap/src/main/resources/application.yml
+# Put connection strings and secrets in the repo-root .env file; do not commit .env
 cd box-server && mvn spring-boot:run -pl box-bootstrap
 ```
 
@@ -192,7 +194,7 @@ cd box-admin-web && npm install && npm run dev
 **Full stack in Docker** (includes `box-server` image):
 
 ```bash
-cd deploy && docker compose --profile app up -d --build
+cd deploy && docker compose --env-file ../.env --profile app up -d --build
 ```
 
 | Component | URL |
@@ -203,11 +205,11 @@ cd deploy && docker compose --profile app up -d --build
 | MySQL | `localhost:3307`, database `box` |
 | MinIO Console | http://localhost:9001 |
 
-See [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example) for configuration.
+See [`.env.example`](.env.example) and [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example). Local and deployed runtimes inject secrets via environment variables; the app loads the repo-root `.env` on startup. Do not commit `.env` or `application.yml`.
 
 **Troubleshooting**
 
-- Backend won't start: ensure Docker services are up and ports match `application.yml` and `deploy/docker-compose.yml`.
+- Backend won't start: copy `.env.example` to `.env`, ensure Docker services are up, and ports in `.env` match `deploy/docker-compose.yml`.
 - Frontend 401: sign in first; Open API calls need an API Key (below).
 - Squashed images on Gitee: README uses PNG assets; set `width` only on `<img>`, not `height`.
 
@@ -412,8 +414,8 @@ await box.chat(agentId, 'Hello', {
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| **V1 P0** | Agent / RAG / Tool / Workflow / Publish / API Key / RBAC / Trace | In progress — [Progress](docx/09-Progress.md) |
-| **V1 P1** | MCP, long-term memory, multi-agent, webhook, marketplace | Planned — [Gaps](docx/10-Gaps.md) |
+| **V1 P0** | Agent / RAG / Tool / Workflow / Publish / API Key / RBAC / Trace | **Released** ([v1.0.0](releases/v1.0.0.md)) |
+| **V1 P1** | MCP, long-term memory, multi-agent, webhook, marketplace | Partially shipped — [Gaps](docx/10-Gaps.md) |
 | **V2** | Billing, enterprise SSO, distributed runtime, K8s | Future |
 
 ---

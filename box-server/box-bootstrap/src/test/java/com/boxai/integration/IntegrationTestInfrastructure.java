@@ -54,6 +54,7 @@ final class IntegrationTestInfrastructure {
             registry.add("spring.datasource.password", () -> jdbcPassword);
             registry.add("spring.data.redis.host", () -> envOrDefault("BOX_IT_REDIS_HOST", "127.0.0.1"));
             registry.add("spring.data.redis.port", () -> Integer.parseInt(envOrDefault("BOX_IT_REDIS_PORT", "6379")));
+            registerLocalStackOverrides(registry);
         } else {
             registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
             registry.add("spring.datasource.username", MYSQL::getUsername);
@@ -78,5 +79,27 @@ final class IntegrationTestInfrastructure {
     private static String envOrDefault(String key, String defaultValue) {
         String value = System.getenv(key);
         return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    /**
+     * 本地共用 MySQL 时，库内平台配置往往用 dev 密钥加密；与 {@code application-integration.yml} 的测试密钥不一致会启动失败。
+     * CI 使用空库 + integration 密钥即可；本地 external 默认对齐 dev 密钥，可用环境变量覆盖。
+     */
+    private static void registerLocalStackOverrides(DynamicPropertyRegistry registry) {
+        registry.add("box.security.crypto.aes-key",
+                () -> envOrDefault("BOX_IT_AES_KEY", "box-dev-aes-256-key-change-me!!"));
+        registry.add("box.security.jwt.secret",
+                () -> envOrDefault("BOX_IT_JWT_SECRET", "box-dev-jwt-secret-change-me-please-32b"));
+        registerIfPresent(registry, "box.minio.endpoint", "BOX_IT_MINIO_ENDPOINT");
+        registerIfPresent(registry, "box.minio.access-key", "BOX_IT_MINIO_ACCESS_KEY");
+        registerIfPresent(registry, "box.minio.secret-key", "BOX_IT_MINIO_SECRET_KEY");
+        registerIfPresent(registry, "box.minio.bucket", "BOX_IT_MINIO_BUCKET");
+    }
+
+    private static void registerIfPresent(DynamicPropertyRegistry registry, String property, String envKey) {
+        String value = System.getenv(envKey);
+        if (value != null && !value.isBlank()) {
+            registry.add(property, () -> value);
+        }
     }
 }

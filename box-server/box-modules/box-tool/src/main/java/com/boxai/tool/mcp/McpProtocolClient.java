@@ -3,6 +3,7 @@ package com.boxai.tool.mcp;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.common.security.SsrfGuard;
+import com.boxai.common.security.SsrfSafeHttpClient;
 import com.boxai.domain.mcp.McpServer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,9 +31,7 @@ public class McpProtocolClient {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(8))
-            .build();
+    private final HttpClient httpClient = SsrfSafeHttpClient.create(Duration.ofSeconds(8), false);
 
     public McpProtocolClient(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -131,7 +130,8 @@ public class McpProtocolClient {
             if (sessionId != null && !sessionId.isBlank()) {
                 builder.header("Mcp-Session-Id", sessionId);
             }
-            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = SsrfSafeHttpClient.send(
+                    httpClient, builder.build(), false, REQUEST_TIMEOUT);
             String sessionHeader = response.headers().firstValue("Mcp-Session-Id").orElse(sessionId);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new BusinessException(ErrorCode.EXECUTION_FAILED,
@@ -172,7 +172,8 @@ public class McpProtocolClient {
                     .header("Accept", "text/event-stream")
                     .GET();
             applyAuth(builder, server);
-            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = SsrfSafeHttpClient.send(
+                    httpClient, builder.build(), false, REQUEST_TIMEOUT);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return null;
             }

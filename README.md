@@ -175,12 +175,13 @@ HTTP / Database / Function / **MCP** 统一抽象为 `AgentTool`，支持流式 
 
 ```bash
 # 1. 基础设施：MySQL / Redis / Elasticsearch / MinIO
-cd deploy && docker compose up -d
+cp .env.example .env
+cd deploy && docker compose --env-file ../.env up -d
 
 # 2. 后端配置与启动（8080）
 cp box-server/box-bootstrap/src/main/resources/application.yml.example \
    box-server/box-bootstrap/src/main/resources/application.yml
-# 按需修改数据库、Redis、ES、MinIO 连接信息
+# 连接信息与密钥写在仓库根目录 .env，不要写进 yml、不要提交 .env
 cd box-server && mvn spring-boot:run -pl box-bootstrap
 ```
 
@@ -195,7 +196,7 @@ cd box-admin-web && npm install && npm run dev
 **Docker 全栈**（含 `box-server` 镜像）：
 
 ```bash
-cd deploy && docker compose --profile app up -d --build
+cd deploy && docker compose --env-file ../.env --profile app up -d --build
 ```
 
 | 组件 | 地址 |
@@ -206,11 +207,11 @@ cd deploy && docker compose --profile app up -d --build
 | MySQL | `localhost:3307`，库名 `box` |
 | MinIO Console | http://localhost:9001 |
 
-配置说明见 [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example)。
+配置说明见 [`.env.example`](.env.example) 与 [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example)。本地和部署都通过环境变量注入密钥；启动时会自动读取仓库根目录 `.env`。不要提交 `.env` 或 `application.yml`。
 
 **常见问题**
 
-- 后端启动失败：确认 Docker 中间件已就绪，且 `application.yml` 中端口与 `deploy/docker-compose.yml` 一致。
+- 后端启动失败：确认已复制 `.env.example` 为 `.env`，Docker 中间件已就绪，且 `.env` 中端口与 `deploy/docker-compose.yml` 一致。
 - 前端 401：先完成注册/登录；开放 API 调用需使用 API Key（见下文）。
 - Gitee 上图被挤压：README 配图使用 PNG，`<img>` 仅设 `width`、不设 `height`。
 
@@ -415,8 +416,8 @@ await box.chat(agentId, '你好', {
 
 | 阶段 | 范围 | 状态 |
 |------|------|------|
-| **V1 P0** | Agent / RAG / Tool / Workflow / Publish / API Key / RBAC / Trace | 进行中，见 [进度追踪](docx/09-Progress.md) |
-| **V1 P1** | MCP 深化、长期记忆、多 Agent、Webhook、插件市场 | 规划，见 [待办缺口](docx/10-Gaps.md) |
+| **V1 P0** | Agent / RAG / Tool / Workflow / Publish / API Key / RBAC / Trace | **已发布**（[v1.0.0](releases/v1.0.0.md)） |
+| **V1 P1** | MCP 深化、长期记忆、多 Agent、Webhook、插件市场 | 部分已落地，见 [待办缺口](docx/10-Gaps.md) |
 | **V2** | 计费配额、企业 SSO、分布式 Runtime、K8s 部署 | 远期 |
 
 ---

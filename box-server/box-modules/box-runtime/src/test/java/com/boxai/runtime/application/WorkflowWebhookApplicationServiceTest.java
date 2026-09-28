@@ -82,19 +82,16 @@ class WorkflowWebhookApplicationServiceTest {
     }
 
     @Test
-    void triggerWrapsNonJsonPayloadAsMessage() {
+    void triggerRejectsMissingWebhookSecret() {
         var service = service();
         Workflow workflow = publishedWorkflow();
         workflow.setWebhookSecret("");
         when(workflowRepository.findByWebhookToken("tok")).thenReturn(Optional.of(workflow));
-        when(workflowExecutionApplicationService.executeWebhook(eq(5L), any()))
-                .thenReturn(resultVo());
 
-        service.trigger("tok", "plain-text", "");
-
-        ArgumentCaptor<WorkflowExecuteRequest> captor = ArgumentCaptor.forClass(WorkflowExecuteRequest.class);
-        verify(workflowExecutionApplicationService).executeWebhook(eq(5L), captor.capture());
-        assertEquals("plain-text", ((Map<?, ?>) captor.getValue().inputs().get("input")).get("message"));
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.trigger("tok", "plain-text", ""));
+        assertEquals(ErrorCode.UNAUTHORIZED, ex.getCode());
+        verify(workflowExecutionApplicationService, never()).executeWebhook(anyLong(), any());
     }
 
     private static WorkflowExecutionResultVO resultVo() {

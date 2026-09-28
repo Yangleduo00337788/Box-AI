@@ -86,8 +86,8 @@ GitHub Actions [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) 覆盖 
 
 | 场景 | 做法 |
 |------|------|
-| 本地开发 | `deploy/docker compose up -d`，再启 `box-server` / 前端 |
-| 预发全栈 | `deploy/docker compose --profile app up -d --build` |
+| 本地开发 | 仓库根目录 `cp .env.example .env`，再 `deploy/docker compose --env-file ../.env up -d`，然后启 `box-server` / 前端 |
+| 预发全栈 | `deploy/docker compose --env-file ../.env --profile app up -d --build` |
 | 对象存储 | MinIO（Compose）或管理端配置 R2；见 [manual/storage-checklist.md](./manual/storage-checklist.md) |
 
 配置复制：`scripts/config.example.env` → 本地 `config.env`（勿提交密钥）。

@@ -5,6 +5,7 @@ import com.boxai.ai.ModelRuntimeConfig;
 import com.boxai.common.constant.PermissionCodes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.common.security.SsrfGuard;
 import com.boxai.domain.crypto.SecretCipher;
 import com.boxai.domain.model.ModelCredential;
 import com.boxai.domain.model.ModelCredentialRepository;
@@ -68,7 +69,7 @@ public class ModelApplicationService {
         provider.setProviderName(request.providerName().trim());
         provider.setProviderType(request.providerType() == null || request.providerType().isBlank()
                 ? "OPENAI_COMPATIBLE" : request.providerType());
-        provider.setBaseUrl(request.baseUrl());
+        provider.setBaseUrl(normalizeBaseUrl(request.baseUrl()));
         provider.setStatus(1);
         providerRepository.save(provider);
         return toProviderVO(provider);
@@ -82,7 +83,7 @@ public class ModelApplicationService {
         provider.setProviderName(request.providerName().trim());
         provider.setProviderType(request.providerType() == null || request.providerType().isBlank()
                 ? provider.getProviderType() : request.providerType());
-        provider.setBaseUrl(request.baseUrl());
+        provider.setBaseUrl(normalizeBaseUrl(request.baseUrl()));
         providerRepository.update(provider);
         return toProviderVO(provider);
     }
@@ -214,6 +215,13 @@ public class ModelApplicationService {
 
     private Long workspaceId() {
         return WorkspaceContext.require().workspaceId();
+    }
+
+    private String normalizeBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return null;
+        }
+        return SsrfGuard.validateHttpUrl(baseUrl.trim()).toString();
     }
 
     private ProviderVO toProviderVO(ModelProvider provider) {

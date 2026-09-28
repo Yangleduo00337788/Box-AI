@@ -22,6 +22,8 @@ public class VerificationCodeService {
     private static final Duration RATE_LIMIT = Duration.ofSeconds(60);
     private static final String CODE_KEY_PREFIX = "box:auth:code:";
     private static final String RATE_KEY_PREFIX = "box:auth:code:rate:";
+    private static final String ATTEMPT_KEY_PREFIX = "box:auth:code:attempt:";
+    private static final int MAX_VERIFY_ATTEMPTS = 5;
 
     private final RedisService redisService;
     private final VerificationEmailSender verificationEmailSender;
@@ -44,6 +46,8 @@ public class VerificationCodeService {
         }
         String code = String.format("%06d", random.nextInt(1_000_000));
         String codeKey = CODE_KEY_PREFIX + purpose.name() + ":" + normalized;
+        String attemptKey = attemptKey(purpose, normalized);
+        redisService.delete(attemptKey);
         redisService.set(codeKey, code, CODE_TTL);
         try {
             verificationEmailSender.send(normalized, purpose, code);
@@ -62,14 +66,24 @@ public class VerificationCodeService {
         }
         String normalized = normalizeEmail(email);
         String codeKey = CODE_KEY_PREFIX + purpose.name() + ":" + normalized;
+        String attemptKey = attemptKey(purpose, normalized);
         String stored = redisService.get(codeKey);
         if (stored == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码已过期，请重新获取");
         }
         if (!stored.equals(code.trim())) {
+            if (!redisService.incrementWithinLimit(attemptKey, MAX_VERIFY_ATTEMPTS, CODE_TTL)) {
+                redisService.delete(codeKey);
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码尝试次数过多，请重新获取");
+            }
             throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码错误");
         }
         redisService.delete(codeKey);
+        redisService.delete(attemptKey);
+    }
+
+    private static String attemptKey(VerificationCodePurpose purpose, String normalizedEmail) {
+        return ATTEMPT_KEY_PREFIX + purpose.name() + ":" + normalizedEmail;
     }
 
     private String normalizeEmail(String email) {

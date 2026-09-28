@@ -1,3 +1,5 @@
+# 密钥与连接信息来自仓库根目录 .env（复制 .env.example）。
+# 启动：docker compose --env-file ../.env up -d
 name: box
 
 services:
@@ -6,7 +8,7 @@ services:
     container_name: box-mysql
     environment:
       MYSQL_DATABASE: box
-      MYSQL_ROOT_PASSWORD: box
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-box}
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
@@ -17,7 +19,7 @@ services:
     volumes:
       - box-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pbox"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-box}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -48,8 +50,8 @@ services:
     container_name: box-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: box
-      MINIO_ROOT_PASSWORD: boxsecret1
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-box}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-boxsecret1}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -66,17 +68,17 @@ services:
       - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/box?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: box
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-box}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       BOX_MINIO_ENDPOINT: http://minio:9000
-      BOX_MINIO_ACCESS_KEY: box
-      BOX_MINIO_SECRET_KEY: boxsecret1
+      BOX_MINIO_ACCESS_KEY: ${BOX_MINIO_ACCESS_KEY:-box}
+      BOX_MINIO_SECRET_KEY: ${BOX_MINIO_SECRET_KEY:-boxsecret1}
       BOX_ELASTICSEARCH_HOST: elasticsearch
       BOX_ELASTICSEARCH_PORT: 9200
-      BOX_SECURITY_JWT_SECRET: box-docker-jwt-secret-change-me-please-32b
-      BOX_SECURITY_CRYPTO_AES_KEY: box-docker-aes-256-key-change!!
+      BOX_SECURITY_JWT_SECRET: ${BOX_SECURITY_JWT_SECRET:-box-docker-jwt-secret-change-me-please-32b}
+      BOX_SECURITY_CRYPTO_AES_KEY: ${BOX_SECURITY_CRYPTO_AES_KEY:-box-docker-aes-256-key-change!!}
     depends_on:
       mysql:
         condition: service_healthy

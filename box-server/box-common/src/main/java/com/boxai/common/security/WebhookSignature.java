@@ -29,7 +29,7 @@ public final class WebhookSignature {
 
     public static boolean verify(String secret, String payload, String signatureHeader) {
         if (secret == null || secret.isBlank()) {
-            return true;
+            return false;
         }
         if (signatureHeader == null || signatureHeader.isBlank()) {
             return false;

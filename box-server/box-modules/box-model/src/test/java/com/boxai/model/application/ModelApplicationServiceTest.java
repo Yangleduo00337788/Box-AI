@@ -59,6 +59,16 @@ class ModelApplicationServiceTest {
     }
 
     @Test
+    void createProviderRejectsInternalBaseUrl() {
+        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.createProvider(
+                new CreateProviderRequest("OpenAI", "OpenAI", null, "http://127.0.0.1/v1")));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
+        verify(providerRepository, never()).save(any());
+    }
+
+    @Test
     void createProviderNormalizesCodeAndDefaultsType() {
         WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
 
