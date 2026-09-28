@@ -28,7 +28,10 @@ public class PlanApplicationService {
     }
 
     public List<PlanVO> listAll() {
-        return planRepository.listAll().stream().map(this::toVo).toList();
+        return planRepository.listAll().stream()
+                .filter(plan -> !isEphemeralTestPlan(plan))
+                .map(this::toVo)
+                .toList();
     }
 
     public PlanVO detail(Long id) {
@@ -38,6 +41,9 @@ public class PlanApplicationService {
     @Transactional
     public PlanVO create(CreatePlanRequest request) {
         String code = request.code().trim().toLowerCase(Locale.ROOT);
+        if (isEphemeralTestCode(code) || isEphemeralTestName(request.name())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请勿使用 E2E 临时套餐编码或名称");
+        }
         if (planRepository.findByCode(code).isPresent()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "套餐编码已存在");
         }
@@ -163,5 +169,25 @@ public class PlanApplicationService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean isEphemeralTestPlan(Plan plan) {
+        return isEphemeralTestCode(plan.getCode()) || isEphemeralTestName(plan.getName());
+    }
+
+    private boolean isEphemeralTestCode(String code) {
+        if (code == null || code.isBlank()) {
+            return false;
+        }
+        return code.trim().toLowerCase(Locale.ROOT).startsWith("e2e_");
+    }
+
+    private boolean isEphemeralTestName(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        String trimmed = name.trim();
+        return trimmed.regionMatches(true, 0, "E2E-", 0, 4)
+                || trimmed.regionMatches(true, 0, "E2E_", 0, 4);
     }
 }
