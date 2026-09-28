@@ -13,7 +13,7 @@
 
     <groupId>com.boxai</groupId>
     <artifactId>box-server</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>box-server</name>
     <description>Box AI Agent &amp; Workflow Platform</description>
