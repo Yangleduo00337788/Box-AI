@@ -78,6 +78,9 @@ public class SubscriptionApplicationService {
         if (plan.getStatus() == null || plan.getStatus() != 1) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "套餐不可用");
         }
+        if ("team_enterprise".equalsIgnoreCase(plan.getCode())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业定制套餐请联系销售开通，无法在线订阅");
+        }
         cancelOpenSubscriptions(tenantId);
         LocalDate start = LocalDate.now();
         LocalDate end = start.plusMonths(1);

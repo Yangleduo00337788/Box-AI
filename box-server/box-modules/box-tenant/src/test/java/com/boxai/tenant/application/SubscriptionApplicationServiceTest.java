@@ -137,6 +137,18 @@ class SubscriptionApplicationServiceTest {
     }
 
     @Test
+    void subscribeRejectsEnterpriseCustomPlan() {
+        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "OWNER"));
+        stubWorkspace(7L, 1L);
+        Plan enterprise = plan(9L, 1, BigDecimal.ZERO);
+        enterprise.setCode("team_enterprise");
+        when(planApplicationService.requirePlan(9L)).thenReturn(enterprise);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.subscribe(new SubscribePlanRequest(9L)));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
+        verify(billingRepository, never()).saveSubscription(any());
+    }
+
+    @Test
     void confirmPaymentRejectsOtherTenant() {
         WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "OWNER"));
         stubWorkspace(7L, 1L);
