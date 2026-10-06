@@ -11,18 +11,15 @@ import java.util.Optional;
 public class PaymentGatewayRegistry {
 
     private final List<PaymentGateway> gateways;
-    private final MockPaymentGateway mockPaymentGateway;
 
-    public PaymentGatewayRegistry(List<PaymentGateway> gateways, MockPaymentGateway mockPaymentGateway) {
+    public PaymentGatewayRegistry(List<PaymentGateway> gateways) {
         this.gateways = gateways;
-        this.mockPaymentGateway = mockPaymentGateway;
     }
 
     public PaymentGateway resolve(PaymentProperties properties) {
         return gateways.stream()
-                .filter(gateway -> gateway != mockPaymentGateway && gateway.supports(properties))
+                .filter(gateway -> gateway.supports(properties))
                 .findFirst()
-                .or(() -> mockPaymentGateway.supports(properties) ? Optional.of(mockPaymentGateway) : Optional.empty())
                 .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "支付网关未配置或不可用"));
     }
 

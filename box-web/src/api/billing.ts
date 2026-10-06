@@ -83,10 +83,6 @@ export function subscribePlan(planId: number) {
   return http.post<Result<CreateSubscriptionOrderVO>>('/billing/subscribe', { planId })
 }
 
-export function confirmPayment(paymentId: number) {
-  return http.post<Result<unknown>>(`/billing/payments/${paymentId}/confirm`)
-}
-
 export function fetchPayment(paymentId: number) {
   return http.get<Result<PaymentRecordVO>>(`/billing/payments/${paymentId}`)
 }

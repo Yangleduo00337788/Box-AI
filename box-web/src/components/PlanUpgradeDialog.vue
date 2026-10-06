@@ -74,7 +74,7 @@
                 <button
                   type="button"
                   class="plan-upgrade__cta"
-                  :disabled="plan.id === currentPlanId"
+                  :disabled="plan.id === currentPlanId || !overview?.paymentEnabled"
                   :class="{ 'is-loading': subscribingId === plan.id }"
                   @click.stop="onSubscribePlan(plan)"
                 >

@@ -35,7 +35,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
@@ -113,10 +112,12 @@ class SubscriptionApplicationServiceTest {
             item.setId(31L);
             return item;
         }).when(billingRepository).savePayment(any());
+        when(paymentProperties.isEnabled()).thenReturn(true);
+        when(paymentProperties.isRealGatewayConfigured()).thenReturn(true);
         when(paymentGatewayRegistry.resolve(paymentProperties)).thenReturn(paymentGateway);
-        when(paymentGateway.channel()).thenReturn("MOCK");
+        when(paymentGateway.channel()).thenReturn("ALIPAY");
         when(paymentGateway.createCheckout(any(), any()))
-                .thenReturn(new PaymentCheckoutResult("MOCK", "https://pay.example/c", "ext-1", true));
+                .thenReturn(new PaymentCheckoutResult("ALIPAY", "https://pay.example/c", "ext-1", false));
 
         var vo = service.subscribe(new SubscribePlanRequest(9L));
 
@@ -125,9 +126,9 @@ class SubscriptionApplicationServiceTest {
         assertEquals(31L, vo.paymentId());
         assertEquals(new BigDecimal("99.00"), vo.amount());
         assertEquals("PENDING", vo.paymentStatus());
-        assertEquals("MOCK", vo.paymentChannel());
+        assertEquals("ALIPAY", vo.paymentChannel());
         assertEquals("https://pay.example/c", vo.paymentUrl());
-        assertTrue(vo.requiresClientConfirm());
+        assertEquals(false, vo.requiresClientConfirm());
         verify(billingRepository).updateSubscription(previous);
         assertEquals(SubscriptionStatuses.CANCELLED, previous.getStatus());
         ArgumentCaptor<PaymentRecord> paymentCaptor = ArgumentCaptor.forClass(PaymentRecord.class);
@@ -158,40 +159,14 @@ class SubscriptionApplicationServiceTest {
     }
 
     @Test
-    void confirmPaymentRejectsOtherTenant() {
+    void subscribeRejectsWhenPaymentNotConfigured() {
         WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "OWNER"));
         stubWorkspace(7L, 1L);
-        PaymentRecord payment = payment(31L, 2L, "MOCK");
-        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment));
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.confirmPayment(31L));
-        assertEquals(ErrorCode.FORBIDDEN, ex.getCode());
-    }
-
-    @Test
-    void confirmPaymentRejectsNonMockChannel() {
-        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "OWNER"));
-        stubWorkspace(7L, 1L);
-        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment(31L, 1L, "STRIPE")));
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.confirmPayment(31L));
-        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
-    }
-
-    @Test
-    void confirmPaymentCompletesMockPayment() {
-        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "OWNER"));
-        stubWorkspace(7L, 1L);
-        PaymentRecord payment = payment(31L, 1L, "MOCK");
-        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment));
+        when(planApplicationService.requirePlan(9L)).thenReturn(plan(9L, 1, BigDecimal.TEN));
         when(paymentProperties.isEnabled()).thenReturn(false);
-        PaymentRecord completed = payment(31L, 1L, "MOCK");
-        completed.setStatus("SUCCEEDED");
-        completed.setPaidAt(LocalDateTime.now());
-        when(paymentCompletionService.completePayment(31L, "MOCK-31", "MOCK")).thenReturn(completed);
-
-        var vo = service.confirmPayment(31L);
-
-        assertEquals("SUCCEEDED", vo.status());
-        assertEquals(31L, vo.id());
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.subscribe(new SubscribePlanRequest(9L)));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
+        verify(billingRepository, never()).saveSubscription(any());
     }
 
     @Test

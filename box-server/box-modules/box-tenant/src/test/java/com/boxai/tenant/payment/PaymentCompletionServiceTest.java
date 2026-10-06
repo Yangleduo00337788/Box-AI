@@ -40,10 +40,10 @@ class PaymentCompletionServiceTest {
 
     @Test
     void completePaymentIsIdempotentWhenAlreadySucceeded() {
-        PaymentRecord payment = payment("SUCCEEDED", "MOCK", BigDecimal.TEN);
+        PaymentRecord payment = payment("SUCCEEDED", "ALIPAY", BigDecimal.TEN);
         when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment));
 
-        PaymentRecord result = service.completePayment(31L, "ext", "MOCK");
+        PaymentRecord result = service.completePayment(31L, "ext", "ALIPAY");
 
         assertSame(payment, result);
         verify(billingRepository, never()).updatePayment(any());
@@ -52,30 +52,30 @@ class PaymentCompletionServiceTest {
 
     @Test
     void completePaymentRejectsNonPendingStatus() {
-        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment("FAILED", "MOCK", BigDecimal.TEN)));
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.completePayment(31L, "ext", "MOCK"));
+        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment("FAILED", "ALIPAY", BigDecimal.TEN)));
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.completePayment(31L, "ext", "ALIPAY"));
         assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
     }
 
     @Test
     void completePaymentRejectsChannelMismatch() {
-        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment("PENDING", "STRIPE", BigDecimal.TEN)));
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.completePayment(31L, "ext", "MOCK"));
+        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment("PENDING", "ALIPAY", BigDecimal.TEN)));
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.completePayment(31L, "ext", "UNKNOWN"));
         assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
     }
 
     @Test
     void completePaymentRejectsAmountMismatch() {
-        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment("PENDING", "MOCK", BigDecimal.TEN)));
+        when(billingRepository.findPaymentById(31L)).thenReturn(Optional.of(payment("PENDING", "ALIPAY", BigDecimal.TEN)));
         BillingInvoice invoice = invoice(new BigDecimal("99.00"));
         when(billingRepository.findInvoiceById(21L)).thenReturn(Optional.of(invoice));
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.completePayment(31L, "ext", "MOCK"));
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.completePayment(31L, "ext", "ALIPAY"));
         assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
     }
 
     @Test
     void completePaymentActivatesSubscriptionAndAssignsPlan() {
-        PaymentRecord payment = payment("PENDING", "MOCK", new BigDecimal("99.00"));
+        PaymentRecord payment = payment("PENDING", "ALIPAY", new BigDecimal("99.00"));
         BillingInvoice invoice = invoice(new BigDecimal("99.00"));
         Subscription subscription = new Subscription();
         subscription.setId(11L);
@@ -84,7 +84,7 @@ class PaymentCompletionServiceTest {
         when(billingRepository.findInvoiceById(21L)).thenReturn(Optional.of(invoice));
         when(billingRepository.listSubscriptionsByTenant(1L)).thenReturn(List.of(subscription));
 
-        PaymentRecord result = service.completePayment(31L, "ext-9", "mock");
+        PaymentRecord result = service.completePayment(31L, "ext-9", "ALIPAY");
 
         assertEquals("SUCCEEDED", result.getStatus());
         assertEquals("ext-9", result.getExternalRef());

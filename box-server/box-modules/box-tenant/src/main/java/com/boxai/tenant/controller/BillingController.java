@@ -11,16 +11,12 @@ import com.boxai.tenant.application.SubscriptionApplicationService;
 import com.boxai.tenant.payment.AlipayPaymentGateway;
 import com.boxai.tenant.payment.PaymentProperties;
 import com.boxai.tenant.payment.PaymentUrls;
-import com.boxai.tenant.payment.StripePaymentGateway;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,9 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,18 +41,15 @@ public class BillingController {
     private final BillingApplicationService billingApplicationService;
     private final SubscriptionApplicationService subscriptionApplicationService;
     private final PaymentProperties paymentProperties;
-    private final StripePaymentGateway stripePaymentGateway;
     private final AlipayPaymentGateway alipayPaymentGateway;
 
     public BillingController(BillingApplicationService billingApplicationService,
                              SubscriptionApplicationService subscriptionApplicationService,
                              PaymentProperties paymentProperties,
-                             StripePaymentGateway stripePaymentGateway,
                              AlipayPaymentGateway alipayPaymentGateway) {
         this.billingApplicationService = billingApplicationService;
         this.subscriptionApplicationService = subscriptionApplicationService;
         this.paymentProperties = paymentProperties;
-        this.stripePaymentGateway = stripePaymentGateway;
         this.alipayPaymentGateway = alipayPaymentGateway;
     }
 
@@ -99,30 +90,6 @@ public class BillingController {
         return Result.success(subscriptionApplicationService.getMyPayment(paymentId));
     }
 
-    @PostMapping("/payments/{paymentId}/confirm")
-    public Result<PaymentRecordVO> confirmPayment(@PathVariable Long paymentId) {
-        return Result.success(subscriptionApplicationService.confirmPayment(paymentId));
-    }
-
-    @PostMapping(value = "/payments/webhook/stripe", consumes = MediaType.ALL_VALUE)
-    public ResponseEntity<Result<Void>> stripeWebhook(HttpServletRequest request) throws Exception {
-        String rawBody = StreamUtils.copyToString(request.getInputStream(), StandardCharsets.UTF_8);
-        Map<String, String> headers = readHeaders(request);
-        if (!stripePaymentGateway.isWebhookAuthentic(rawBody, headers, paymentProperties)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Result.failure(400, "Stripe 签名无效"));
-        }
-        Optional<Long> paymentId = stripePaymentGateway.resolvePaymentIdFromWebhook(rawBody, headers, paymentProperties);
-        if (paymentId.isPresent()) {
-            try {
-                subscriptionApplicationService.completePaymentFromGateway(paymentId.get(), null, "STRIPE");
-            } catch (Exception e) {
-                log.warn("Stripe 回调入账失败 paymentId={}: {}", paymentId.get(), e.getMessage());
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Result.failure(400, "支付入账失败"));
-            }
-        }
-        return ResponseEntity.ok(Result.success(null));
-    }
-
     @PostMapping(value = "/payments/notify/alipay", consumes = MediaType.ALL_VALUE)
     public String alipayNotify(HttpServletRequest request) {
         Map<String, String> params = readParams(request);
@@ -148,16 +115,6 @@ public class BillingController {
     @GetMapping("/invoices")
     public Result<List<BillingInvoiceVO>> invoices() {
         return Result.success(subscriptionApplicationService.listMyInvoices());
-    }
-
-    private Map<String, String> readHeaders(HttpServletRequest request) {
-        Map<String, String> headers = new HashMap<>();
-        Enumeration<String> names = request.getHeaderNames();
-        while (names != null && names.hasMoreElements()) {
-            String name = names.nextElement();
-            headers.put(name, request.getHeader(name));
-        }
-        return headers;
     }
 
     private Map<String, String> readParams(HttpServletRequest request) {

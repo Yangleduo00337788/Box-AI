@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
-  confirmPayment,
   fetchBillingOverview,
   fetchPayment,
   listPlans,
@@ -110,10 +109,8 @@ export function planQuotaMultiplier(plan: PlanVO, baseline: PlanVO | undefined) 
 export { formatQuotaNumber }
 
 export function paymentSubscribeLabel(overview: BillingOverviewVO | null | undefined) {
-  if (!overview?.paymentEnabled) return '订阅（模拟支付）'
-  if (overview.paymentProvider === 'alipay') return '支付宝支付'
-  if (overview.paymentProvider === 'stripe') return 'Stripe 支付'
-  return '订阅并支付'
+  if (!overview?.paymentEnabled) return '支付未开通'
+  return '支付宝支付'
 }
 
 function postCheckoutForm(action: string, fields: Record<string, string>) {
@@ -169,6 +166,10 @@ export function usePlanUpgrade() {
   }
 
   async function subscribe(planId: number) {
+    if (!overview.value?.paymentEnabled) {
+      MessagePlugin.warning('支付未开通，请先配置支付宝沙箱')
+      return { redirected: false as const, success: false as const }
+    }
     subscribingId.value = planId
     try {
       const { data } = await subscribePlan(planId)
@@ -177,20 +178,12 @@ export function usePlanUpgrade() {
         postCheckoutForm(order.checkoutFormAction, order.checkoutForm)
         return { redirected: true as const }
       }
-      if (order?.paymentChannel === 'ALIPAY') {
-        MessagePlugin.error('无法打开支付宝收银台，请重试')
-        return { redirected: false as const, success: false as const }
-      }
       if (order?.paymentUrl) {
         window.location.href = order.paymentUrl
         return { redirected: true as const }
       }
-      if (order?.requiresClientConfirm && order?.paymentId) {
-        await confirmPayment(order.paymentId)
-      }
-      MessagePlugin.success('套餐已更新')
-      await loadPlans()
-      return { redirected: false as const, success: true as const }
+      MessagePlugin.error('无法打开支付收银台，请检查支付配置后重试')
+      return { redirected: false as const, success: false as const }
     } finally {
       subscribingId.value = null
     }

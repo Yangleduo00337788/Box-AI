@@ -46,7 +46,7 @@ public class AlipayPaymentGateway implements PaymentGateway {
 
     @Override
     public boolean supports(PaymentProperties properties) {
-        return "alipay".equalsIgnoreCase(properties.getProvider())
+        return "alipay".equalsIgnoreCase(properties.resolvedProvider())
                 && properties.getAlipay().getAppId() != null
                 && !properties.getAlipay().getAppId().isBlank()
                 && properties.getAlipay().getPrivateKey() != null

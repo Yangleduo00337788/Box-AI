@@ -83,6 +83,9 @@ public class SubscriptionApplicationService {
         if ("team_enterprise".equalsIgnoreCase(plan.getCode())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "企业定制套餐请联系销售开通，无法在线订阅");
         }
+        if (!paymentProperties.isEnabled() || !paymentProperties.isRealGatewayConfigured()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "支付未开通，请配置支付宝沙箱");
+        }
         cancelOpenSubscriptions(tenantId);
         LocalDate start = LocalDate.now();
         LocalDate end = start.plusMonths(1);
@@ -147,26 +150,6 @@ public class SubscriptionApplicationService {
                 checkout.requiresClientConfirm(),
                 checkout.checkoutFormAction(),
                 checkout.checkoutForm());
-    }
-
-    @Transactional
-    public PaymentRecordVO confirmPayment(Long paymentId) {
-        Long workspaceId = WorkspaceContext.require().workspaceId();
-        Long tenantId = resolveTenantId(workspaceId);
-        PaymentRecord payment = billingRepository.findPaymentById(paymentId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "支付记录不存在"));
-        if (!payment.getTenantId().equals(tenantId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作该支付");
-        }
-        if (!"MOCK".equalsIgnoreCase(payment.getChannel())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "当前支付渠道不支持手动确认");
-        }
-        if (paymentProperties.isEnabled() && paymentProperties.isRealGatewayConfigured()) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "已启用真实支付，不支持模拟确认");
-        }
-        PaymentRecord completed = paymentCompletionService.completePayment(
-                paymentId, "MOCK-" + payment.getId(), "MOCK");
-        return toPaymentVo(completed);
     }
 
     @Transactional
