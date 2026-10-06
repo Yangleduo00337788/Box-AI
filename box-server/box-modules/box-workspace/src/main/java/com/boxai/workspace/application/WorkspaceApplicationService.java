@@ -127,6 +127,10 @@ public class WorkspaceApplicationService {
                 .toList();
     }
 
+    public List<Workspace> listByTenantId(Long tenantId) {
+        return workspaceRepository.listByTenantId(tenantId);
+    }
+
     private Workspace createWorkspace(Long ownerId, String name, String description, String avatarUrl, Long tenantId) {
         Workspace workspace = new Workspace();
         workspace.setTenantId(tenantId);

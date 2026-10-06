@@ -8,6 +8,7 @@ import com.boxai.domain.plan.Plan;
 import com.boxai.domain.plan.PlanRepository;
 import com.boxai.domain.tenant.Tenant;
 import com.boxai.domain.tenant.TenantMember;
+import com.boxai.domain.tenant.TenantOAuthOrgRepository;
 import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.user.User;
 import com.boxai.domain.workspace.WorkspaceRepository;
@@ -44,6 +45,8 @@ class TenantApplicationServiceTest {
     private WorkspaceRepository workspaceRepository;
     @Mock
     private PlanRepository planRepository;
+    @Mock
+    private TenantOAuthOrgRepository tenantOAuthOrgRepository;
 
     @InjectMocks
     private TenantApplicationService service;

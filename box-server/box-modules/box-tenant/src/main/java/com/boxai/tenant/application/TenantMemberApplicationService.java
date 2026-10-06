@@ -77,6 +77,21 @@ public class TenantMemberApplicationService {
     }
 
     @Transactional
+    public void ensureOAuthEnterpriseMember(Long tenantId, Long userId, boolean admin) {
+        if (tenantRepository.findMember(tenantId, userId).isPresent()) {
+            return;
+        }
+        quotaApplicationService.assertMemberQuotaAvailable(tenantId);
+        TenantMember member = new TenantMember();
+        member.setTenantId(tenantId);
+        member.setUserId(userId);
+        member.setRoleCode(admin ? RoleCodes.TENANT_ADMIN : RoleCodes.MEMBER);
+        member.setStatus(1);
+        tenantRepository.addMember(member);
+        syncToTenantWorkspaces(tenantId, userId, member.getRoleCode());
+    }
+
+    @Transactional
     public TenantMemberVO updateMemberStatus(Long tenantId, Long userId, Integer status) {
         requireTenant(tenantId);
         if (status == null || (status != 0 && status != 1)) {

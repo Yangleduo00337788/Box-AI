@@ -1,12 +1,14 @@
 <template>
-  <p class="auth-agreement">
+  <div class="auth-agreement">
     <t-checkbox v-model="agreed">
-      {{ actionLabel }}即表示同意
-      <router-link to="/legal/terms" target="_blank" @click.stop>《用户协议》</router-link>
-      和
-      <router-link to="/legal/privacy" target="_blank" @click.stop>《隐私政策》</router-link>
+      <span class="auth-agreement__text">
+        {{ actionLabel }}即表示同意
+        <router-link to="/legal/terms" target="_blank" @click.stop>《用户协议》</router-link>
+        和
+        <router-link to="/legal/privacy" target="_blank" @click.stop>《隐私政策》</router-link>
+      </span>
     </t-checkbox>
-  </p>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -33,6 +35,18 @@ const agreed = defineModel<boolean>('agreed', { default: false })
 }
 
 .auth-agreement :deep(.t-checkbox) {
-  align-items: flex-start;
+  display: inline-flex;
+  align-items: center;
+}
+
+.auth-agreement :deep(.t-checkbox__input) {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.auth-agreement__text {
+  display: inline;
+  line-height: 1.4;
+  vertical-align: middle;
 }
 </style>

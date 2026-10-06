@@ -128,6 +128,16 @@ const oauthItems = [
   },
   { configKey: 'oauth.google.client_id', label: 'Google Client ID', placeholder: 'xxx.apps.googleusercontent.com' },
   { configKey: 'oauth.google.client_secret', label: 'Google Client Secret', placeholder: '******', secret: true },
+  {
+    configKey: 'oauth.wechat.enabled',
+    label: '微信扫码登录（个人端）',
+    options: [
+      { label: '关闭', value: 'false' },
+      { label: '开启', value: 'true' },
+    ],
+  },
+  { configKey: 'oauth.wechat.client_id', label: '微信开放平台 AppID', placeholder: 'wx...' },
+  { configKey: 'oauth.wechat.client_secret', label: '微信开放平台 AppSecret', placeholder: '******', secret: true },
 ]
 
 const loading = ref(false)

@@ -33,6 +33,8 @@ declare module 'vue' {
     ImagePicker: typeof import('./src/components/ImagePicker.vue')['default']
     MonacoEditor: typeof import('./src/components/MonacoEditor.vue')['default']
     NotificationCenter: typeof import('./src/components/NotificationCenter.vue')['default']
+    OAuthProviderButton: typeof import('./src/components/OAuthProviderButton.vue')['default']
+    OAuthProviderIcon: typeof import('./src/components/OAuthProviderIcon.vue')['default']
     OpsCornerPromo: typeof import('./src/components/OpsCornerPromo.vue')['default']
     OpsGlobalAlert: typeof import('./src/components/OpsGlobalAlert.vue')['default']
     OpsPlacementIcon: typeof import('./src/components/OpsPlacementIcon.vue')['default']

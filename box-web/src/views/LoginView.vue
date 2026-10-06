@@ -20,7 +20,7 @@
 
     <t-form :data="formData" :rules="rules" label-width="0" @submit="onSubmit">
       <t-form-item name="account">
-        <t-input v-model="formData.account" placeholder="邮箱 / 用户名" clearable size="large">
+        <t-input v-model="formData.account" :placeholder="accountPlaceholder" clearable size="large">
           <template #prefix-icon>
             <t-icon name="user" />
           </template>
@@ -54,21 +54,31 @@
       </t-form-item>
     </t-form>
 
-    <div class="oauth-section">
-      <div class="oauth-divider"><span>或使用第三方登录</span></div>
-      <div class="oauth-actions">
-        <t-button
+    <div v-if="portal === 'personal'" class="oauth-section">
+      <div class="oauth-divider">
+        <span>或使用第三方登录</span>
+      </div>
+      <div class="oauth-actions oauth-actions--icons">
+        <t-tooltip
           v-for="item in oauthProviders"
           :key="item.provider"
-          variant="outline"
-          block
-          size="large"
-          shape="round"
-          :disabled="loading || !item.enabled"
-          @click="onOAuthLogin(item)"
+          :content="`使用 ${item.displayName} 登录`"
+          placement="top"
+          theme="light"
         >
-          使用 {{ item.displayName }} 登录
-        </t-button>
+          <span class="oauth-tip">
+            <t-button
+              class="oauth-btn"
+              variant="outline"
+              size="large"
+              shape="circle"
+              :disabled="loading || !item.enabled"
+              @click="onOAuthLogin(item)"
+            >
+              <span class="oauth-logo" :data-provider="item.provider" />
+            </t-button>
+          </span>
+        </t-tooltip>
       </div>
       <p v-if="oauthConfigHint" class="oauth-hint">{{ oauthConfigHint }}</p>
     </div>
@@ -95,12 +105,12 @@ const loading = ref(false)
 const remember = ref(false)
 const agreed = ref(false)
 const portal = ref<PortalType>('personal')
-const oauthProviders = ref<OAuthProviderVO[]>(mergeOAuthProviders([]))
+const oauthProviders = ref<OAuthProviderVO[]>(mergeOAuthProviders([], 'personal'))
 const oauthConfigHint = computed(() => {
   if (oauthProviders.value.some((item) => item.enabled)) {
     return ''
   }
-  return '第三方登录未启用：请在 .env 或管理端系统配置填写 GitHub/Google 的 Client ID 与 Secret，并重启后端。'
+  return '第三方登录未启用：请在环境变量或管理端填写 GitHub / Google / 微信的 Client ID 与 Secret，并重启后端。'
 })
 
 const formData = reactive({
@@ -113,9 +123,16 @@ const rules: FormProps['rules'] = {
   password: [{ required: true, message: '请输入密码' }],
 }
 
-const currentPortalDesc = computed(
-  () => PORTAL_OPTIONS.find((item) => item.value === portal.value)?.desc || '',
+const accountPlaceholder = computed(() =>
+  portal.value === 'enterprise' ? '企业邮箱' : '邮箱 / 用户名',
 )
+
+const currentPortalDesc = computed(() => {
+  if (portal.value === 'enterprise') {
+    return '企业管理员使用企业邮箱登录。员工邀请与企业 ID 登录稍后开放。个人账号与企业账号互不混用。'
+  }
+  return PORTAL_OPTIONS.find((item) => item.value === portal.value)?.desc || ''
+})
 
 const registerLink = computed(() => ({
   path: '/register',
@@ -128,24 +145,28 @@ function switchPortal(value: PortalType) {
 }
 
 async function loadOAuthProviders() {
+  if (portal.value !== 'personal') {
+    oauthProviders.value = []
+    return
+  }
   try {
     const { data } = await fetchOAuthProviders()
-    oauthProviders.value = mergeOAuthProviders(data.data)
+    oauthProviders.value = mergeOAuthProviders(data.data, 'personal')
   } catch {
-    oauthProviders.value = mergeOAuthProviders([])
+    oauthProviders.value = mergeOAuthProviders([], 'personal')
   }
 }
 
 function onOAuthLogin(item: OAuthProviderVO) {
   if (!item.enabled) {
-    MessagePlugin.warning('该登录方式尚未配置，请检查 .env 或管理端 OAuth 配置后重启后端')
+    MessagePlugin.warning('该登录方式尚未配置，请检查环境变量或管理端 OAuth 配置后重启后端')
     return
   }
   if (!agreed.value) {
     MessagePlugin.warning('请先阅读并同意用户协议和隐私政策')
     return
   }
-  startOAuthLogin(item.provider, portal.value === 'enterprise' ? 'ENTERPRISE' : 'PERSONAL')
+  startOAuthLogin(item.provider, 'PERSONAL')
 }
 
 onMounted(async () => {
@@ -170,6 +191,10 @@ watch(
     }
   },
 )
+
+watch(portal, () => {
+  void loadOAuthProviders()
+})
 
 const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   if (validateResult !== true) return
@@ -271,10 +296,47 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   background: var(--box-border);
 }
 
-.oauth-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.oauth-actions--icons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.oauth-tip {
+  display: inline-flex;
+}
+
+.oauth-actions :deep(.oauth-btn .t-button__text) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.oauth-logo {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.oauth-logo[data-provider='github'] {
+  background-image: url('../assets/oauth/github.svg');
+}
+
+.oauth-logo[data-provider='google'] {
+  background-image: url('../assets/oauth/google.svg');
+}
+
+.oauth-logo[data-provider='wechat'] {
+  background-image: url('../assets/oauth/wechat.svg');
+}
+
+:global(html[data-box-theme='dark']) .oauth-logo[data-provider='github'] {
+  filter: invert(1);
 }
 
 .oauth-hint {

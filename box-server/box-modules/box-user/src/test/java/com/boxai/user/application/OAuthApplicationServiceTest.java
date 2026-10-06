@@ -44,11 +44,13 @@ class OAuthApplicationServiceTest {
     void listProvidersReturnsDisabledWhenNotConfigured() {
         when(clientConfigResolver.resolve("github")).thenReturn(disabled("github"));
         when(clientConfigResolver.resolve("google")).thenReturn(disabled("google"));
+        when(clientConfigResolver.resolve("wechat")).thenReturn(disabled("wechat"));
 
         var providers = service.listProviders();
         assertEquals(3, providers.size());
         assertEquals("github", providers.get(0).provider());
         assertEquals("google", providers.get(1).provider());
+        assertEquals("wechat", providers.get(2).provider());
         assertTrue(providers.stream().allMatch(item -> !item.enabled()));
     }
 
@@ -76,7 +78,7 @@ class OAuthApplicationServiceTest {
     @Test
     void startAuthorizeRejectsUnknownProvider() {
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.buildAuthorizeUrl("wechat", "http://localhost:5173/login", "personal"));
+                () -> service.buildAuthorizeUrl("feishu", "http://localhost:5173/login", "personal"));
         assertEquals(ErrorCode.OAUTH_PROVIDER_UNKNOWN, ex.getCode());
     }
 
@@ -89,11 +91,17 @@ class OAuthApplicationServiceTest {
     }
 
     @Test
-    void startAuthorizeReportsNotConfiguredForSso() {
+    void startAuthorizeRejectsOAuthOnEnterprisePortal() {
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.buildAuthorizeUrl("SSO", "http://localhost:5173/login", "personal"));
-        assertEquals(ErrorCode.OAUTH_NOT_CONFIGURED, ex.getCode());
-        assertTrue(ex.getMessage().toLowerCase().contains("sso"));
+                () -> service.buildAuthorizeUrl("wechat", "http://localhost:5173/login", "enterprise"));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
+    }
+
+    @Test
+    void startAuthorizeRejectsPersonalProviderOnEnterprisePortal() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.buildAuthorizeUrl("github", "http://localhost:5173/login", "enterprise"));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
     }
 
     @Test
@@ -115,7 +123,7 @@ class OAuthApplicationServiceTest {
                 eq("code-1"),
                 eq("http://localhost:8080/api/v1/auth/oauth/google/callback")))
                 .thenReturn(new OAuthRemoteClient.OAuthUserProfile(
-                        "google", "sub-1", "user@example.com", "user@example.com", "User", null));
+                        "google", "sub-1", "user@example.com", "user@example.com", "User", null, null, null));
         when(authApplicationService.loginOrRegisterWithOAuth(any(), eq("PERSONAL"))).thenReturn("jwt-token");
 
         String redirect = service.handleCallbackAndBuildRedirect("google", "code-1", "state-2");

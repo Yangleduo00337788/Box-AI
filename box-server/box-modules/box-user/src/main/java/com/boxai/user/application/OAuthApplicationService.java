@@ -23,11 +23,11 @@ public class OAuthApplicationService {
     private static final Map<String, String> PROVIDER_NAMES = Map.of(
             "github", "GitHub",
             "google", "Google",
-            "sso", "企业 SSO"
+            "wechat", "微信"
     );
 
-    private static final List<String> PROVIDER_ORDER = List.of("github", "google", "sso");
-    private static final Set<String> IMPLEMENTED_PROVIDERS = Set.of("github", "google");
+    private static final List<String> PROVIDER_ORDER = List.of("github", "google", "wechat");
+    private static final Set<String> IMPLEMENTED_PROVIDERS = Set.of("github", "google", "wechat");
     private static final Set<String> SUPPORTED_PROVIDERS = Set.copyOf(PROVIDER_ORDER);
 
     private final OAuthClientConfigResolver clientConfigResolver;
@@ -58,11 +58,13 @@ public class OAuthApplicationService {
                     ErrorCode.OAUTH_NOT_CONFIGURED,
                     "OAuth 登录尚未配置，请在管理端或 box.oauth 中启用 " + normalized);
         }
+        String portalType = normalizePortal(portal);
+        assertProviderMatchesPortal(normalized, portalType);
         OAuthClientConfigResolver.ResolvedOAuthClient client = requireEnabledClient(normalized);
         String safeRedirect = sanitizeFrontendRedirect(redirectUri);
         String state = stateStore.create(new OAuthStateStore.OAuthStatePayload(
                 normalized,
-                normalizePortal(portal),
+                portalType,
                 safeRedirect));
         String callbackUri = callbackUri(normalized);
         return remoteClient.buildAuthorizeUrl(normalized, client, callbackUri, state);
@@ -81,6 +83,7 @@ public class OAuthApplicationService {
         if (!normalized.equals(payload.provider())) {
             throw new BusinessException(ErrorCode.OAUTH_FAILED, "OAuth 状态与提供商不匹配");
         }
+        assertProviderMatchesPortal(normalized, payload.portal());
         OAuthClientConfigResolver.ResolvedOAuthClient client = requireEnabledClient(normalized);
         OAuthRemoteClient.OAuthUserProfile profile = remoteClient.exchangeAndFetchProfile(
                 normalized, client, code.trim(), callbackUri(normalized));
@@ -106,6 +109,12 @@ public class OAuthApplicationService {
                     "OAuth 登录尚未配置，请在管理端或 box.oauth 中启用 " + provider + " 并填写 Client ID/Secret");
         }
         return client;
+    }
+
+    private static void assertProviderMatchesPortal(String provider, String portal) {
+        if (TenantTypes.ENTERPRISE.equals(portal)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业请使用企业邮箱登录");
+        }
     }
 
     private OAuthProviderVO toProvider(String provider) {

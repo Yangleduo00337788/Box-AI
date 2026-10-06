@@ -9,6 +9,7 @@ public class OAuthProperties {
     private String publicBaseUrl = "http://localhost:8080";
     private final Provider github = new Provider();
     private final Provider google = new Provider();
+    private final Provider wechat = new Provider();
 
     public String getPublicBaseUrl() {
         return publicBaseUrl;
@@ -24,6 +25,10 @@ public class OAuthProperties {
 
     public Provider getGoogle() {
         return google;
+    }
+
+    public Provider getWechat() {
+        return wechat;
     }
 
     public static class Provider {

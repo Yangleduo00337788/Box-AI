@@ -8,6 +8,8 @@ import com.boxai.domain.plan.Plan;
 import com.boxai.domain.plan.PlanRepository;
 import com.boxai.domain.tenant.Tenant;
 import com.boxai.domain.tenant.TenantMember;
+import com.boxai.domain.tenant.TenantOAuthOrg;
+import com.boxai.domain.tenant.TenantOAuthOrgRepository;
 import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.user.User;
 import com.boxai.domain.workspace.WorkspaceRepository;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -31,19 +34,22 @@ public class TenantApplicationService {
     private final PlanApplicationService planApplicationService;
     private final WorkspaceRepository workspaceRepository;
     private final PlanRepository planRepository;
+    private final TenantOAuthOrgRepository tenantOAuthOrgRepository;
 
     public TenantApplicationService(TenantRepository tenantRepository,
                                     TenantAccessGuard tenantAccessGuard,
                                     QuotaApplicationService quotaApplicationService,
                                     PlanApplicationService planApplicationService,
                                     WorkspaceRepository workspaceRepository,
-                                    PlanRepository planRepository) {
+                                    PlanRepository planRepository,
+                                    TenantOAuthOrgRepository tenantOAuthOrgRepository) {
         this.tenantRepository = tenantRepository;
         this.tenantAccessGuard = tenantAccessGuard;
         this.quotaApplicationService = quotaApplicationService;
         this.planApplicationService = planApplicationService;
         this.workspaceRepository = workspaceRepository;
         this.planRepository = planRepository;
+        this.tenantOAuthOrgRepository = tenantOAuthOrgRepository;
     }
 
     @Transactional
@@ -73,6 +79,29 @@ public class TenantApplicationService {
         member.setStatus(1);
         tenantRepository.addMember(member);
         return tenant;
+    }
+
+    public Optional<Tenant> findByOAuthOrg(String provider, String orgId) {
+        if (provider == null || orgId == null || orgId.isBlank()) {
+            return Optional.empty();
+        }
+        return tenantOAuthOrgRepository.findByProviderAndOrgId(provider, orgId)
+                .flatMap(binding -> tenantRepository.findById(binding.getTenantId()));
+    }
+
+    @Transactional
+    public void bindOAuthOrg(Long tenantId, String provider, String orgId) {
+        if (tenantId == null || provider == null || orgId == null || orgId.isBlank()) {
+            return;
+        }
+        if (tenantOAuthOrgRepository.findByProviderAndOrgId(provider, orgId).isPresent()) {
+            return;
+        }
+        TenantOAuthOrg binding = new TenantOAuthOrg();
+        binding.setTenantId(tenantId);
+        binding.setProvider(provider);
+        binding.setOrgId(orgId);
+        tenantOAuthOrgRepository.save(binding);
     }
 
     public List<TenantVO> listAll() {

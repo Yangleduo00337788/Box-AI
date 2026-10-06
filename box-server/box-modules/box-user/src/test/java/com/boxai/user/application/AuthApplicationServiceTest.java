@@ -64,12 +64,14 @@ class AuthApplicationServiceTest {
     private UserOAuthIdentityRepository userOAuthIdentityRepository;
     @Mock
     private OAuthIdentityLinkService oauthIdentityLinkService;
+    @Mock
+    private com.boxai.tenant.application.TenantMemberApplicationService tenantMemberApplicationService;
 
     @InjectMocks
     private AuthApplicationService service;
 
     @Test
-    void registerRejectsEnterpriseWithoutCompanyName() {
+    void registerRejectsEnterpriseEmail() {
         RegisterRequest request = new RegisterRequest(
                 "a@example.com", "password1", "123456", null, TenantTypes.ENTERPRISE, "  ", null);
 
@@ -120,6 +122,29 @@ class AuthApplicationServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> service.login(
                 new LoginRequest("user@example.com", "wrong", TenantTypes.PERSONAL)));
         assertEquals(ErrorCode.INVALID_CREDENTIALS, ex.getCode());
+    }
+
+    @Test
+    void loginIssuesTokenForEnterpriseEmail() {
+        User user = user(3L, UserTypes.TENANT_USER, 1);
+        user.setPasswordHash("hash");
+        user.setUsername("corp@example.com");
+        user.setEmail("corp@example.com");
+        user.setNickname("Corp");
+        when(userRepository.findByEmail("corp@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+        when(tenantApplicationService.findPrimaryByUserId(3L)).thenReturn(tenant(TenantTypes.ENTERPRISE));
+        when(userSessionApplicationService.createSession(3L)).thenReturn("sess-e");
+        when(jwtService.generate(3L, "corp@example.com", UserTypes.TENANT_USER, "sess-e")).thenReturn("jwt-ent");
+        when(workspaceApplicationService.listMineByUserId(3L)).thenReturn(List.of(
+                new WorkspaceDetailVO(8L, "Corp", "corp", null, null, 1, "OWNER")));
+        when(userPreferenceApplicationService.getCurrentWorkspaceId(3L)).thenReturn(8L);
+
+        AuthVO auth = service.login(new LoginRequest("corp@example.com", "secret", TenantTypes.ENTERPRISE));
+
+        assertEquals("jwt-ent", auth.token());
+        assertEquals(8L, auth.currentWorkspaceId());
+        verify(userRepository).updateLastLogin(3L);
     }
 
     @Test

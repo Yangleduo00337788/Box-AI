@@ -15,6 +15,7 @@ import com.boxai.security.context.LoginUser;
 import com.boxai.security.jwt.JwtService;
 import com.boxai.tenant.api.TenantVO;
 import com.boxai.tenant.application.TenantApplicationService;
+import com.boxai.tenant.application.TenantMemberApplicationService;
 import com.boxai.user.api.AuthVO;
 import com.boxai.user.api.ChangePasswordRequest;
 import com.boxai.user.api.LoginRequest;
@@ -55,6 +56,7 @@ public class AuthApplicationService {
     private final UserSessionApplicationService userSessionApplicationService;
     private final UserOAuthIdentityRepository userOAuthIdentityRepository;
     private final OAuthIdentityLinkService oauthIdentityLinkService;
+    private final TenantMemberApplicationService tenantMemberApplicationService;
 
     public AuthApplicationService(UserRepository userRepository,
                                   WorkspaceApplicationService workspaceApplicationService,
@@ -67,7 +69,8 @@ public class AuthApplicationService {
                                   UserPreferenceApplicationService userPreferenceApplicationService,
                                   UserSessionApplicationService userSessionApplicationService,
                                   UserOAuthIdentityRepository userOAuthIdentityRepository,
-                                  OAuthIdentityLinkService oauthIdentityLinkService) {
+                                  OAuthIdentityLinkService oauthIdentityLinkService,
+                                  TenantMemberApplicationService tenantMemberApplicationService) {
         this.userRepository = userRepository;
         this.workspaceApplicationService = workspaceApplicationService;
         this.tenantApplicationService = tenantApplicationService;
@@ -80,6 +83,7 @@ public class AuthApplicationService {
         this.userSessionApplicationService = userSessionApplicationService;
         this.userOAuthIdentityRepository = userOAuthIdentityRepository;
         this.oauthIdentityLinkService = oauthIdentityLinkService;
+        this.tenantMemberApplicationService = tenantMemberApplicationService;
     }
 
     @Transactional
@@ -255,15 +259,15 @@ public class AuthApplicationService {
     }
 
     private User resolveUserForOAuth(OAuthRemoteClient.OAuthUserProfile profile, String portal) {
+        if (TenantTypes.ENTERPRISE.equals(portal)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业请使用企业邮箱登录");
+        }
         String email = profile.normalizedEmail();
         if (email != null) {
             var existing = userRepository.findByEmail(email);
             if (existing.isPresent()) {
                 return existing.get();
             }
-        }
-        if (TenantTypes.ENTERPRISE.equals(portal)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "企业账号请使用邮箱注册后再登录");
         }
         return registerOAuthUser(profile);
     }

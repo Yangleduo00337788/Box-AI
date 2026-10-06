@@ -49,6 +49,15 @@ public class OAuthRemoteClient {
             params.put("prompt", "select_account");
             return "https://accounts.google.com/o/oauth2/v2/auth?" + encode(params);
         }
+        if ("wechat".equals(provider)) {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("appid", client.clientId());
+            params.put("redirect_uri", redirectUri);
+            params.put("response_type", "code");
+            params.put("scope", "snsapi_login");
+            params.put("state", state);
+            return "https://open.weixin.qq.com/connect/qrconnect?" + encode(params) + "#wechat_redirect";
+        }
         throw new BusinessException(ErrorCode.OAUTH_PROVIDER_UNKNOWN, "不支持的 OAuth 提供商: " + provider);
     }
 
@@ -62,6 +71,9 @@ public class OAuthRemoteClient {
             }
             if ("google".equals(provider)) {
                 return fetchGoogleProfile(client, code, redirectUri);
+            }
+            if ("wechat".equals(provider)) {
+                return fetchWeChatProfile(client, code);
             }
             throw new BusinessException(ErrorCode.OAUTH_PROVIDER_UNKNOWN, "不支持的 OAuth 提供商: " + provider);
         } catch (BusinessException ex) {
@@ -111,7 +123,7 @@ public class OAuthRemoteClient {
         if (providerUserId == null || providerUserId.isBlank()) {
             throw new BusinessException(ErrorCode.OAUTH_FAILED, "GitHub 用户信息不完整");
         }
-        return new OAuthUserProfile("github", providerUserId, email, login, name, avatar);
+        return new OAuthUserProfile("github", providerUserId, email, login, name, avatar, null, null);
     }
 
     private String fetchPrimaryGitHubEmail(String accessToken) throws Exception {
@@ -174,7 +186,46 @@ public class OAuthRemoteClient {
         if (providerUserId == null || providerUserId.isBlank()) {
             throw new BusinessException(ErrorCode.OAUTH_FAILED, "Google 用户信息不完整");
         }
-        return new OAuthUserProfile("google", providerUserId, email, email, name, avatar);
+        return new OAuthUserProfile("google", providerUserId, email, email, name, avatar, null, null);
+    }
+
+    private OAuthUserProfile fetchWeChatProfile(OAuthClientConfigResolver.ResolvedOAuthClient client,
+                                               String code) throws Exception {
+        String tokenUrl = "https://api.weixin.qq.com/sns/oauth2/access_token?"
+                + encode(Map.of(
+                "appid", client.clientId(),
+                "secret", client.clientSecret(),
+                "code", code,
+                "grant_type", "authorization_code"));
+        JsonNode tokenJson = sendJson(HttpRequest.newBuilder()
+                .uri(URI.create(tokenUrl))
+                .timeout(Duration.ofSeconds(30))
+                .GET()
+                .build());
+        requireWeChatOk(tokenJson, "微信换票失败");
+        String accessToken = text(tokenJson, "access_token");
+        String openId = text(tokenJson, "openid");
+        if (accessToken == null || openId == null) {
+            throw new BusinessException(ErrorCode.OAUTH_FAILED, "微信未返回 access_token");
+        }
+        String userUrl = "https://api.weixin.qq.com/sns/userinfo?"
+                + encode(Map.of(
+                "access_token", accessToken,
+                "openid", openId,
+                "lang", "zh_CN"));
+        JsonNode userJson = sendJson(HttpRequest.newBuilder()
+                .uri(URI.create(userUrl))
+                .timeout(Duration.ofSeconds(30))
+                .GET()
+                .build());
+        requireWeChatOk(userJson, "微信获取用户失败");
+        String providerUserId = firstNonBlank(text(userJson, "unionid"), text(userJson, "openid"), openId);
+        String name = text(userJson, "nickname");
+        String avatar = text(userJson, "headimgurl");
+        if (providerUserId == null || providerUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.OAUTH_FAILED, "微信用户信息不完整");
+        }
+        return new OAuthUserProfile("wechat", providerUserId, null, name, name, avatar, null, null);
     }
 
     private JsonNode sendJson(HttpRequest request) throws Exception {
@@ -184,6 +235,26 @@ public class OAuthRemoteClient {
                     "OAuth 远程请求失败 (" + response.statusCode() + ")");
         }
         return MAPPER.readTree(response.body());
+    }
+
+    private static void requireWeChatOk(JsonNode node, String message) {
+        if (node.has("errcode") && node.path("errcode").asInt(0) != 0) {
+            String detail = text(node, "errmsg");
+            throw new BusinessException(ErrorCode.OAUTH_FAILED,
+                    message + (detail == null ? "" : ": " + detail));
+        }
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static String text(JsonNode node, String field) {
@@ -211,7 +282,9 @@ public class OAuthRemoteClient {
             String email,
             String usernameHint,
             String displayName,
-            String avatarUrl
+            String avatarUrl,
+            String organizationId,
+            String organizationName
     ) {
         public String normalizedEmail() {
             if (email == null || email.isBlank()) {
