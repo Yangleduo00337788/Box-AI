@@ -27,7 +27,9 @@ import com.boxai.user.api.UpdateProfileRequest;
 import com.boxai.user.api.TenantSummaryVO;
 import com.boxai.user.api.UserVO;
 import com.boxai.user.api.WorkspaceVO;
+import com.boxai.user.support.OAuthRemoteClient;
 import com.boxai.user.support.VerificationCodePurpose;
+import com.boxai.domain.user.UserOAuthIdentityRepository;
 import com.boxai.workspace.application.WorkspaceApplicationService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 public class AuthApplicationService {
@@ -50,6 +53,8 @@ public class AuthApplicationService {
     private final RateLimitService rateLimitService;
     private final UserPreferenceApplicationService userPreferenceApplicationService;
     private final UserSessionApplicationService userSessionApplicationService;
+    private final UserOAuthIdentityRepository userOAuthIdentityRepository;
+    private final OAuthIdentityLinkService oauthIdentityLinkService;
 
     public AuthApplicationService(UserRepository userRepository,
                                   WorkspaceApplicationService workspaceApplicationService,
@@ -60,7 +65,9 @@ public class AuthApplicationService {
                                   AuditLogService auditLogService,
                                   RateLimitService rateLimitService,
                                   UserPreferenceApplicationService userPreferenceApplicationService,
-                                  UserSessionApplicationService userSessionApplicationService) {
+                                  UserSessionApplicationService userSessionApplicationService,
+                                  UserOAuthIdentityRepository userOAuthIdentityRepository,
+                                  OAuthIdentityLinkService oauthIdentityLinkService) {
         this.userRepository = userRepository;
         this.workspaceApplicationService = workspaceApplicationService;
         this.tenantApplicationService = tenantApplicationService;
@@ -71,6 +78,8 @@ public class AuthApplicationService {
         this.rateLimitService = rateLimitService;
         this.userPreferenceApplicationService = userPreferenceApplicationService;
         this.userSessionApplicationService = userSessionApplicationService;
+        this.userOAuthIdentityRepository = userOAuthIdentityRepository;
+        this.oauthIdentityLinkService = oauthIdentityLinkService;
     }
 
     @Transactional
@@ -220,6 +229,98 @@ public class AuthApplicationService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "该邮箱未注册"));
         verificationCodeService.verify(email, VerificationCodePurpose.RESET_PASSWORD, request.verificationCode());
         userRepository.updatePasswordHash(user.getId(), passwordEncoder.encode(request.newPassword()));
+    }
+
+    @Transactional
+    public String loginOrRegisterWithOAuth(OAuthRemoteClient.OAuthUserProfile profile, String portal) {
+        String provider = profile.provider();
+        User user = userOAuthIdentityRepository.findByProviderAndUserId(provider, profile.providerUserId())
+                .map(identity -> userRepository.findById(identity.getUserId())
+                        .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在")))
+                .orElseGet(() -> resolveUserForOAuth(profile, portal));
+        oauthIdentityLinkService.linkIfAbsent(user.getId(), profile);
+        assertOAuthLoginAllowed(user, portal);
+        userRepository.updateLastLogin(user.getId());
+        AuthVO auth = issue(user);
+        auditLogService.recordForUser(
+                user.getId(),
+                null,
+                AuditActions.LOGIN,
+                AuditResourceTypes.AUTH,
+                String.valueOf(user.getId()),
+                user.getEmail(),
+                AuditLogService.RESULT_SUCCESS,
+                "oauth:" + provider);
+        return auth.token();
+    }
+
+    private User resolveUserForOAuth(OAuthRemoteClient.OAuthUserProfile profile, String portal) {
+        String email = profile.normalizedEmail();
+        if (email != null) {
+            var existing = userRepository.findByEmail(email);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
+        if (TenantTypes.ENTERPRISE.equals(portal)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "企业账号请使用邮箱注册后再登录");
+        }
+        return registerOAuthUser(profile);
+    }
+
+    private User registerOAuthUser(OAuthRemoteClient.OAuthUserProfile profile) {
+        String email = profile.normalizedEmail();
+        String username = email != null ? email : profile.provider() + "_" + profile.providerUserId();
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, "用户名已存在，请使用密码登录后绑定");
+        }
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode("oauth-" + UUID.randomUUID()));
+        String nickname = profile.displayName();
+        if (nickname == null || nickname.isBlank()) {
+            nickname = profile.usernameHint();
+        }
+        if (nickname == null || nickname.isBlank()) {
+            nickname = username.contains("@") ? username.split("@")[0] : username;
+        }
+        user.setNickname(nickname);
+        user.setAvatarUrl(profile.avatarUrl());
+        user.setStatus(1);
+        user.setUserType(UserTypes.TENANT_USER);
+        userRepository.save(user);
+        var tenant = tenantApplicationService.createForRegistration(user, TenantTypes.PERSONAL, null, email);
+        var workspace = workspaceApplicationService.createDefaultWorkspace(user, tenant.getId(), tenant.getTenantType());
+        userPreferenceApplicationService.setCurrentWorkspaceId(user.getId(), workspace.getId());
+        oauthIdentityLinkService.linkIfAbsent(user.getId(), profile);
+        auditLogService.recordForUser(
+                user.getId(),
+                null,
+                AuditActions.REGISTER,
+                AuditResourceTypes.AUTH,
+                String.valueOf(user.getId()),
+                user.getEmail(),
+                AuditLogService.RESULT_SUCCESS,
+                "oauth:" + profile.provider());
+        return user;
+    }
+
+    private void assertOAuthLoginAllowed(User user, String portal) {
+        if (UserTypes.PLATFORM_ADMIN.equals(user.getUserType())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "请使用平台管理端登录");
+        }
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.USER_DISABLED, "账号已禁用");
+        }
+        String expectedType = normalizeAccountType(portal);
+        TenantVO tenant = tenantApplicationService.findPrimaryByUserId(user.getId());
+        if (tenant != null && tenant.tenantType() != null && !expectedType.equals(tenant.tenantType())) {
+            if (TenantTypes.PERSONAL.equals(expectedType)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "该账号为企业账号，请切换到企业端登录");
+            }
+            throw new BusinessException(ErrorCode.FORBIDDEN, "该账号为个人账号，请切换到个人端登录");
+        }
     }
 
     @Transactional

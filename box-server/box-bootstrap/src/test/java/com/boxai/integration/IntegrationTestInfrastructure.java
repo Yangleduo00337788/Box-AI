@@ -54,6 +54,7 @@ final class IntegrationTestInfrastructure {
             registry.add("spring.datasource.password", () -> jdbcPassword);
             registry.add("spring.data.redis.host", () -> envOrDefault("BOX_IT_REDIS_HOST", "127.0.0.1"));
             registry.add("spring.data.redis.port", () -> Integer.parseInt(envOrDefault("BOX_IT_REDIS_PORT", "6379")));
+            registry.add("spring.data.redis.password", () -> envOrDefault("BOX_IT_REDIS_PASSWORD", envOrDefault("SPRING_DATA_REDIS_PASSWORD", "")));
             registerLocalStackOverrides(registry);
         } else {
             registry.add("spring.datasource.url", MYSQL::getJdbcUrl);

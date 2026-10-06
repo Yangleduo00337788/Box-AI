@@ -19,6 +19,8 @@ import com.boxai.user.application.AuthApplicationService;
 import com.boxai.user.application.OAuthApplicationService;
 import com.boxai.user.application.PublicImageAssetService;
 import com.boxai.user.application.UserPreferenceApplicationService;
+import com.boxai.common.exception.BusinessException;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -68,18 +71,27 @@ public class AuthController {
     }
 
     @GetMapping("/oauth/{provider}/authorize")
-    public Result<Void> oauthAuthorize(@PathVariable String provider,
-                                       @RequestParam(required = false) String redirectUri) {
-        oauthApplicationService.startAuthorize(provider, redirectUri);
-        return Result.success(null);
+    public void oauthAuthorize(@PathVariable String provider,
+                               @RequestParam(required = false) String redirectUri,
+                               @RequestParam(required = false) String portal,
+                               HttpServletResponse response) throws IOException {
+        String url = oauthApplicationService.buildAuthorizeUrl(provider, redirectUri, portal);
+        response.sendRedirect(url);
     }
 
     @GetMapping("/oauth/{provider}/callback")
-    public Result<Void> oauthCallback(@PathVariable String provider,
-                                      @RequestParam(required = false) String code,
-                                      @RequestParam(required = false) String state) {
-        oauthApplicationService.handleCallback(provider, code, state);
-        return Result.success(null);
+    public void oauthCallback(@PathVariable String provider,
+                              @RequestParam(required = false) String code,
+                              @RequestParam(required = false) String state,
+                              HttpServletResponse response) throws IOException {
+        try {
+            String target = oauthApplicationService.handleCallbackAndBuildRedirect(provider, code, state);
+            response.sendRedirect(target);
+        } catch (BusinessException ex) {
+            response.sendRedirect(oauthApplicationService.buildErrorRedirect(state, ex.getMessage()));
+        } catch (Exception ex) {
+            response.sendRedirect(oauthApplicationService.buildErrorRedirect(state, "OAuth 登录失败，请稍后重试"));
+        }
     }
 
     @PostMapping("/verification-code")

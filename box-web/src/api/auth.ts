@@ -62,8 +62,31 @@ export interface AuthVO {
   currentWorkspaceId?: number | null
 }
 
+export interface OAuthProviderVO {
+  provider: string
+  displayName: string
+  enabled: boolean
+  authorizePath: string
+}
+
+export function fetchOAuthProviders() {
+  return http.get<Result<OAuthProviderVO[]>>('/auth/oauth/providers')
+}
+
 export function login(account: string, password: string, accountType: 'PERSONAL' | 'ENTERPRISE') {
   return http.post<Result<AuthVO>>('/auth/login', { account, password, accountType })
+}
+
+export function startOAuthLogin(
+  provider: string,
+  accountType: 'PERSONAL' | 'ENTERPRISE',
+  redirectUri = `${window.location.origin}/chat`,
+) {
+  const params = new URLSearchParams({
+    redirectUri,
+    portal: accountType,
+  })
+  window.location.href = `/api/v1/auth/oauth/${provider}/authorize?${params.toString()}`
 }
 
 export function register(payload: RegisterRequest) {

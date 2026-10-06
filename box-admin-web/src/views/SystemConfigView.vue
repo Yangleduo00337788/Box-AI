@@ -57,7 +57,7 @@
         </t-card>
 
         <t-card :bordered="false" title="OAuth 登录" class="config-card">
-          <p class="config-group__hint">开关与 Client 信息供 C 端 OAuth 入口读取；回调实现仍依赖后端 box.oauth 配置。</p>
+          <p class="config-group__hint">开启并填写 Client 后，C 端登录页将显示对应按钮。回调地址固定为后端 /api/v1/auth/oauth/{provider}/callback，也可在 .env 配置 BOX_OAUTH_*。本地开发可用 GitHub/Google（localhost 回调即可）。</p>
           <t-form-item
             v-for="item in oauthItems"
             :key="item.configKey"

@@ -29,7 +29,12 @@ services:
     container_name: box-redis
     ports:
       - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${SPRING_DATA_REDIS_PASSWORD:-admin123}
     volumes:
       - box-redis-data:/data
 
@@ -72,6 +77,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-box}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD:-admin123}
       BOX_MINIO_ENDPOINT: http://minio:9000
       BOX_MINIO_ACCESS_KEY: ${BOX_MINIO_ACCESS_KEY:-box}
       BOX_MINIO_SECRET_KEY: ${BOX_MINIO_SECRET_KEY:-boxsecret1}

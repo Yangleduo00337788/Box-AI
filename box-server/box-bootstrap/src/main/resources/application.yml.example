@@ -17,6 +17,7 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST}
       port: ${SPRING_DATA_REDIS_PORT}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -33,12 +34,13 @@ box:
     verification:
       expose-code: ${BOX_AUTH_VERIFICATION_EXPOSE_CODE:false}
   oauth:
+    public-base-url: ${BOX_OAUTH_PUBLIC_BASE_URL:http://localhost:8080}
     github:
-      enabled: false
+      enabled: ${BOX_OAUTH_GITHUB_ENABLED:false}
       client-id: ${BOX_OAUTH_GITHUB_CLIENT_ID:}
       client-secret: ${BOX_OAUTH_GITHUB_CLIENT_SECRET:}
     google:
-      enabled: false
+      enabled: ${BOX_OAUTH_GOOGLE_ENABLED:false}
       client-id: ${BOX_OAUTH_GOOGLE_CLIENT_ID:}
       client-secret: ${BOX_OAUTH_GOOGLE_CLIENT_SECRET:}
     sso:

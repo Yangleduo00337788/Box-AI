@@ -30,6 +30,7 @@ public final class LocalDotenv {
             Map.entry("SPRING_DATASOURCE_PASSWORD", "spring.datasource.password"),
             Map.entry("SPRING_DATA_REDIS_HOST", "spring.data.redis.host"),
             Map.entry("SPRING_DATA_REDIS_PORT", "spring.data.redis.port"),
+            Map.entry("SPRING_DATA_REDIS_PASSWORD", "spring.data.redis.password"),
             Map.entry("BOX_SECURITY_JWT_SECRET", "box.security.jwt.secret"),
             Map.entry("BOX_SECURITY_CRYPTO_AES_KEY", "box.security.crypto.aes-key"),
             Map.entry("BOX_MINIO_ENDPOINT", "box.minio.endpoint"),

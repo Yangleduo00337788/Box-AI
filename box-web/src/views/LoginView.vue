@@ -53,6 +53,25 @@
         </t-button>
       </t-form-item>
     </t-form>
+
+    <div class="oauth-section">
+      <div class="oauth-divider"><span>或使用第三方登录</span></div>
+      <div class="oauth-actions">
+        <t-button
+          v-for="item in oauthProviders"
+          :key="item.provider"
+          variant="outline"
+          block
+          size="large"
+          shape="round"
+          :disabled="loading || !item.enabled"
+          @click="onOAuthLogin(item)"
+        >
+          使用 {{ item.displayName }} 登录
+        </t-button>
+      </div>
+      <p v-if="oauthConfigHint" class="oauth-hint">{{ oauthConfigHint }}</p>
+    </div>
   </auth-layout>
 </template>
 
@@ -65,6 +84,8 @@ import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
 import AuthAgreement from '@/components/AuthAgreement.vue'
 import { PORTAL_OPTIONS, type PortalType } from '@/constants/portal'
 import { extractApiError } from '@/api/apiError'
+import { fetchOAuthProviders, startOAuthLogin, type OAuthProviderVO } from '@/api/auth'
+import { mergeOAuthProviders } from '@/constants/oauthProviders'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -74,6 +95,13 @@ const loading = ref(false)
 const remember = ref(false)
 const agreed = ref(false)
 const portal = ref<PortalType>('personal')
+const oauthProviders = ref<OAuthProviderVO[]>(mergeOAuthProviders([]))
+const oauthConfigHint = computed(() => {
+  if (oauthProviders.value.some((item) => item.enabled)) {
+    return ''
+  }
+  return '第三方登录未启用：请在 .env 或管理端系统配置填写 GitHub/Google 的 Client ID 与 Secret，并重启后端。'
+})
 
 const formData = reactive({
   account: '',
@@ -99,12 +127,39 @@ function switchPortal(value: PortalType) {
   router.replace({ query: { portal: value } })
 }
 
-onMounted(() => {
+async function loadOAuthProviders() {
+  try {
+    const { data } = await fetchOAuthProviders()
+    oauthProviders.value = mergeOAuthProviders(data.data)
+  } catch {
+    oauthProviders.value = mergeOAuthProviders([])
+  }
+}
+
+function onOAuthLogin(item: OAuthProviderVO) {
+  if (!item.enabled) {
+    MessagePlugin.warning('该登录方式尚未配置，请检查 .env 或管理端 OAuth 配置后重启后端')
+    return
+  }
+  if (!agreed.value) {
+    MessagePlugin.warning('请先阅读并同意用户协议和隐私政策')
+    return
+  }
+  startOAuthLogin(item.provider, portal.value === 'enterprise' ? 'ENTERPRISE' : 'PERSONAL')
+}
+
+onMounted(async () => {
   auth.logout()
   const queryPortal = route.query.portal
   if (queryPortal === 'enterprise' || queryPortal === 'personal') {
     portal.value = queryPortal
   }
+  const oauthError = route.query.oauth_error
+  if (typeof oauthError === 'string' && oauthError.trim()) {
+    MessagePlugin.error(oauthError.trim())
+    void router.replace({ path: route.path, query: { portal: portal.value } })
+  }
+  await loadOAuthProviders()
 })
 
 watch(
@@ -193,5 +248,40 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
 .form-link {
   font: var(--td-font-body-medium);
   color: var(--td-brand-color);
+}
+
+.oauth-section {
+  margin-top: 24px;
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: var(--box-muted);
+  font: var(--td-font-body-small);
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--box-border);
+}
+
+.oauth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.oauth-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+  line-height: 1.5;
 }
 </style>

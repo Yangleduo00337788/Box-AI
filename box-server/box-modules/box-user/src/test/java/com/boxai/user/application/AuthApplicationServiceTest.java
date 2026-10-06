@@ -5,6 +5,7 @@ import com.boxai.common.constant.UserTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.user.User;
+import com.boxai.domain.user.UserOAuthIdentityRepository;
 import com.boxai.domain.user.UserRepository;
 import com.boxai.security.audit.AuditLogService;
 import com.boxai.security.jwt.JwtService;
@@ -59,6 +60,10 @@ class AuthApplicationServiceTest {
     private UserPreferenceApplicationService userPreferenceApplicationService;
     @Mock
     private UserSessionApplicationService userSessionApplicationService;
+    @Mock
+    private UserOAuthIdentityRepository userOAuthIdentityRepository;
+    @Mock
+    private OAuthIdentityLinkService oauthIdentityLinkService;
 
     @InjectMocks
     private AuthApplicationService service;

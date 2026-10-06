@@ -104,11 +104,33 @@
         </t-button>
       </t-form-item>
     </t-form>
+
+    <div class="oauth-section">
+      <div class="oauth-divider"><span>或使用第三方注册</span></div>
+      <div class="oauth-actions">
+        <t-button
+          v-for="item in oauthProviders"
+          :key="item.provider"
+          variant="outline"
+          block
+          size="large"
+          shape="round"
+          :disabled="loading || !item.enabled"
+          @click="onOAuthRegister(item)"
+        >
+          使用 {{ item.displayName }} 注册
+        </t-button>
+      </div>
+      <p v-if="oauthConfigHint" class="oauth-hint">{{ oauthConfigHint }}</p>
+      <p v-else-if="accountType === 'enterprise'" class="oauth-hint">
+        企业账号请先完成邮箱注册；已有企业账号可在登录页使用第三方登录。
+      </p>
+    </div>
   </auth-layout>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, FormRule } from 'tdesign-vue-next'
@@ -116,7 +138,8 @@ import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
 import AuthAgreement from '@/components/AuthAgreement.vue'
 import { PORTAL_OPTIONS, type PortalType } from '@/constants/portal'
 import { extractApiError } from '@/api/apiError'
-import { sendVerificationCode } from '@/api/auth'
+import { fetchOAuthProviders, sendVerificationCode, startOAuthLogin, type OAuthProviderVO } from '@/api/auth'
+import { mergeOAuthProviders } from '@/constants/oauthProviders'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -128,6 +151,13 @@ const agreed = ref(false)
 const countdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 const accountType = ref<PortalType>('personal')
+const oauthProviders = ref<OAuthProviderVO[]>(mergeOAuthProviders([]))
+const oauthConfigHint = computed(() => {
+  if (oauthProviders.value.some((item) => item.enabled)) {
+    return ''
+  }
+  return '第三方注册未启用：请在 .env 或管理端系统配置填写 GitHub/Google 的 Client ID 与 Secret，并重启后端。'
+})
 
 const formData = reactive({
   companyName: '',
@@ -159,12 +189,38 @@ const rules: FormProps['rules'] = {
 
 const companyNameRules: FormRule[] = [{ required: true, message: '请输入企业名称' }]
 
-onMounted(() => {
+async function loadOAuthProviders() {
+  try {
+    const { data } = await fetchOAuthProviders()
+    oauthProviders.value = mergeOAuthProviders(data.data)
+  } catch {
+    oauthProviders.value = mergeOAuthProviders([])
+  }
+}
+
+function onOAuthRegister(item: OAuthProviderVO) {
+  if (!item.enabled) {
+    MessagePlugin.warning('该方式尚未配置，请检查 .env 或管理端 OAuth 配置后重启后端')
+    return
+  }
+  if (accountType.value === 'enterprise') {
+    MessagePlugin.warning('企业账号请使用邮箱注册；个人账号可直接使用第三方注册')
+    return
+  }
+  if (!agreed.value) {
+    MessagePlugin.warning('请先阅读并同意用户协议和隐私政策')
+    return
+  }
+  startOAuthLogin(item.provider, 'PERSONAL')
+}
+
+onMounted(async () => {
   auth.logout()
   const queryPortal = route.query.portal
   if (queryPortal === 'enterprise' || queryPortal === 'personal') {
     accountType.value = queryPortal
   }
+  await loadOAuthProviders()
 })
 
 onUnmounted(() => {
@@ -275,5 +331,40 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   grid-template-columns: 1fr auto;
   gap: 8px;
   width: 100%;
+}
+
+.oauth-section {
+  margin-top: 24px;
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: var(--box-muted);
+  font: var(--td-font-body-small);
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--box-border);
+}
+
+.oauth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.oauth-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+  line-height: 1.5;
 }
 </style>
