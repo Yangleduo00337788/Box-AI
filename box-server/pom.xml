@@ -199,9 +199,6 @@
                 <configuration>
                     <groups>${surefire.groups}</groups>
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>
-                    <systemPropertyVariables>
-                        <box.dotenv.disabled>true</box.dotenv.disabled>
-                    </systemPropertyVariables>
                 </configuration>
             </plugin>
         </plugins>

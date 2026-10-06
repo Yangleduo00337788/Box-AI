@@ -1,4 +1,4 @@
-# 键值来自仓库根目录 .env（复制 .env.example）。application.yml 本身不含密钥。
+# 键值来自进程环境变量（本地由 IDE 加载仓库根 .env，部署由编排注入）。application.yml 本身不含密钥。
 server:
   port: ${SERVER_PORT:8080}
 
@@ -43,9 +43,10 @@ box:
       enabled: ${BOX_OAUTH_GOOGLE_ENABLED:false}
       client-id: ${BOX_OAUTH_GOOGLE_CLIENT_ID:}
       client-secret: ${BOX_OAUTH_GOOGLE_CLIENT_SECRET:}
-    sso:
-      enabled: false
-      issuer-uri: ${BOX_OAUTH_SSO_ISSUER_URI:}
+    wechat:
+      enabled: ${BOX_OAUTH_WECHAT_ENABLED:false}
+      client-id: ${BOX_OAUTH_WECHAT_CLIENT_ID:}
+      client-secret: ${BOX_OAUTH_WECHAT_CLIENT_SECRET:}
   security:
     jwt:
       secret: ${BOX_SECURITY_JWT_SECRET}
@@ -58,13 +59,9 @@ box:
     gateway-tls-mode: ${BOX_EMBED_GATEWAY_TLS_MODE:platform}
   payment:
     enabled: ${BOX_PAYMENT_ENABLED:false}
-    provider: ${BOX_PAYMENT_PROVIDER:mock}
+    provider: ${BOX_PAYMENT_PROVIDER:alipay}
     success-url: ${BOX_PAYMENT_SUCCESS_URL:http://localhost:5173/settings/plan?tab=billing&payment=success}
     cancel-url: ${BOX_PAYMENT_CANCEL_URL:http://localhost:5173/settings/plan?tab=plans&payment=cancel}
-    stripe:
-      secret-key: ${BOX_STRIPE_SECRET_KEY:}
-      webhook-secret: ${BOX_STRIPE_WEBHOOK_SECRET:}
-      currency: ${BOX_STRIPE_CURRENCY:usd}
     alipay:
       gateway-url: ${BOX_ALIPAY_GATEWAY_URL:https://openapi-sandbox.dl.alipaydev.com/gateway.do}
       app-id: ${BOX_ALIPAY_APP_ID:}

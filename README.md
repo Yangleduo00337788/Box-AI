@@ -181,8 +181,9 @@ cd deploy && docker compose --env-file ../.env up -d
 # 2. 后端配置与启动（8080）
 cp box-server/box-bootstrap/src/main/resources/application.yml.example \
    box-server/box-bootstrap/src/main/resources/application.yml
-# 连接信息与密钥写在仓库根目录 .env，不要写进 yml、不要提交 .env
-cd box-server && mvn spring-boot:run -pl box-bootstrap
+# 连接信息与密钥写在仓库根目录 .env，由 IDE 注入进程环境变量，不要写进 yml、不要提交 .env
+# Cursor：运行与调试 → BoxApplication；IntelliJ：运行配置 BoxApplication（加载 .env）
+# 不要用「裸」mvn spring-boot:run，进程里没有 .env，行为会和生产不一致
 ```
 
 ```bash
@@ -207,11 +208,11 @@ cd deploy && docker compose --env-file ../.env --profile app up -d --build
 | MySQL | `localhost:3307`，库名 `box` |
 | MinIO Console | http://localhost:9001 |
 
-配置说明见 [`.env.example`](.env.example) 与 [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example)。本地和部署都通过环境变量注入密钥；启动时会自动读取仓库根目录 `.env`。不要提交 `.env` 或 `application.yml`。
+配置说明见 [`.env.example`](.env.example) 与 [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example)。本地由 IDE 注入环境变量，部署由 Docker / 编排注入；应用只读进程环境，不解析 `.env`。不要提交 `.env` 或 `application.yml`。
 
 **常见问题**
 
-- 后端启动失败：确认已复制 `.env.example` 为 `.env`，Docker 中间件已就绪，且 `.env` 中端口与 `deploy/docker-compose.yml` 一致。
+- 后端启动失败：确认已复制 `.env.example` 为 `.env`，用 IDE 的 **BoxApplication** 启动（会注入 `.env`），Docker 中间件已就绪，且 `.env` 中端口与 `deploy/docker-compose.yml` 一致。
 - 前端 401：先完成注册/登录；开放 API 调用需使用 API Key（见下文）。
 - Gitee 上图被挤压：README 配图使用 PNG，`<img>` 仅设 `width`、不设 `height`。
 

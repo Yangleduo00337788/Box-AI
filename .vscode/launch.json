@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "BoxApplication",
+      "request": "launch",
+      "mainClass": "com.boxai.BoxApplication",
+      "projectName": "box-bootstrap",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}

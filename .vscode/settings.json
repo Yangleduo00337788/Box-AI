@@ -1,0 +1,3 @@
+{
+  "java.debug.settings.envFile": "${workspaceFolder}/.env"
+}

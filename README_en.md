@@ -179,8 +179,8 @@ cd deploy && docker compose --env-file ../.env up -d
 # 2. Backend (port 8080)
 cp box-server/box-bootstrap/src/main/resources/application.yml.example \
    box-server/box-bootstrap/src/main/resources/application.yml
-# Put connection strings and secrets in the repo-root .env file; do not commit .env
-cd box-server && mvn spring-boot:run -pl box-bootstrap
+# Secrets live in the repo-root .env (gitignored). The app does not parse .env.
+# Run BoxApplication from the IDE so process env matches production injection.
 ```
 
 ```bash
@@ -205,7 +205,7 @@ cd deploy && docker compose --env-file ../.env --profile app up -d --build
 | MySQL | `localhost:3307`, database `box` |
 | MinIO Console | http://localhost:9001 |
 
-See [`.env.example`](.env.example) and [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example). Local and deployed runtimes inject secrets via environment variables; the app loads the repo-root `.env` on startup. Do not commit `.env` or `application.yml`.
+See [`.env.example`](.env.example) and [`application.yml.example`](box-server/box-bootstrap/src/main/resources/application.yml.example). Locally the IDE injects env vars; in deploy, the orchestrator does. The app only reads the process environment and does not parse `.env`. Do not commit `.env` or `application.yml`.
 
 **Troubleshooting**
 
