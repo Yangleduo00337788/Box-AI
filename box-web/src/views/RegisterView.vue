@@ -2,7 +2,7 @@
   <auth-layout
     slogan="把模型、知识、工具、工作流装进一个 Box"
   >
-    <h2 class="form-title">{{ portal === 'enterprise' ? '创建企业账号' : '创建个人账号' }}</h2>
+    <h2 class="form-title">{{ portal === 'enterprise' ? '使用企业邮箱注册' : '创建个人账号' }}</h2>
     <p class="form-desc">
       已有账号？
       <router-link :to="{ path: '/login', query: { portal } }">返回登录</router-link>
@@ -14,6 +14,9 @@
         · 个人请
         <router-link :to="{ path: '/register', query: { portal: 'personal' } }">注册个人账号</router-link>
       </template>
+    </p>
+    <p v-if="portal === 'enterprise'" class="form-hint">
+      员工不能自行注册。请使用企业邮箱完成注册，或从登录页进入员工入口。
     </p>
 
     <t-form :data="formData" :rules="rules" label-width="0" @submit="onSubmit">
@@ -121,6 +124,15 @@
       </div>
       <p v-if="oauthConfigHint" class="oauth-hint">{{ oauthConfigHint }}</p>
     </div>
+
+    <router-link
+      v-if="portal === 'enterprise'"
+      class="employee-entry"
+      :to="{ path: '/login', query: { portal: 'enterprise', mode: 'employee' } }"
+    >
+      <t-icon name="usergroup" />
+      企业员工登录
+    </router-link>
   </auth-layout>
 </template>
 
@@ -132,7 +144,7 @@ import type { FormProps, FormRule } from 'tdesign-vue-next'
 import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
 import AuthAgreement from '@/components/AuthAgreement.vue'
 import type { PortalType } from '@/constants/portal'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { fetchOAuthProviders, sendVerificationCode, startOAuthLogin, type OAuthProviderVO } from '@/api/auth'
 import { mergeOAuthProviders } from '@/constants/oauthProviders'
 import { useAuthStore } from '@/stores/auth'
@@ -145,13 +157,13 @@ const sendingCode = ref(false)
 const agreed = ref(false)
 const countdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
-const portal = ref<PortalType>('personal')
-const oauthProviders = ref<OAuthProviderVO[]>(mergeOAuthProviders([], 'personal'))
+const portal = ref<PortalType>(route.query.portal === 'enterprise' ? 'enterprise' : 'personal')
+const oauthProviders = ref<OAuthProviderVO[]>(mergeOAuthProviders([], portal.value))
 const oauthConfigHint = computed(() => {
   if (oauthProviders.value.some((item) => item.enabled)) {
     return ''
   }
-  return '第三方注册未启用：请在环境变量或管理端填写 GitHub / Google / 微信的 Client ID 与 Secret，并重启后端。'
+  return '第三方注册未启用：请在环境变量或管理端填写 GitHub / Google 的 Client ID 与 Secret，并重启后端。'
 })
 
 const formData = reactive({
@@ -263,7 +275,7 @@ async function sendCode() {
     }
     startCountdown()
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '发送验证码失败'))
+    notifyApiError(error, '发送验证码失败')
   } finally {
     sendingCode.value = false
   }
@@ -288,7 +300,7 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
     MessagePlugin.success('注册成功')
     await router.push('/chat')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '注册失败'))
+    notifyApiError(error, '注册失败')
   } finally {
     loading.value = false
   }
@@ -303,9 +315,16 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
 }
 
 .form-desc {
-  margin: 0 0 24px;
+  margin: 0 0 12px;
   font: var(--td-font-body-medium);
   color: var(--box-muted);
+}
+
+.form-hint {
+  margin: 0 0 24px;
+  font: var(--td-font-body-small);
+  color: var(--box-muted);
+  line-height: 1.5;
 }
 
 .code-row {
@@ -371,10 +390,6 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   background-image: url('../assets/oauth/google.svg');
 }
 
-.oauth-logo[data-provider='wechat'] {
-  background-image: url('../assets/oauth/wechat.svg');
-}
-
 :global(html[data-box-theme='dark']) .oauth-logo[data-provider='github'] {
   filter: invert(1);
 }
@@ -385,5 +400,25 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   font: var(--td-font-body-small);
   color: var(--box-muted);
   line-height: 1.5;
+}
+
+.employee-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  color: var(--box-ink);
+  font: var(--td-font-body-medium);
+  text-decoration: none;
+}
+
+.employee-entry :deep(.t-icon) {
+  font-size: 18px;
+}
+
+.employee-entry:hover {
+  color: var(--td-brand-color);
 }
 </style>

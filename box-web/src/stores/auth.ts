@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { usePermissionStore } from '@/stores/permission'
 import {
   fetchMe,
+  joinEnterprise as joinEnterpriseApi,
   login as loginApi,
   register as registerApi,
   selectCurrentWorkspace,
@@ -113,13 +114,29 @@ export const useAuthStore = defineStore('auth', () => {
     applyWorkspaceSelection(Number(currentWorkspaceId.value) || undefined, true)
   }
 
-  async function login(account: string, password: string, accountType: 'PERSONAL' | 'ENTERPRISE') {
-    const { data } = await loginApi(account, password, accountType)
+  async function login(
+    account: string,
+    password: string,
+    accountType: 'PERSONAL' | 'ENTERPRISE',
+    orgId?: string,
+  ) {
+    const { data } = await loginApi(account, password, accountType, orgId)
     persist(data.data)
   }
 
   async function register(payload: RegisterRequest) {
     const { data } = await registerApi(payload)
+    persist(data.data)
+  }
+
+  async function joinEnterprise(payload: {
+    orgId: string
+    inviteCode: string
+    account: string
+    password: string
+    nickname?: string
+  }) {
+    const { data } = await joinEnterpriseApi(payload)
     persist(data.data)
   }
 
@@ -168,6 +185,7 @@ export const useAuthStore = defineStore('auth', () => {
     currentWorkspace,
     login,
     register,
+    joinEnterprise,
     hydrate,
     refreshWorkspaces,
     updateProfile,

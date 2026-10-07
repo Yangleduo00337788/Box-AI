@@ -73,8 +73,32 @@ export function fetchOAuthProviders() {
   return http.get<Result<OAuthProviderVO[]>>('/auth/oauth/providers')
 }
 
-export function login(account: string, password: string, accountType: 'PERSONAL' | 'ENTERPRISE') {
-  return http.post<Result<AuthVO>>('/auth/login', { account, password, accountType })
+export function login(
+  account: string,
+  password: string,
+  accountType: 'PERSONAL' | 'ENTERPRISE',
+  orgId?: string,
+) {
+  return http.post<Result<AuthVO>>('/auth/login', { account, password, accountType, orgId })
+}
+
+export interface EnterpriseOrgLookupVO {
+  orgId: string
+  name: string
+}
+
+export function lookupEnterpriseOrg(orgId: string) {
+  return http.get<Result<EnterpriseOrgLookupVO>>('/auth/enterprise/org', { params: { orgId } })
+}
+
+export function joinEnterprise(payload: {
+  orgId: string
+  inviteCode: string
+  account: string
+  password: string
+  nickname?: string
+}) {
+  return http.post<Result<AuthVO>>('/auth/enterprise/join', payload)
 }
 
 export function startOAuthLogin(
