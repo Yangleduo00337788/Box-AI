@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record TenantMemberVO(
         Long id,
         Long userId,
+        String loginName,
         String email,
         String nickname,
         String roleCode,

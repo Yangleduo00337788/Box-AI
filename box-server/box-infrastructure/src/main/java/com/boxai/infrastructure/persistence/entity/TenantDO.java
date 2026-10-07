@@ -22,6 +22,8 @@ public class TenantDO {
     private Long planId;
     @Column("contact_email")
     private String contactEmail;
+    @Column("invite_code")
+    private String inviteCode;
     private Integer status;
     @Column("owner_id")
     private Long ownerId;

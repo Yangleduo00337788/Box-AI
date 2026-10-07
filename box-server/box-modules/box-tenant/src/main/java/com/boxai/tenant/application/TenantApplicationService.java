@@ -4,6 +4,7 @@ import com.boxai.common.constant.RoleCodes;
 import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.common.security.EnterpriseAccounts;
 import com.boxai.domain.plan.Plan;
 import com.boxai.domain.plan.PlanRepository;
 import com.boxai.domain.tenant.Tenant;
@@ -16,6 +17,7 @@ import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.security.tenant.TenantAccessGuard;
 import com.boxai.tenant.api.AdminWorkspaceVO;
 import com.boxai.tenant.api.CreateTenantRequest;
+import com.boxai.tenant.api.EnterpriseOrgAccessVO;
 import com.boxai.tenant.api.TenantVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +63,7 @@ public class TenantApplicationService {
             tenant.setSlug(uniqueSlug(companyName));
             tenant.setContactEmail(contactEmail == null || contactEmail.isBlank() ? user.getEmail() : contactEmail.trim());
             tenant.setTenantType(TenantTypes.ENTERPRISE);
+            tenant.setInviteCode(newUniqueInviteCode());
         } else {
             tenant.setName(user.getNickname() + " 的个人空间");
             tenant.setSlug(uniqueSlug(user.getNickname() + "-personal"));
@@ -76,6 +79,7 @@ public class TenantApplicationService {
         member.setTenantId(tenant.getId());
         member.setUserId(user.getId());
         member.setRoleCode(RoleCodes.TENANT_ADMIN);
+        member.setLoginName(defaultLoginName(user));
         member.setStatus(1);
         tenantRepository.addMember(member);
         return tenant;
@@ -202,8 +206,95 @@ public class TenantApplicationService {
         Plan plan = planRepository.findByCode("enterprise_starter")
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAN_NOT_FOUND, "企业套餐不存在"));
         tenant.setPlanId(plan.getId());
+        if (tenant.getInviteCode() == null || tenant.getInviteCode().isBlank()) {
+            tenant.setInviteCode(newUniqueInviteCode());
+        }
         tenantRepository.update(tenant);
         return toVo(tenant);
+    }
+
+    public Optional<Tenant> findEnterpriseByOrgId(String orgId) {
+        String slug = EnterpriseAccounts.normalizeOrgId(orgId);
+        return tenantRepository.findBySlug(slug)
+                .filter(item -> TenantTypes.ENTERPRISE.equals(item.getTenantType())
+                        && item.getStatus() != null
+                        && item.getStatus() == 1);
+    }
+
+    @Transactional
+    public EnterpriseOrgAccessVO getOrgAccess(Long operatorUserId) {
+        Tenant tenant = requireAdminEnterprise(operatorUserId);
+        if (tenant.getInviteCode() == null || tenant.getInviteCode().isBlank()) {
+            tenant.setInviteCode(newUniqueInviteCode());
+            tenantRepository.update(tenant);
+        }
+        return new EnterpriseOrgAccessVO(tenant.getId(), tenant.getName(), tenant.getSlug(), tenant.getInviteCode());
+    }
+
+    @Transactional
+    public EnterpriseOrgAccessVO updateOrgId(Long operatorUserId, String orgId) {
+        Tenant tenant = requireAdminEnterprise(operatorUserId);
+        String slug = normalizeSlug(orgId);
+        if (slug.length() < 2 || slug.length() > 64) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业标识为 2-64 位字母、数字或短横线");
+        }
+        if (!slug.equals(tenant.getSlug()) && tenantRepository.findBySlug(slug).isPresent()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业标识已被占用");
+        }
+        tenant.setSlug(slug);
+        tenantRepository.update(tenant);
+        return new EnterpriseOrgAccessVO(tenant.getId(), tenant.getName(), tenant.getSlug(), tenant.getInviteCode());
+    }
+
+    @Transactional
+    public EnterpriseOrgAccessVO rotateInviteCode(Long operatorUserId) {
+        Tenant tenant = requireAdminEnterprise(operatorUserId);
+        tenant.setInviteCode(newUniqueInviteCode());
+        tenantRepository.update(tenant);
+        return new EnterpriseOrgAccessVO(tenant.getId(), tenant.getName(), tenant.getSlug(), tenant.getInviteCode());
+    }
+
+    public Tenant requireMatchingInvite(String orgId, String inviteCode) {
+        Tenant tenant = findEnterpriseByOrgId(orgId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "企业标识或邀请码无效"));
+        String code = inviteCode == null ? "" : inviteCode.trim().toUpperCase(Locale.ROOT);
+        if (tenant.getInviteCode() == null || !tenant.getInviteCode().equalsIgnoreCase(code)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业标识或邀请码无效");
+        }
+        return tenant;
+    }
+
+    private Tenant requireAdminEnterprise(Long operatorUserId) {
+        TenantMember operator = tenantRepository.findPrimaryByUserId(operatorUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "未找到租户"));
+        if (!RoleCodes.TENANT_ADMIN.equals(operator.getRoleCode())
+                || operator.getStatus() == null
+                || operator.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "需要租户管理员权限");
+        }
+        Tenant tenant = tenantRepository.findById(operator.getTenantId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "租户不存在"));
+        if (!TenantTypes.ENTERPRISE.equals(tenant.getTenantType())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅企业租户支持该操作");
+        }
+        return tenant;
+    }
+
+    private String newUniqueInviteCode() {
+        for (int i = 0; i < 8; i++) {
+            String code = EnterpriseAccounts.randomInviteCode();
+            if (tenantRepository.findByInviteCode(code).isEmpty()) {
+                return code;
+            }
+        }
+        return EnterpriseAccounts.randomInviteCode() + UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
+    }
+
+    private static String defaultLoginName(User user) {
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            return user.getEmail().trim().toLowerCase(Locale.ROOT);
+        }
+        return user.getUsername() == null ? null : user.getUsername().trim().toLowerCase(Locale.ROOT);
     }
 
     private TenantVO toVo(Tenant tenant) {

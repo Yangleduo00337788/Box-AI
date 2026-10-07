@@ -2,6 +2,7 @@ package com.boxai.user.application;
 
 import com.boxai.common.constant.AuditActions;
 import com.boxai.common.constant.AuditResourceTypes;
+import com.boxai.common.constant.RoleCodes;
 import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.constant.UserTypes;
 import com.boxai.security.audit.AuditLogService;
@@ -13,11 +14,16 @@ import com.boxai.domain.user.User;
 import com.boxai.domain.user.UserRepository;
 import com.boxai.security.context.LoginUser;
 import com.boxai.security.jwt.JwtService;
+import com.boxai.domain.tenant.Tenant;
+import com.boxai.domain.tenant.TenantMember;
+import com.boxai.tenant.api.ProvisionEmployeeRequest;
 import com.boxai.tenant.api.TenantVO;
 import com.boxai.tenant.application.TenantApplicationService;
 import com.boxai.tenant.application.TenantMemberApplicationService;
 import com.boxai.user.api.AuthVO;
 import com.boxai.user.api.ChangePasswordRequest;
+import com.boxai.user.api.EnterpriseOrgLookupVO;
+import com.boxai.user.api.JoinEnterpriseRequest;
 import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
 import com.boxai.user.api.ResetPasswordRequest;
@@ -130,20 +136,17 @@ public class AuthApplicationService {
     public AuthVO login(LoginRequest request) {
         String clientIp = HttpRequestContext.clientIp();
         rateLimitService.assertAllowed("login", clientIp == null ? "unknown" : clientIp, 20, Duration.ofMinutes(1));
+        String expectedType = normalizeAccountType(request.accountType());
+        if (TenantTypes.ENTERPRISE.equals(expectedType)
+                && request.orgId() != null
+                && !request.orgId().isBlank()) {
+            return completeLogin(resolveEnterpriseEmployee(request), expectedType);
+        }
         String account = request.account().trim();
         User user = userRepository.findByEmail(account.toLowerCase(Locale.ROOT))
                 .or(() -> userRepository.findByUsername(account))
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS, "账号或密码错误"));
-        if (UserTypes.PLATFORM_ADMIN.equals(user.getUserType())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "请使用平台管理端登录");
-        }
-        if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new BusinessException(ErrorCode.USER_DISABLED, "账号已禁用");
-        }
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "账号或密码错误");
-        }
-        String expectedType = normalizeAccountType(request.accountType());
+        assertPasswordAndStatus(user, request.password());
         TenantVO tenant = tenantApplicationService.findPrimaryByUserId(user.getId());
         if (tenant != null && tenant.tenantType() != null && !expectedType.equals(tenant.tenantType())) {
             if (TenantTypes.PERSONAL.equals(expectedType)) {
@@ -151,6 +154,72 @@ public class AuthApplicationService {
             }
             throw new BusinessException(ErrorCode.FORBIDDEN, "该账号为个人账号，请切换到个人端登录");
         }
+        if (TenantTypes.ENTERPRISE.equals(expectedType)) {
+            TenantMember member = tenantMemberApplicationService.findPrimaryMember(user.getId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "员工请使用企业标识与账号登录"));
+            if (!RoleCodes.TENANT_ADMIN.equals(member.getRoleCode())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "员工请使用企业标识与账号登录");
+            }
+        }
+        return completeLogin(user, expectedType);
+    }
+
+    public EnterpriseOrgLookupVO lookupEnterpriseOrg(String orgId) {
+        String clientIp = HttpRequestContext.clientIp();
+        rateLimitService.assertAllowed("login", clientIp == null ? "unknown" : clientIp, 20, Duration.ofMinutes(1));
+        Tenant tenant = tenantApplicationService.findEnterpriseByOrgId(orgId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "企业标识不存在"));
+        return new EnterpriseOrgLookupVO(tenant.getSlug(), tenant.getName());
+    }
+
+    @Transactional
+    public AuthVO joinEnterprise(JoinEnterpriseRequest request) {
+        String clientIp = HttpRequestContext.clientIp();
+        rateLimitService.assertAllowed("login", clientIp == null ? "unknown" : clientIp, 20, Duration.ofMinutes(1));
+        var tenant = tenantApplicationService.requireMatchingInvite(request.orgId(), request.inviteCode());
+        var member = tenantMemberApplicationService.provisionEmployee(
+                tenant.getId(),
+                new ProvisionEmployeeRequest(
+                        request.account(),
+                        request.password(),
+                        request.nickname(),
+                        null,
+                        RoleCodes.MEMBER));
+        User user = userRepository.findById(member.userId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在"));
+        AuthVO auth = issue(user);
+        auditLogService.recordForUser(
+                user.getId(),
+                null,
+                AuditActions.REGISTER,
+                AuditResourceTypes.AUTH,
+                String.valueOf(user.getId()),
+                user.getEmail(),
+                AuditLogService.RESULT_SUCCESS,
+                "enterprise-invite:" + tenant.getSlug());
+        return auth;
+    }
+
+    private User resolveEnterpriseEmployee(LoginRequest request) {
+        User user = tenantMemberApplicationService.findEnterpriseLoginUser(request.orgId(), request.account())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS, "企业标识或账号密码错误"));
+        assertPasswordAndStatus(user, request.password());
+        return user;
+    }
+
+    private void assertPasswordAndStatus(User user, String password) {
+        if (UserTypes.PLATFORM_ADMIN.equals(user.getUserType())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "请使用平台管理端登录");
+        }
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.USER_DISABLED, "账号已禁用");
+        }
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "账号或密码错误");
+        }
+    }
+
+    private AuthVO completeLogin(User user, String expectedType) {
         userRepository.updateLastLogin(user.getId());
         AuthVO auth = issue(user);
         auditLogService.recordForUser(
@@ -161,7 +230,7 @@ public class AuthApplicationService {
                 String.valueOf(user.getId()),
                 user.getEmail(),
                 AuditLogService.RESULT_SUCCESS,
-                null);
+                expectedType);
         return auth;
     }
 
@@ -238,12 +307,16 @@ public class AuthApplicationService {
     @Transactional
     public String loginOrRegisterWithOAuth(OAuthRemoteClient.OAuthUserProfile profile, String portal) {
         String provider = profile.provider();
+        String accountType = normalizeAccountType(portal == null || portal.isBlank() ? TenantTypes.PERSONAL : portal);
         User user = userOAuthIdentityRepository.findByProviderAndUserId(provider, profile.providerUserId())
                 .map(identity -> userRepository.findById(identity.getUserId())
                         .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在")))
-                .orElseGet(() -> resolveUserForOAuth(profile, portal));
+                .orElseGet(() -> resolveUserForOAuth(profile, accountType));
+        if (TenantTypes.ENTERPRISE.equals(accountType)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业请使用企业邮箱或企业标识登录");
+        }
         oauthIdentityLinkService.linkIfAbsent(user.getId(), profile);
-        assertOAuthLoginAllowed(user, portal);
+        assertOAuthLoginAllowed(user, accountType);
         userRepository.updateLastLogin(user.getId());
         AuthVO auth = issue(user);
         auditLogService.recordForUser(
@@ -258,10 +331,7 @@ public class AuthApplicationService {
         return auth.token();
     }
 
-    private User resolveUserForOAuth(OAuthRemoteClient.OAuthUserProfile profile, String portal) {
-        if (TenantTypes.ENTERPRISE.equals(portal)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业请使用企业邮箱登录");
-        }
+    private User resolveUserForOAuth(OAuthRemoteClient.OAuthUserProfile profile, String accountType) {
         String email = profile.normalizedEmail();
         if (email != null) {
             var existing = userRepository.findByEmail(email);
@@ -269,10 +339,10 @@ public class AuthApplicationService {
                 return existing.get();
             }
         }
-        return registerOAuthUser(profile);
+        return registerOAuthUser(profile, accountType);
     }
 
-    private User registerOAuthUser(OAuthRemoteClient.OAuthUserProfile profile) {
+    private User registerOAuthUser(OAuthRemoteClient.OAuthUserProfile profile, String accountType) {
         String email = profile.normalizedEmail();
         String username = email != null ? email : profile.provider() + "_" + profile.providerUserId();
         if (userRepository.findByUsername(username).isPresent()) {

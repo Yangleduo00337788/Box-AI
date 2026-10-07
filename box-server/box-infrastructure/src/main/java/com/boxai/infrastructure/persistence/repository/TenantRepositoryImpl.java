@@ -60,6 +60,16 @@ public class TenantRepositoryImpl implements TenantRepository {
     }
 
     @Override
+    public Optional<Tenant> findByInviteCode(String inviteCode) {
+        if (inviteCode == null || inviteCode.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(
+                tenantMapper.selectOneByQuery(QueryWrapper.create().eq("invite_code", inviteCode)))
+                .map(this::toDomain);
+    }
+
+    @Override
     public List<Tenant> listAll() {
         return tenantMapper.selectListByQuery(QueryWrapper.create().orderBy("created_at", false))
                 .stream()
@@ -79,6 +89,16 @@ public class TenantRepositoryImpl implements TenantRepository {
     public Optional<TenantMember> findMember(Long tenantId, Long userId) {
         return Optional.ofNullable(memberMapper.selectOneByQuery(
                         QueryWrapper.create().eq("tenant_id", tenantId).eq("user_id", userId)))
+                .map(this::toMember);
+    }
+
+    @Override
+    public Optional<TenantMember> findMemberByLoginName(Long tenantId, String loginName) {
+        if (loginName == null || loginName.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(memberMapper.selectOneByQuery(
+                        QueryWrapper.create().eq("tenant_id", tenantId).eq("login_name", loginName)))
                 .map(this::toMember);
     }
 
@@ -106,6 +126,7 @@ public class TenantRepositoryImpl implements TenantRepository {
         row.setTenantId(member.getTenantId());
         row.setUserId(member.getUserId());
         row.setRoleCode(member.getRoleCode());
+        row.setLoginName(member.getLoginName());
         row.setStatus(member.getStatus() == null ? 1 : member.getStatus());
         row.setJoinedAt(LocalDateTime.now());
         row.setCreatedAt(LocalDateTime.now());
@@ -135,6 +156,7 @@ public class TenantRepositoryImpl implements TenantRepository {
         tenant.setTenantType(row.getTenantType());
         tenant.setPlanId(row.getPlanId());
         tenant.setContactEmail(row.getContactEmail());
+        tenant.setInviteCode(row.getInviteCode());
         tenant.setStatus(row.getStatus());
         tenant.setOwnerId(row.getOwnerId());
         tenant.setCreatedAt(row.getCreatedAt());
@@ -149,6 +171,7 @@ public class TenantRepositoryImpl implements TenantRepository {
         row.setTenantType(tenant.getTenantType());
         row.setPlanId(tenant.getPlanId());
         row.setContactEmail(tenant.getContactEmail());
+        row.setInviteCode(tenant.getInviteCode());
         row.setStatus(tenant.getStatus() == null ? 1 : tenant.getStatus());
         row.setOwnerId(tenant.getOwnerId());
         return row;
@@ -160,6 +183,7 @@ public class TenantRepositoryImpl implements TenantRepository {
         member.setTenantId(row.getTenantId());
         member.setUserId(row.getUserId());
         member.setRoleCode(row.getRoleCode());
+        member.setLoginName(row.getLoginName());
         member.setStatus(row.getStatus());
         member.setJoinedAt(row.getJoinedAt());
         return member;

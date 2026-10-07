@@ -13,11 +13,15 @@ public interface TenantRepository {
 
     Optional<Tenant> findBySlug(String slug);
 
+    Optional<Tenant> findByInviteCode(String inviteCode);
+
     List<Tenant> listAll();
 
     long countByPlanId(Long planId);
 
     Optional<TenantMember> findMember(Long tenantId, Long userId);
+
+    Optional<TenantMember> findMemberByLoginName(Long tenantId, String loginName);
 
     Optional<TenantMember> findPrimaryByUserId(Long userId);
 

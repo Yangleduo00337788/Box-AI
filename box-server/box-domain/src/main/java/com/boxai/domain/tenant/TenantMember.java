@@ -13,6 +13,7 @@ public class TenantMember {
     private Long tenantId;
     private Long userId;
     private String roleCode;
+    private String loginName;
     private Integer status;
     private LocalDateTime joinedAt;
 }

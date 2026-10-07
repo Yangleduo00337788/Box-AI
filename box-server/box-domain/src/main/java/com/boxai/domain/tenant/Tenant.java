@@ -15,6 +15,7 @@ public class Tenant {
     private String tenantType;
     private Long planId;
     private String contactEmail;
+    private String inviteCode;
     private Integer status;
     private Long ownerId;
     private LocalDateTime createdAt;

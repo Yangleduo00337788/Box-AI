@@ -16,6 +16,8 @@ import com.boxai.domain.workspace.Workspace;
 import com.boxai.domain.workspace.WorkspaceMember;
 import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.tenant.api.AddTenantMemberRequest;
+import com.boxai.tenant.api.ProvisionEmployeeRequest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -45,6 +47,8 @@ class TenantMemberApplicationServiceTest {
     private WorkspaceRepository workspaceRepository;
     @Mock
     private RoleRepository roleRepository;
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private TenantMemberApplicationService service;
@@ -133,6 +137,35 @@ class TenantMemberApplicationServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.addMyTenantMember(3L, new AddTenantMemberRequest("a@example.com", RoleCodes.MEMBER)));
         assertEquals(ErrorCode.FORBIDDEN, ex.getCode());
+    }
+
+    @Test
+    void provisionEmployeeCreatesUserAndMember() {
+        when(tenantRepository.findById(1L)).thenReturn(Optional.of(tenant(TenantTypes.ENTERPRISE)));
+        when(tenantRepository.findMemberByLoginName(1L, "staff1")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("password1")).thenReturn("encoded");
+        when(userRepository.findByUsername("t1_staff1")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User created = invocation.getArgument(0);
+            created.setId(9L);
+            return created;
+        });
+        when(userRepository.findById(9L)).thenAnswer(invocation -> {
+            User created = user(9L, UserTypes.TENANT_USER);
+            created.setUsername("t1_staff1");
+            created.setNickname("Staff");
+            created.setEmail(null);
+            return Optional.of(created);
+        });
+        when(workspaceRepository.listByTenantId(1L)).thenReturn(List.of());
+
+        var vo = service.provisionEmployee(1L, new ProvisionEmployeeRequest(
+                "staff1", "password1", "Staff", null, RoleCodes.MEMBER));
+
+        assertEquals("staff1", vo.loginName());
+        assertEquals(RoleCodes.MEMBER, vo.roleCode());
+        verify(quotaApplicationService).assertMemberQuotaAvailable(1L);
+        verify(tenantRepository).addMember(any(TenantMember.class));
     }
 
     private static Tenant tenant(String type) {

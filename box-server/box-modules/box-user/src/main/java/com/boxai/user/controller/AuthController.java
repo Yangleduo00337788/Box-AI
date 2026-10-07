@@ -4,6 +4,8 @@ import com.boxai.common.result.Result;
 import com.boxai.security.context.SecurityContexts;
 import com.boxai.user.api.AuthVO;
 import com.boxai.user.api.ChangePasswordRequest;
+import com.boxai.user.api.EnterpriseOrgLookupVO;
+import com.boxai.user.api.JoinEnterpriseRequest;
 import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
 import com.boxai.user.api.OAuthProviderVO;
@@ -63,6 +65,16 @@ public class AuthController {
     @PostMapping("/login")
     public Result<AuthVO> login(@Valid @RequestBody LoginRequest request) {
         return Result.success(authApplicationService.login(request));
+    }
+
+    @PostMapping("/enterprise/join")
+    public Result<AuthVO> joinEnterprise(@Valid @RequestBody JoinEnterpriseRequest request) {
+        return Result.success(authApplicationService.joinEnterprise(request));
+    }
+
+    @GetMapping("/enterprise/org")
+    public Result<EnterpriseOrgLookupVO> lookupEnterpriseOrg(@RequestParam String orgId) {
+        return Result.success(authApplicationService.lookupEnterpriseOrg(orgId));
     }
 
     @GetMapping("/oauth/providers")

@@ -1,19 +1,26 @@
 package com.boxai.user.application;
 
+import com.boxai.common.constant.RoleCodes;
 import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.constant.UserTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.domain.tenant.Tenant;
+import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.user.User;
 import com.boxai.domain.user.UserOAuthIdentityRepository;
 import com.boxai.domain.user.UserRepository;
 import com.boxai.security.audit.AuditLogService;
 import com.boxai.security.jwt.JwtService;
 import com.boxai.security.ratelimit.RateLimitService;
+import com.boxai.tenant.api.ProvisionEmployeeRequest;
+import com.boxai.tenant.api.TenantMemberVO;
 import com.boxai.tenant.api.TenantVO;
 import com.boxai.tenant.application.TenantApplicationService;
+import com.boxai.tenant.application.TenantMemberApplicationService;
 import com.boxai.user.api.AuthVO;
 import com.boxai.user.api.ChangePasswordRequest;
+import com.boxai.user.api.JoinEnterpriseRequest;
 import com.boxai.user.api.LoginRequest;
 import com.boxai.user.api.RegisterRequest;
 import com.boxai.workspace.api.WorkspaceDetailVO;
@@ -33,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,7 +73,7 @@ class AuthApplicationServiceTest {
     @Mock
     private OAuthIdentityLinkService oauthIdentityLinkService;
     @Mock
-    private com.boxai.tenant.application.TenantMemberApplicationService tenantMemberApplicationService;
+    private TenantMemberApplicationService tenantMemberApplicationService;
 
     @InjectMocks
     private AuthApplicationService service;
@@ -98,7 +106,7 @@ class AuthApplicationServiceTest {
         when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(user));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.login(
-                new LoginRequest("admin@example.com", "secret", TenantTypes.PERSONAL)));
+                new LoginRequest("admin@example.com", "secret", TenantTypes.PERSONAL, null)));
         assertEquals(ErrorCode.FORBIDDEN, ex.getCode());
     }
 
@@ -108,7 +116,7 @@ class AuthApplicationServiceTest {
         when(userRepository.findByEmail("disabled@example.com")).thenReturn(Optional.of(user));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.login(
-                new LoginRequest("disabled@example.com", "secret", TenantTypes.PERSONAL)));
+                new LoginRequest("disabled@example.com", "secret", TenantTypes.PERSONAL, null)));
         assertEquals(ErrorCode.USER_DISABLED, ex.getCode());
     }
 
@@ -120,31 +128,72 @@ class AuthApplicationServiceTest {
         when(passwordEncoder.matches("wrong", "hash")).thenReturn(false);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.login(
-                new LoginRequest("user@example.com", "wrong", TenantTypes.PERSONAL)));
+                new LoginRequest("user@example.com", "wrong", TenantTypes.PERSONAL, null)));
         assertEquals(ErrorCode.INVALID_CREDENTIALS, ex.getCode());
     }
 
     @Test
-    void loginIssuesTokenForEnterpriseEmail() {
+    void loginIssuesTokenForEnterpriseAdminEmail() {
         User user = user(3L, UserTypes.TENANT_USER, 1);
         user.setPasswordHash("hash");
         user.setUsername("corp@example.com");
         user.setEmail("corp@example.com");
         user.setNickname("Corp");
+        TenantMember admin = new TenantMember();
+        admin.setRoleCode(RoleCodes.TENANT_ADMIN);
         when(userRepository.findByEmail("corp@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
         when(tenantApplicationService.findPrimaryByUserId(3L)).thenReturn(tenant(TenantTypes.ENTERPRISE));
+        when(tenantMemberApplicationService.findPrimaryMember(3L)).thenReturn(Optional.of(admin));
         when(userSessionApplicationService.createSession(3L)).thenReturn("sess-e");
         when(jwtService.generate(3L, "corp@example.com", UserTypes.TENANT_USER, "sess-e")).thenReturn("jwt-ent");
         when(workspaceApplicationService.listMineByUserId(3L)).thenReturn(List.of(
                 new WorkspaceDetailVO(8L, "Corp", "corp", null, null, 1, "OWNER")));
         when(userPreferenceApplicationService.getCurrentWorkspaceId(3L)).thenReturn(8L);
 
-        AuthVO auth = service.login(new LoginRequest("corp@example.com", "secret", TenantTypes.ENTERPRISE));
+        AuthVO auth = service.login(new LoginRequest("corp@example.com", "secret", TenantTypes.ENTERPRISE, null));
 
         assertEquals("jwt-ent", auth.token());
         assertEquals(8L, auth.currentWorkspaceId());
         verify(userRepository).updateLastLogin(3L);
+    }
+
+    @Test
+    void loginRejectsEmployeeWithoutOrgId() {
+        User user = user(4L, UserTypes.TENANT_USER, 1);
+        user.setPasswordHash("hash");
+        when(userRepository.findByEmail("staff@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+        when(tenantApplicationService.findPrimaryByUserId(4L)).thenReturn(tenant(TenantTypes.ENTERPRISE));
+        TenantMember member = new TenantMember();
+        member.setRoleCode(RoleCodes.MEMBER);
+        when(tenantMemberApplicationService.findPrimaryMember(4L)).thenReturn(Optional.of(member));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.login(
+                new LoginRequest("staff@example.com", "secret", TenantTypes.ENTERPRISE, null)));
+        assertEquals(ErrorCode.FORBIDDEN, ex.getCode());
+    }
+
+    @Test
+    void loginWithOrgIdForEnterpriseEmployee() {
+        User user = user(6L, UserTypes.TENANT_USER, 1);
+        user.setPasswordHash("hash");
+        user.setUsername("t1_staff");
+        user.setNickname("Staff");
+        when(tenantMemberApplicationService.findEnterpriseLoginUser("acme", "staff"))
+                .thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+        when(tenantApplicationService.findPrimaryByUserId(6L)).thenReturn(tenant(TenantTypes.ENTERPRISE));
+        when(userSessionApplicationService.createSession(6L)).thenReturn("sess-staff");
+        when(jwtService.generate(6L, "t1_staff", UserTypes.TENANT_USER, "sess-staff")).thenReturn("jwt-staff");
+        when(workspaceApplicationService.listMineByUserId(6L)).thenReturn(List.of(
+                new WorkspaceDetailVO(8L, "Corp", "corp", null, null, 1, "MEMBER")));
+        when(userPreferenceApplicationService.getCurrentWorkspaceId(6L)).thenReturn(8L);
+
+        AuthVO auth = service.login(new LoginRequest("staff", "secret", TenantTypes.ENTERPRISE, "acme"));
+
+        assertEquals("jwt-staff", auth.token());
+        verify(userRepository).updateLastLogin(6L);
     }
 
     @Test
@@ -156,7 +205,7 @@ class AuthApplicationServiceTest {
         when(tenantApplicationService.findPrimaryByUserId(4L)).thenReturn(tenant(TenantTypes.ENTERPRISE));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.login(
-                new LoginRequest("corp@example.com", "secret", TenantTypes.PERSONAL)));
+                new LoginRequest("corp@example.com", "secret", TenantTypes.PERSONAL, null)));
         assertEquals(ErrorCode.FORBIDDEN, ex.getCode());
     }
 
@@ -176,13 +225,60 @@ class AuthApplicationServiceTest {
                 new WorkspaceDetailVO(9L, "Default", "default", null, null, 1, "OWNER")));
         when(userPreferenceApplicationService.getCurrentWorkspaceId(5L)).thenReturn(9L);
 
-        AuthVO auth = service.login(new LoginRequest("ok@example.com", "secret", TenantTypes.PERSONAL));
+        AuthVO auth = service.login(new LoginRequest("ok@example.com", "secret", TenantTypes.PERSONAL, null));
 
         assertEquals("jwt-token", auth.token());
         assertEquals(9L, auth.currentWorkspaceId());
         assertEquals(5L, auth.user().id());
         verify(userRepository).updateLastLogin(5L);
         verify(rateLimitService).assertAllowed(anyString(), anyString(), anyInt(), any());
+    }
+
+    @Test
+    void joinEnterpriseProvisionsMemberAndIssuesToken() {
+        Tenant tenant = new Tenant();
+        tenant.setId(30L);
+        tenant.setSlug("acme");
+        when(tenantApplicationService.requireMatchingInvite("acme", "INVITE123")).thenReturn(tenant);
+        when(tenantMemberApplicationService.provisionEmployee(eq(30L), any(ProvisionEmployeeRequest.class)))
+                .thenReturn(new TenantMemberVO(1L, 21L, "staff1", null, "Staff", RoleCodes.MEMBER, 1, null));
+        User created = user(21L, UserTypes.TENANT_USER, 1);
+        created.setUsername("t30_staff1");
+        created.setNickname("Staff");
+        when(userRepository.findById(21L)).thenReturn(Optional.of(created));
+        when(tenantApplicationService.findPrimaryByUserId(21L)).thenReturn(tenant(TenantTypes.ENTERPRISE));
+        when(userSessionApplicationService.createSession(21L)).thenReturn("sess-join");
+        when(jwtService.generate(21L, "t30_staff1", UserTypes.TENANT_USER, "sess-join")).thenReturn("jwt-join");
+        when(workspaceApplicationService.listMineByUserId(21L)).thenReturn(List.of(
+                new WorkspaceDetailVO(8L, "Corp", "corp", null, null, 1, "MEMBER")));
+        when(userPreferenceApplicationService.getCurrentWorkspaceId(21L)).thenReturn(8L);
+
+        AuthVO auth = service.joinEnterprise(new JoinEnterpriseRequest(
+                "acme", "INVITE123", "staff1", "password1", "Staff"));
+
+        assertEquals("jwt-join", auth.token());
+        verify(tenantMemberApplicationService).provisionEmployee(eq(30L), any(ProvisionEmployeeRequest.class));
+    }
+
+    @Test
+    void lookupEnterpriseOrgReturnsPublicProfile() {
+        Tenant tenant = new Tenant();
+        tenant.setSlug("acme");
+        tenant.setName("Acme Corp");
+        when(tenantApplicationService.findEnterpriseByOrgId("acme")).thenReturn(Optional.of(tenant));
+
+        var vo = service.lookupEnterpriseOrg("acme");
+
+        assertEquals("acme", vo.orgId());
+        assertEquals("Acme Corp", vo.name());
+    }
+
+    @Test
+    void lookupEnterpriseOrgRejectsUnknownOrg() {
+        when(tenantApplicationService.findEnterpriseByOrgId("missing")).thenReturn(Optional.empty());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.lookupEnterpriseOrg("missing"));
+        assertEquals(ErrorCode.TENANT_NOT_FOUND, ex.getCode());
     }
 
     @Test

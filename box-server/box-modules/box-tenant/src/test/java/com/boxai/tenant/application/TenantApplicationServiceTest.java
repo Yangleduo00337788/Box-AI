@@ -125,6 +125,7 @@ class TenantApplicationServiceTest {
         when(tenantRepository.findBySlug("acme")).thenReturn(Optional.empty());
         when(planRepository.findByCode("enterprise_starter")).thenReturn(Optional.of(plan));
         when(planApplicationService.requirePlan(22L)).thenReturn(plan);
+        when(tenantRepository.findByInviteCode(any())).thenReturn(Optional.empty());
 
         var vo = service.upgradeToEnterprise(3L, "  Acme  ");
 
@@ -133,5 +134,47 @@ class TenantApplicationServiceTest {
         assertEquals(22L, vo.planId());
         assertEquals("企业起步", vo.planName());
         verify(tenantRepository).update(tenant);
+    }
+
+    @Test
+    void updateOrgIdPersistsNormalizedSlug() {
+        TenantMember member = new TenantMember();
+        member.setTenantId(11L);
+        member.setRoleCode(RoleCodes.TENANT_ADMIN);
+        member.setStatus(1);
+        Tenant tenant = new Tenant();
+        tenant.setId(11L);
+        tenant.setName("Acme");
+        tenant.setSlug("acme");
+        tenant.setTenantType(TenantTypes.ENTERPRISE);
+        tenant.setInviteCode("INVITE123");
+        when(tenantRepository.findPrimaryByUserId(3L)).thenReturn(Optional.of(member));
+        when(tenantRepository.findById(11L)).thenReturn(Optional.of(tenant));
+        when(tenantRepository.findBySlug("coze")).thenReturn(Optional.empty());
+
+        var vo = service.updateOrgId(3L, " Coze ");
+
+        assertEquals("coze", vo.orgId());
+        assertEquals("coze", tenant.getSlug());
+        verify(tenantRepository).update(tenant);
+    }
+
+    @Test
+    void updateOrgIdRejectsDuplicateSlug() {
+        TenantMember member = new TenantMember();
+        member.setTenantId(11L);
+        member.setRoleCode(RoleCodes.TENANT_ADMIN);
+        member.setStatus(1);
+        Tenant tenant = new Tenant();
+        tenant.setId(11L);
+        tenant.setSlug("acme");
+        tenant.setTenantType(TenantTypes.ENTERPRISE);
+        when(tenantRepository.findPrimaryByUserId(3L)).thenReturn(Optional.of(member));
+        when(tenantRepository.findById(11L)).thenReturn(Optional.of(tenant));
+        when(tenantRepository.findBySlug("taken")).thenReturn(Optional.of(new Tenant()));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.updateOrgId(3L, "taken"));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
+        verify(tenantRepository, never()).update(any());
     }
 }

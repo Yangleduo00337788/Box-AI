@@ -4,7 +4,9 @@ import com.boxai.common.result.Result;
 import com.boxai.security.context.LoginUser;
 import com.boxai.security.context.SecurityContexts;
 import com.boxai.tenant.api.AddTenantMemberRequest;
+import com.boxai.tenant.api.ProvisionEmployeeRequest;
 import com.boxai.tenant.api.TenantMemberVO;
+import com.boxai.tenant.api.UpdateMemberPasswordRequest;
 import com.boxai.tenant.api.UpdateTenantMemberStatusRequest;
 import com.boxai.tenant.application.TenantMemberApplicationService;
 import jakarta.validation.Valid;
@@ -38,6 +40,20 @@ public class TenantMemberController {
     public Result<TenantMemberVO> add(@Valid @RequestBody AddTenantMemberRequest request) {
         LoginUser user = SecurityContexts.currentUser();
         return Result.success(tenantMemberApplicationService.addMyTenantMember(user.userId(), request));
+    }
+
+    @PostMapping("/accounts")
+    public Result<TenantMemberVO> provision(@Valid @RequestBody ProvisionEmployeeRequest request) {
+        LoginUser user = SecurityContexts.currentUser();
+        return Result.success(tenantMemberApplicationService.provisionMyEmployee(user.userId(), request));
+    }
+
+    @PutMapping("/{userId}/password")
+    public Result<Void> resetPassword(@PathVariable Long userId,
+                                      @Valid @RequestBody UpdateMemberPasswordRequest request) {
+        LoginUser user = SecurityContexts.currentUser();
+        tenantMemberApplicationService.resetMyEmployeePassword(user.userId(), userId, request.password());
+        return Result.success(null);
     }
 
     @PutMapping("/{userId}/status")

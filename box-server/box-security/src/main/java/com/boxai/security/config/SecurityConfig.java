@@ -54,6 +54,8 @@ public class SecurityConfig {
                                 "/error",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register",
+                                "/api/v1/auth/enterprise/join",
+                                "/api/v1/auth/enterprise/org",
                                 "/api/v1/auth/verification-code",
                                 "/api/v1/auth/password/reset",
                                 "/api/v1/auth/oauth/providers",

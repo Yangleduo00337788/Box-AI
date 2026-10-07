@@ -20,6 +20,8 @@ public class TenantMemberDO {
     private Long userId;
     @Column("role_code")
     private String roleCode;
+    @Column("login_name")
+    private String loginName;
     private Integer status;
     @Column("joined_at")
     private LocalDateTime joinedAt;
