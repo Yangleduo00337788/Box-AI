@@ -91,7 +91,7 @@ import type { PrimaryTableCol } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import TraceSpanTree from '@/components/TraceSpanTree.vue'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import {
   getExecution,
   getExecutionTrace,
@@ -164,7 +164,7 @@ async function loadExecutions() {
     })
     executions.value = data.data || []
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载执行记录失败'))
+    notifyApiError(error, '加载执行记录失败')
   } finally {
     loading.value = false
   }
@@ -181,7 +181,7 @@ async function selectExecution(ctx: { row: ExecutionVO }) {
     detail.value = detailRes.data.data || ctx.row
     traceSpans.value = traceRes.data.data?.spans || []
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载 Trace 失败'))
+    notifyApiError(error, '加载 Trace 失败')
   }
 }
 

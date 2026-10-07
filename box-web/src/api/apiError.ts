@@ -1,3 +1,4 @@
+import { MessagePlugin } from 'tdesign-vue-next'
 import type { Result } from './http'
 
 export const TENANT_DISABLED_CODE = 18002
@@ -73,7 +74,28 @@ export function resolveErrorMessage(payload?: Result<unknown> | null, fallback =
 
 export function isAuthApiPath(url?: string) {
   if (!url) return false
-  return url.startsWith('/auth/login') || url.startsWith('/auth/register')
+  const path = url.split('?')[0]
+  return path.startsWith('/auth/') || path.startsWith('auth/') || path.includes('/auth/')
+}
+
+const ERROR_DEDUPE_MS = 1500
+let lastErrorText = ''
+let lastErrorAt = 0
+
+export function notifyError(message: string) {
+  const text = (message || '').trim()
+  if (!text) return
+  const now = Date.now()
+  if (text === lastErrorText && now - lastErrorAt < ERROR_DEDUPE_MS) {
+    return
+  }
+  lastErrorText = text
+  lastErrorAt = now
+  MessagePlugin.error(text)
+}
+
+export function notifyApiError(error: unknown, fallback = '请求失败') {
+  notifyError(extractApiError(error, fallback))
 }
 
 /** 从 axios 拒绝对象或业务 Result 中提取可读错误文案 */

@@ -44,7 +44,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { listAuditLogs, type AuditLogVO } from '@/api/audit'
 
@@ -91,7 +91,7 @@ async function loadLogs() {
     logs.value = page?.records || []
     pagination.total = page?.total || 0
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载审计日志失败'))
+    notifyApiError(error, '加载审计日志失败')
   } finally {
     loading.value = false
   }

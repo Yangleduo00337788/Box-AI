@@ -1,8 +1,8 @@
 import axios from 'axios'
-import { MessagePlugin } from 'tdesign-vue-next'
 import {
   CONFLICT_CODE,
   extractApiError,
+  notifyError,
   isAuthApiPath,
   isDependencyConflict,
   isTenantDisabled,
@@ -59,16 +59,16 @@ function handleBusinessError(payload: Result<unknown>) {
     requestQuotaRefresh()
   }
   if (isTenantDisabled(payload)) {
-    MessagePlugin.error(message || '租户已停用')
+    notifyError(message || '租户已停用')
     forceLogout()
     return
   }
   if (isUnauthorized(payload)) {
-    MessagePlugin.error(message || '登录已过期，请重新登录')
+    notifyError(message || '登录已过期，请重新登录')
     forceLogout()
     return
   }
-  MessagePlugin.error(message)
+  notifyError(message)
 }
 
 http.interceptors.response.use(
@@ -98,7 +98,7 @@ http.interceptors.response.use(
         })
       }
     } else if (!isAuthApiPath(url) && !isDependencyConflict(payload) && error.response?.status !== CONFLICT_CODE) {
-      MessagePlugin.error(message)
+      notifyError(message)
     }
     return Promise.reject(error)
   },

@@ -65,7 +65,7 @@ import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps } from 'tdesign-vue-next'
 import { createAgent } from '@/api/agent'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { groupedPlatformModelOptions } from '@/utils/modelOptions'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { enableMarketTemplate, listMarketTemplates, type AgentTemplateVO } from '@/api/market'
@@ -125,7 +125,7 @@ watch(createMode, async (mode) => {
     templates.value = data.data || []
     selectedTemplateId.value = templates.value[0]?.id
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载模板失败'))
+    notifyApiError(error, '加载模板失败')
   } finally {
     loadingTemplates.value = false
   }
@@ -147,7 +147,7 @@ async function submit() {
         router.push(`/agents/${data.data.id}/builder`)
       }
     } catch (error) {
-      MessagePlugin.error(extractApiError(error, '启用失败'))
+      notifyApiError(error, '启用失败')
     } finally {
       creating.value = false
     }
@@ -178,7 +178,7 @@ async function submit() {
       router.push(`/agents/${data.data.id}/builder`)
     }
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '创建失败'))
+    notifyApiError(error, '创建失败')
   } finally {
     creating.value = false
   }

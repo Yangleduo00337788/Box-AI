@@ -1,11 +1,34 @@
-import { describe, expect, it } from 'vitest'
-import { isAuthApiPath, isQuotaExceeded, UNAUTHORIZED_CODE, QUOTA_EXCEEDED_CODE } from './apiError'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+vi.mock('tdesign-vue-next', () => ({
+  MessagePlugin: { error: vi.fn() },
+}))
+
+import { MessagePlugin } from 'tdesign-vue-next'
+import {
+  isAuthApiPath,
+  isQuotaExceeded,
+  notifyError,
+  UNAUTHORIZED_CODE,
+  QUOTA_EXCEEDED_CODE,
+} from './apiError'
 
 describe('apiError auth and quota helpers', () => {
-  it('isAuthApiPath detects login and register', () => {
+  beforeEach(() => {
+    vi.mocked(MessagePlugin.error).mockClear()
+  })
+
+  it('isAuthApiPath detects auth endpoints', () => {
     expect(isAuthApiPath('/auth/login')).toBe(true)
     expect(isAuthApiPath('/auth/register')).toBe(true)
+    expect(isAuthApiPath('/auth/enterprise/org')).toBe(true)
     expect(isAuthApiPath('/agents')).toBe(false)
+  })
+
+  it('notifyError suppresses duplicate messages', () => {
+    notifyError('企业标识不存在')
+    notifyError('企业标识不存在')
+    expect(MessagePlugin.error).toHaveBeenCalledTimes(1)
   })
 
   it('isQuotaExceeded reads business code', () => {

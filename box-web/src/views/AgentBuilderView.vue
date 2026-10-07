@@ -520,7 +520,7 @@ import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, PrimaryTableCol } from 'tdesign-vue-next'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import ImagePicker from '@/components/ImagePicker.vue'
-import { extractApiError } from '@/api/apiError'
+import { extractApiError, notifyApiError } from '@/api/apiError'
 import { parseAgentVariablesJson } from '@/utils/agentConfigBuilder'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import {
@@ -888,7 +888,7 @@ async function loadVersions() {
     const { data } = await listAgentVersions(agentId.value)
     versions.value = data.data || []
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载版本失败'))
+    notifyApiError(error, '加载版本失败')
   } finally {
     versionLoading.value = false
   }
@@ -908,7 +908,7 @@ async function createVersionSnapshot() {
     MessagePlugin.success('版本快照已创建')
     await loadVersions()
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '创建版本失败'))
+    notifyApiError(error, '创建版本失败')
   } finally {
     versionLoading.value = false
   }
@@ -921,7 +921,7 @@ async function runCompare() {
     compareResult.value = data.data?.diffs || []
     compareVisible.value = true
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '对比失败'))
+    notifyApiError(error, '对比失败')
   }
 }
 
@@ -937,7 +937,7 @@ function restoreVersion(versionId: number) {
         await loadAgent()
         dialog.destroy()
       } catch (error) {
-        MessagePlugin.error(extractApiError(error, '恢复失败'))
+        notifyApiError(error, '恢复失败')
       }
     },
   })
@@ -950,7 +950,7 @@ async function archiveVersion(versionId: number) {
     MessagePlugin.success('版本已归档')
     await loadVersions()
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '归档失败'))
+    notifyApiError(error, '归档失败')
   } finally {
     versionLoading.value = false
   }
@@ -1088,7 +1088,7 @@ async function saveEmbedConfig() {
     }
     MessagePlugin.success('Embed 配置已保存，发布后将对外生效')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '保存失败'))
+    notifyApiError(error, '保存失败')
   } finally {
     savingEmbed.value = false
   }
@@ -1105,7 +1105,7 @@ async function verifyEmbedDomain() {
       embedForm.domainVerifySkipped ? '开发环境已跳过校验' : embedForm.domainVerified ? '域名已验证' : '验证已提交',
     )
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '域名验证失败'))
+    notifyApiError(error, '域名验证失败')
   } finally {
     verifyingDomain.value = false
   }
@@ -1119,7 +1119,7 @@ async function saveConfig() {
     if (data.data) applyAgent(data.data)
     MessagePlugin.success('配置已保存')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '保存失败'))
+    notifyApiError(error, '保存失败')
   } finally {
     savingConfig.value = false
   }
@@ -1467,7 +1467,7 @@ async function sendChat(raw?: string) {
         messages.value[assistantIndex].content = '（已停止生成）'
       }
     } else {
-      MessagePlugin.error(extractApiError(error, '对话失败'))
+      notifyApiError(error, '对话失败')
       if (useStream && assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
         messages.value.splice(assistantIndex, 1)
       }

@@ -73,7 +73,7 @@ import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { FormProps, FormRule } from 'tdesign-vue-next'
 import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { resetPassword, sendVerificationCode } from '@/api/auth'
 
 const router = useRouter()
@@ -133,7 +133,7 @@ async function sendCode() {
     }
     startCountdown()
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '发送验证码失败'))
+    notifyApiError(error, '发送验证码失败')
   } finally {
     sendingCode.value = false
   }
@@ -151,7 +151,7 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
     MessagePlugin.success('密码已重置，请登录')
     await router.push('/login')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '重置密码失败'))
+    notifyApiError(error, '重置密码失败')
   } finally {
     loading.value = false
   }

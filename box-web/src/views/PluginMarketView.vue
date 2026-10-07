@@ -302,7 +302,7 @@ import { listKnowledgeBases } from '@/api/knowledge'
 import { listMcpServers } from '@/api/mcp'
 import { listTools } from '@/api/tool'
 import { listWorkflows } from '@/api/workflow'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { usePermission } from '@/composables/usePermission'
 import { PermissionCodes } from '@/constants/permissions'
@@ -634,7 +634,7 @@ async function loadCategories() {
     }
   } catch (error) {
     categories.value = []
-    MessagePlugin.error(extractApiError(error, '加载分类失败'))
+    notifyApiError(error, '加载分类失败')
   } finally {
     categoriesLoading.value = false
   }
@@ -647,7 +647,7 @@ async function loadPlugins() {
     plugins.value = data.data || []
   } catch (error) {
     plugins.value = []
-    MessagePlugin.error(extractApiError(error, '加载插件失败'))
+    notifyApiError(error, '加载插件失败')
   } finally {
     loading.value = false
   }
@@ -701,7 +701,7 @@ async function runInstallAction(item: PluginCatalogVO) {
     await loadPlugins()
     await loadMineCounts()
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '操作失败'))
+    notifyApiError(error, '操作失败')
   } finally {
     actingId.value = null
   }

@@ -41,7 +41,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { fetchQuota, type QuotaSnapshotVO } from '@/api/quota'
 import { createWorkspace, updateWorkspace } from '@/api/workspace'
 import type { WorkspaceVO } from '@/api/auth'
@@ -121,7 +121,7 @@ async function submit() {
     }
     visible.value = false
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, isEdit.value ? '保存失败' : '创建失败'))
+    notifyApiError(error, isEdit.value ? '保存失败' : '创建失败')
   } finally {
     saving.value = false
   }

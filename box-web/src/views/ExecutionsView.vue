@@ -81,7 +81,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { getExecution, getExecutionTrace, listExecutions, type ExecutionVO, type TraceSpanVO } from '@/api/execution'
 
 defineProps<{ compact?: boolean }>()
@@ -121,7 +121,7 @@ async function loadExecutions() {
     const { data } = await listExecutions({ limit: 100 })
     executions.value = data.data || []
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载执行记录失败'))
+    notifyApiError(error, '加载执行记录失败')
   } finally {
     loading.value = false
   }
@@ -141,7 +141,7 @@ async function openDetail(context: { row: TableRowData }) {
     }
     detailVisible.value = true
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载详情失败'))
+    notifyApiError(error, '加载详情失败')
   }
 }
 

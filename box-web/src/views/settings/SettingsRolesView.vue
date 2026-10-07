@@ -59,7 +59,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import {
   createRole,
@@ -99,7 +99,7 @@ async function loadData() {
     roles.value = rolesRes.data.data || []
     permissions.value = permsRes.data.data || []
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载角色失败'))
+    notifyApiError(error, '加载角色失败')
   } finally {
     loading.value = false
   }
@@ -142,7 +142,7 @@ async function submitForm() {
     await loadData()
     MessagePlugin.success('保存成功')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '保存失败'))
+    notifyApiError(error, '保存失败')
   } finally {
     saving.value = false
   }
@@ -154,7 +154,7 @@ async function removeRole(id: number) {
     await loadData()
     MessagePlugin.success('已删除')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '删除失败'))
+    notifyApiError(error, '删除失败')
   }
 }
 

@@ -60,7 +60,7 @@ import { useRoute } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import BoxChatMessageList from '@/components/BoxChatMessageList.vue'
 import { getPublicConversationShare, type SharedConversationVO } from '@/api/conversation'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { buildSharedListItems } from '@/utils/boxChatListItems'
 
 const route = useRoute()
@@ -89,7 +89,7 @@ async function loadShare() {
     share.value = data.data || null
   } catch (error) {
     share.value = null
-    MessagePlugin.error(extractApiError(error, '加载分享失败'))
+    notifyApiError(error, '加载分享失败')
   } finally {
     loading.value = false
   }

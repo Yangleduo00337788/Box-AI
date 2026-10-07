@@ -97,7 +97,7 @@ import { computed, onMounted, ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { AgentVO } from '@/api/agent'
 import { createProject } from '@/api/project'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { useActiveProject } from '@/composables/useActiveProject'
 import { useAgentSelection } from '@/composables/useAgentSelection'
 import { useCreateAgentDialog } from '@/composables/useCreateAgentDialog'
@@ -178,7 +178,7 @@ async function confirmCreateProject() {
     }
     MessagePlugin.success('项目已创建')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '创建失败'))
+    notifyApiError(error, '创建失败')
   } finally {
     projectSaving.value = false
   }

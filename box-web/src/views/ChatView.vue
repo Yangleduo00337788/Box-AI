@@ -194,7 +194,7 @@ import { buildConversationListItems, type ConversationMessageVO } from '@/utils/
 import type { ChatToolEventPayload } from '@/api/chatStream'
 import { resolveToolInvokeLabel } from '@/utils/chatToolLabel'
 import type { ChatToolRun, MessagePluginMeta } from '@/utils/messageMetadata'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { promptToolConfirmation } from '@/composables/useToolConfirmation'
 import { listPlatformModels, type PlatformModelVO } from '@/api/platform'
 import { uploadImageAsset } from '@/api/asset'
@@ -500,7 +500,7 @@ async function createShareLink() {
     shareMode.value = false
     selectedShareMessageIds.value = []
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '创建分享失败'))
+    notifyApiError(error, '创建分享失败')
   } finally {
     shareCreating.value = false
   }
@@ -519,7 +519,7 @@ async function onMessageFeedback(messageIndex: number, rating: 'good' | 'bad') {
     await submitMessageFeedback(convId, message.id, { rating: 'good' })
     MessagePlugin.success('感谢反馈')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '提交失败'))
+    notifyApiError(error, '提交失败')
   }
 }
 
@@ -719,7 +719,7 @@ async function startNewChat(text: string) {
     clearComposerAttachments()
     clearComposerPlugins()
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '创建对话失败'))
+    notifyApiError(error, '创建对话失败')
   } finally {
     suppressMessagesReload.value = false
   }
@@ -825,7 +825,7 @@ async function sendChat(id?: number, preset?: string) {
         messages.value[assistantIndex].content = '（已停止生成）'
       }
     } else {
-      MessagePlugin.error(extractApiError(error, '发送失败'))
+      notifyApiError(error, '发送失败')
       if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
         messages.value.splice(assistantIndex, 1)
       }
@@ -886,7 +886,7 @@ async function regenerateReply(index: number) {
         messages.value[index].content = '（已停止生成）'
       }
     } else {
-      MessagePlugin.error(extractApiError(error, '重新生成失败'))
+      notifyApiError(error, '重新生成失败')
       await loadMessages(targetId)
     }
   } finally {
@@ -979,7 +979,7 @@ async function onFileSelected(event: Event) {
         MessagePlugin.success('已添加图片')
       } catch (error) {
         removeComposerAttachment(id)
-        MessagePlugin.error(extractApiError(error, '图片上传失败'))
+        notifyApiError(error, '图片上传失败')
       }
       return
     }

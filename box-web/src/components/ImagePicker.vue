@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { uploadImageAsset } from '@/api/asset'
 import { useAuthStore } from '@/stores/auth'
 
@@ -88,7 +88,7 @@ async function onFile(event: Event) {
     emit('uploaded', url)
     MessagePlugin.success(props.persist === 'avatar' ? '头像已更新' : '图片已上传')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '图片上传失败'))
+    notifyApiError(error, '图片上传失败')
   } finally {
     uploading.value = false
   }

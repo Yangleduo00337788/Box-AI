@@ -22,7 +22,7 @@
 import { ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { submitMessageFeedback } from '@/api/conversation'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 
 const props = defineProps<{
   conversationId: number
@@ -62,7 +62,7 @@ async function onConfirm() {
     emit('submitted')
     return true
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '提交失败'))
+    notifyApiError(error, '提交失败')
     return false
   } finally {
     submitting.value = false

@@ -47,7 +47,7 @@ import { useRouter } from 'vue-router'
 import { DialogPlugin, Link, MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
 import { changePassword, fetchSessions, revokeSession, type UserSessionVO } from '@/api/auth'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -116,7 +116,7 @@ async function submitPassword() {
     passwordForm.confirmPassword = ''
     MessagePlugin.success('密码已更新')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '密码更新失败'))
+    notifyApiError(error, '密码更新失败')
   } finally {
     changingPassword.value = false
   }

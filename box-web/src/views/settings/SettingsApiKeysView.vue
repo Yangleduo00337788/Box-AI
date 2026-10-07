@@ -95,7 +95,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import type { PrimaryTableCol } from 'tdesign-vue-next'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { usePermission } from '@/composables/usePermission'
 import { useReloadOnWorkspaceChange } from '@/composables/useReloadOnWorkspaceChange'
 import { PermissionCodes } from '@/constants/permissions'
@@ -135,7 +135,7 @@ async function loadKeys() {
     const { data } = await listApiKeys()
     apiKeys.value = data.data || []
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '加载 API 密钥失败'))
+    notifyApiError(error, '加载 API 密钥失败')
   } finally {
     loading.value = false
   }
@@ -160,7 +160,7 @@ async function submitCreate() {
     await loadKeys()
     MessagePlugin.success('API 密钥已创建')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '创建失败'))
+    notifyApiError(error, '创建失败')
   } finally {
     creating.value = false
   }
@@ -185,7 +185,7 @@ async function toggleKey(id: number, enable: boolean) {
     await loadKeys()
     MessagePlugin.success(enable ? '已启用' : '已禁用')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '操作失败'))
+    notifyApiError(error, '操作失败')
   }
 }
 
@@ -197,7 +197,7 @@ async function rotateKey(id: number) {
     await loadKeys()
     MessagePlugin.success('密钥已轮换，请更新集成配置')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '轮换失败'))
+    notifyApiError(error, '轮换失败')
   }
 }
 
@@ -215,7 +215,7 @@ function removeKey(id: number) {
         await loadKeys()
         MessagePlugin.success('已删除')
       } catch (error) {
-        MessagePlugin.error(extractApiError(error, '删除失败'))
+        notifyApiError(error, '删除失败')
       }
     },
   })

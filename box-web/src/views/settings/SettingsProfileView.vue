@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { useAuthStore } from '@/stores/auth'
 import { roleName } from '@/utils/role'
 import ImagePicker from '@/components/ImagePicker.vue'
@@ -98,7 +98,7 @@ async function save() {
     })
     MessagePlugin.success('已保存')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '保存失败'))
+    notifyApiError(error, '保存失败')
   } finally {
     saving.value = false
   }

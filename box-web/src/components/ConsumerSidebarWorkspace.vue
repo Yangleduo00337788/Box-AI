@@ -422,7 +422,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { DropdownOption } from 'tdesign-vue-next'
 import type { AgentVO } from '@/api/agent'
-import { extractApiError } from '@/api/apiError'
+import { notifyApiError } from '@/api/apiError'
 import { deleteConversation, renameConversation, type ConversationVO } from '@/api/conversation'
 import { createProject, deleteProject, renameProject, type ChatProjectVO } from '@/api/project'
 import { confirmResourceDelete } from '@/composables/useResourceDelete'
@@ -596,7 +596,7 @@ async function confirmCreateProject() {
     }
     MessagePlugin.success('项目已创建')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '创建失败'))
+    notifyApiError(error, '创建失败')
   } finally {
     projectSaving.value = false
   }
@@ -620,7 +620,7 @@ async function confirmRenameProject() {
     projectRenameVisible.value = false
     MessagePlugin.success('已改名')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '改名失败'))
+    notifyApiError(error, '改名失败')
   } finally {
     projectSaving.value = false
   }
@@ -804,7 +804,7 @@ async function confirmRenameConversation() {
     renameVisible.value = false
     MessagePlugin.success('已改名')
   } catch (error) {
-    MessagePlugin.error(extractApiError(error, '改名失败'))
+    notifyApiError(error, '改名失败')
   } finally {
     renameSaving.value = false
   }
