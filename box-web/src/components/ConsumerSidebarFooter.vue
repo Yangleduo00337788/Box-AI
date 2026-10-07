@@ -201,7 +201,7 @@
       attach="body"
       header="团队"
       :footer="false"
-      width="960px"
+      width="1080px"
       placement="center"
     >
       <team-view v-if="teamVisible && canOpenTeam" compact />
