@@ -57,7 +57,7 @@
         </t-card>
 
         <t-card :bordered="false" title="OAuth 登录" class="config-card">
-          <p class="config-group__hint">开启并填写 Client 后，C 端登录页将显示对应按钮。回调地址固定为后端 /api/v1/auth/oauth/{provider}/callback，也可在 .env 配置 BOX_OAUTH_*。本地开发可用 GitHub/Google（localhost 回调即可）。</p>
+          <p class="config-group__hint">仅个人端支持第三方登录（GitHub / Google）。开启并填写 Client 后，C 端登录页将显示对应按钮。回调地址固定为 /api/v1/auth/oauth/{provider}/callback。</p>
           <t-form-item
             v-for="item in oauthItems"
             :key="item.configKey"
@@ -128,16 +128,6 @@ const oauthItems = [
   },
   { configKey: 'oauth.google.client_id', label: 'Google Client ID', placeholder: 'xxx.apps.googleusercontent.com' },
   { configKey: 'oauth.google.client_secret', label: 'Google Client Secret', placeholder: '******', secret: true },
-  {
-    configKey: 'oauth.wechat.enabled',
-    label: '微信扫码登录（个人端）',
-    options: [
-      { label: '关闭', value: 'false' },
-      { label: '开启', value: 'true' },
-    ],
-  },
-  { configKey: 'oauth.wechat.client_id', label: '微信开放平台 AppID', placeholder: 'wx...' },
-  { configKey: 'oauth.wechat.client_secret', label: '微信开放平台 AppSecret', placeholder: '******', secret: true },
 ]
 
 const loading = ref(false)

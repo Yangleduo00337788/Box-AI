@@ -19,10 +19,7 @@ public class OAuthClientConfigResolver {
             "oauth.github.client_secret",
             "oauth.google.enabled",
             "oauth.google.client_id",
-            "oauth.google.client_secret",
-            "oauth.wechat.enabled",
-            "oauth.wechat.client_id",
-            "oauth.wechat.client_secret");
+            "oauth.google.client_secret");
 
     private final SystemConfigRepository systemConfigRepository;
     private final OAuthProperties oauthProperties;
@@ -64,9 +61,6 @@ public class OAuthClientConfigResolver {
         }
         if ("google".equals(provider)) {
             return oauthProperties.getGoogle();
-        }
-        if ("wechat".equals(provider)) {
-            return oauthProperties.getWechat();
         }
         return null;
     }

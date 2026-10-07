@@ -22,12 +22,10 @@ public class OAuthApplicationService {
 
     private static final Map<String, String> PROVIDER_NAMES = Map.of(
             "github", "GitHub",
-            "google", "Google",
-            "wechat", "微信"
+            "google", "Google"
     );
 
-    private static final List<String> PROVIDER_ORDER = List.of("github", "google", "wechat");
-    private static final Set<String> IMPLEMENTED_PROVIDERS = Set.of("github", "google", "wechat");
+    private static final List<String> PROVIDER_ORDER = List.of("github", "google");
     private static final Set<String> SUPPORTED_PROVIDERS = Set.copyOf(PROVIDER_ORDER);
 
     private final OAuthClientConfigResolver clientConfigResolver;
@@ -53,11 +51,6 @@ public class OAuthApplicationService {
 
     public String buildAuthorizeUrl(String provider, String redirectUri, String portal) {
         String normalized = resolveProvider(provider);
-        if (!IMPLEMENTED_PROVIDERS.contains(normalized)) {
-            throw new BusinessException(
-                    ErrorCode.OAUTH_NOT_CONFIGURED,
-                    "OAuth 登录尚未配置，请在管理端或 box.oauth 中启用 " + normalized);
-        }
         String portalType = normalizePortal(portal);
         assertProviderMatchesPortal(normalized, portalType);
         OAuthClientConfigResolver.ResolvedOAuthClient client = requireEnabledClient(normalized);
@@ -72,9 +65,6 @@ public class OAuthApplicationService {
 
     public String handleCallbackAndBuildRedirect(String provider, String code, String state) {
         String normalized = resolveProvider(provider);
-        if (!IMPLEMENTED_PROVIDERS.contains(normalized)) {
-            throw new BusinessException(ErrorCode.OAUTH_NOT_CONFIGURED, "OAuth 回调尚未实现");
-        }
         if (code == null || code.isBlank()) {
             throw new BusinessException(ErrorCode.OAUTH_FAILED, "缺少授权码");
         }
@@ -113,13 +103,12 @@ public class OAuthApplicationService {
 
     private static void assertProviderMatchesPortal(String provider, String portal) {
         if (TenantTypes.ENTERPRISE.equals(portal)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业请使用企业邮箱登录");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "企业请使用企业邮箱或企业标识登录");
         }
     }
 
     private OAuthProviderVO toProvider(String provider) {
-        boolean enabled = IMPLEMENTED_PROVIDERS.contains(provider)
-                && clientConfigResolver.resolve(provider).enabled();
+        boolean enabled = clientConfigResolver.resolve(provider).enabled();
         return new OAuthProviderVO(
                 provider,
                 PROVIDER_NAMES.get(provider),

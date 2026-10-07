@@ -1,13 +1,12 @@
 import type { OAuthProviderVO } from '@/api/auth'
 import type { PortalType } from '@/constants/portal'
 
-export const PERSONAL_OAUTH_PROVIDERS = ['github', 'google', 'wechat'] as const
+export const PERSONAL_OAUTH_PROVIDERS = ['github', 'google'] as const
 export const OAUTH_PROVIDER_ORDER = [...PERSONAL_OAUTH_PROVIDERS] as const
 
 export const OAUTH_PROVIDER_LABELS: Record<string, string> = {
   github: 'GitHub',
   google: 'Google',
-  wechat: '微信',
 }
 
 export function mergeOAuthProviders(

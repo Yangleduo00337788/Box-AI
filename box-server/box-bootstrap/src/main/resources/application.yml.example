@@ -43,10 +43,6 @@ box:
       enabled: ${BOX_OAUTH_GOOGLE_ENABLED:false}
       client-id: ${BOX_OAUTH_GOOGLE_CLIENT_ID:}
       client-secret: ${BOX_OAUTH_GOOGLE_CLIENT_SECRET:}
-    wechat:
-      enabled: ${BOX_OAUTH_WECHAT_ENABLED:false}
-      client-id: ${BOX_OAUTH_WECHAT_CLIENT_ID:}
-      client-secret: ${BOX_OAUTH_WECHAT_CLIENT_SECRET:}
   security:
     jwt:
       secret: ${BOX_SECURITY_JWT_SECRET}

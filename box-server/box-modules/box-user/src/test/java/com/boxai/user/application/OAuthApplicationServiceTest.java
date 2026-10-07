@@ -44,13 +44,11 @@ class OAuthApplicationServiceTest {
     void listProvidersReturnsDisabledWhenNotConfigured() {
         when(clientConfigResolver.resolve("github")).thenReturn(disabled("github"));
         when(clientConfigResolver.resolve("google")).thenReturn(disabled("google"));
-        when(clientConfigResolver.resolve("wechat")).thenReturn(disabled("wechat"));
 
         var providers = service.listProviders();
-        assertEquals(3, providers.size());
+        assertEquals(2, providers.size());
         assertEquals("github", providers.get(0).provider());
         assertEquals("google", providers.get(1).provider());
-        assertEquals("wechat", providers.get(2).provider());
         assertTrue(providers.stream().allMatch(item -> !item.enabled()));
     }
 
@@ -92,13 +90,6 @@ class OAuthApplicationServiceTest {
 
     @Test
     void startAuthorizeRejectsOAuthOnEnterprisePortal() {
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.buildAuthorizeUrl("wechat", "http://localhost:5173/login", "enterprise"));
-        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
-    }
-
-    @Test
-    void startAuthorizeRejectsPersonalProviderOnEnterprisePortal() {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.buildAuthorizeUrl("github", "http://localhost:5173/login", "enterprise"));
         assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
