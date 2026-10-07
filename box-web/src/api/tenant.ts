@@ -1,8 +1,9 @@
 import http, { type Result } from './http'
+import type { EntityId } from '@/utils/entityId'
 
 export interface TenantMemberVO {
   id: number
-  userId: number
+  userId: EntityId
   loginName?: string
   email: string
   nickname: string
@@ -41,7 +42,7 @@ export function provisionEmployee(payload: {
   return http.post<Result<TenantMemberVO>>('/tenant/members/accounts', payload)
 }
 
-export function resetEmployeePassword(userId: number, password: string) {
+export function resetEmployeePassword(userId: EntityId, password: string) {
   return http.put<Result<void>>(`/tenant/members/${userId}/password`, { password })
 }
 
@@ -57,7 +58,7 @@ export function updateOrgId(orgId: string) {
   return http.put<Result<EnterpriseOrgAccessVO>>('/tenant/org-id', { orgId })
 }
 
-export function updateTenantMemberStatus(userId: number, status: number) {
+export function updateTenantMemberStatus(userId: EntityId, status: number) {
   return http.put<Result<TenantMemberVO>>(`/tenant/members/${userId}/status`, { status })
 }
 

@@ -1,6 +1,7 @@
 package com.boxai.infrastructure.persistence.repository;
 
 import com.boxai.common.constant.UserTypes;
+import com.boxai.common.id.SnowflakeIdGenerator;
 import com.boxai.common.result.PageResult;
 import com.boxai.domain.user.User;
 import com.boxai.domain.user.UserQuery;
@@ -21,9 +22,11 @@ import java.util.Optional;
 public class UserRepositoryImpl implements UserRepository {
 
     private final UserMapper userMapper;
+    private final SnowflakeIdGenerator snowflakeIdGenerator;
 
-    public UserRepositoryImpl(UserMapper userMapper) {
+    public UserRepositoryImpl(UserMapper userMapper, SnowflakeIdGenerator snowflakeIdGenerator) {
         this.userMapper = userMapper;
+        this.snowflakeIdGenerator = snowflakeIdGenerator;
     }
 
     @Override
@@ -82,6 +85,8 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public User save(User user) {
         UserDO row = new UserDO();
+        long id = user.getId() != null ? user.getId() : snowflakeIdGenerator.nextId();
+        row.setId(id);
         row.setUsername(user.getUsername());
         row.setEmail(user.getEmail());
         row.setPhone(user.getPhone());
@@ -96,7 +101,7 @@ public class UserRepositoryImpl implements UserRepository {
         row.setUpdatedAt(LocalDateTime.now());
         row.setDeleted(0);
         userMapper.insert(row);
-        user.setId(row.getId());
+        user.setId(id);
         user.setCreatedAt(row.getCreatedAt());
         return user;
     }

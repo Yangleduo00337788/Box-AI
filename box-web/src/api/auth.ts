@@ -1,7 +1,7 @@
 import http, { type Result } from './http'
 
 export interface UserVO {
-  id: number
+  id: number | string
   username: string
   email: string
   nickname: string

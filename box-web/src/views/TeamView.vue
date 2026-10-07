@@ -95,7 +95,7 @@
               </t-tag>
             </template>
             <template #actions="{ row }">
-              <t-space v-if="canManage && row.userId !== auth.user?.id" size="4px">
+              <t-space v-if="canManage && !sameEntityId(row.userId, auth.user?.id)" size="4px">
                 <t-button variant="text" size="small" @click="toggleStatus(row)">
                   {{ row.status === 1 ? '停用' : '启用' }}
                 </t-button>
@@ -133,7 +133,7 @@
             </template>
             <template #roleCode="{ row }">
               <t-select
-                v-if="row.userId !== auth.user?.id"
+                v-if="!sameEntityId(row.userId, auth.user?.id)"
                 :value="row.roleCode"
                 :options="wsRoleOptions"
                 size="small"
@@ -143,7 +143,7 @@
             </template>
             <template #actions="{ row }">
               <t-button
-                v-if="row.userId !== auth.user?.id"
+                v-if="!sameEntityId(row.userId, auth.user?.id)"
                 variant="text"
                 size="small"
                 theme="danger"
@@ -264,6 +264,7 @@ import {
   type WorkspaceMemberVO,
 } from '@/api/workspace'
 import { notifyApiError } from '@/api/apiError'
+import { sameEntityId, type EntityId } from '@/utils/entityId'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -298,7 +299,7 @@ const resetTarget = ref<TenantMemberVO | null>(null)
 const isEnterprise = computed(() => auth.tenant?.tenantType === 'ENTERPRISE')
 const canManageWorkspace = computed(() => auth.currentWorkspace?.roleCode === 'TENANT_ADMIN')
 const canManage = computed(() => {
-  const me = members.value.find((item) => item.userId === auth.user?.id)
+  const me = members.value.find((item) => sameEntityId(item.userId, auth.user?.id))
   return me?.roleCode === 'TENANT_ADMIN' && me?.status === 1
 })
 
@@ -580,7 +581,7 @@ async function onRevokeInvite(id: number) {
   }
 }
 
-async function removeWorkspace(userId: number) {
+async function removeWorkspace(userId: EntityId) {
   try {
     await removeWorkspaceMember(userId)
     MessagePlugin.success('已移除工作空间成员')
@@ -590,7 +591,7 @@ async function removeWorkspace(userId: number) {
   }
 }
 
-async function updateWorkspaceRole(userId: number, roleCode: string) {
+async function updateWorkspaceRole(userId: EntityId, roleCode: string) {
   try {
     await updateWorkspaceMemberRole(userId, { roleCode })
     MessagePlugin.success('角色已更新')

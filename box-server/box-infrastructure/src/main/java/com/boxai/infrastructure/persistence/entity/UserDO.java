@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Table("sys_user")
 public class UserDO {
 
-    @Id(keyType = KeyType.Auto)
+    @Id(keyType = KeyType.None)
     private Long id;
     private String username;
     private String email;

@@ -1,7 +1,7 @@
 import http, { type Result } from './http'
 
 export interface PlatformUserVO {
-  id: number
+  id: number | string
   username?: string
   email?: string
   nickname?: string
@@ -13,7 +13,7 @@ export interface PlatformUserVO {
 }
 
 export interface PlatformUserContextVO {
-  userId: number
+  userId: number | string
   email?: string
   nickname?: string
   primaryTenantId?: number
@@ -44,7 +44,7 @@ export function listPlatformUsers(params: {
   return http.get<Result<PlatformUserPage>>('/users', { params })
 }
 
-export function updatePlatformUserStatus(id: number, status: number) {
+export function updatePlatformUserStatus(id: number | string, status: number) {
   return http.put<Result<PlatformUserVO>>(`/users/${id}/status`, { status })
 }
 
@@ -57,6 +57,6 @@ export function createPlatformAdmin(payload: {
   return http.post<Result<PlatformUserVO>>('/users', payload)
 }
 
-export function fetchUserContext(id: number) {
+export function fetchUserContext(id: number | string) {
   return http.get<Result<PlatformUserContextVO>>(`/users/${id}/context`)
 }

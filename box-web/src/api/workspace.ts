@@ -1,5 +1,6 @@
 import http, { type Result } from './http'
 import type { WorkspaceVO } from './auth'
+import type { EntityId } from '@/utils/entityId'
 
 export function fetchWorkspaces() {
   return http.get<Result<WorkspaceVO[]>>('/workspaces')
@@ -26,7 +27,7 @@ export function fetchCurrentPermissions() {
 
 export interface WorkspaceMemberVO {
   id: number
-  userId: number
+  userId: EntityId
   email: string
   nickname?: string
   roleCode: string
@@ -42,11 +43,11 @@ export function inviteWorkspaceMember(payload: { email: string; roleCode?: strin
   return http.post<Result<WorkspaceMemberVO>>('/workspace/members', payload)
 }
 
-export function updateWorkspaceMemberRole(userId: number, payload: { roleCode: string }) {
+export function updateWorkspaceMemberRole(userId: EntityId, payload: { roleCode: string }) {
   return http.put<Result<WorkspaceMemberVO>>(`/workspace/members/${userId}/role`, payload)
 }
 
-export function removeWorkspaceMember(userId: number) {
+export function removeWorkspaceMember(userId: EntityId) {
   return http.delete<Result<void>>(`/workspace/members/${userId}`)
 }
 

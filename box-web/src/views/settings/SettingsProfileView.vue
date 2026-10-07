@@ -37,8 +37,21 @@
         <t-descriptions-item label="所属企业">{{ auth.tenant?.name || '—' }}</t-descriptions-item>
         <t-descriptions-item label="当前空间角色">{{ roleLabel }}</t-descriptions-item>
         <t-descriptions-item label="用户 ID">
-          <span>{{ auth.user?.id || '—' }}</span>
-          <t-button variant="text" size="small" @click="copyId">复制</t-button>
+          <div class="user-id-row">
+            <span class="user-id-value">{{ auth.user?.id || '—' }}</span>
+            <t-button
+              class="user-id-copy"
+              variant="text"
+              shape="square"
+              size="small"
+              title="复制"
+              @click="copyId"
+            >
+              <template #icon>
+                <t-icon name="file-copy" />
+              </template>
+            </t-button>
+          </div>
         </t-descriptions-item>
       </t-descriptions>
     </section>
@@ -127,6 +140,30 @@ async function save() {
 .settings-card__heading {
   margin: 0 0 16px;
   font: var(--td-font-title-small);
+}
+
+.user-id-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 100%;
+}
+
+.user-id-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.user-id-copy {
+  flex-shrink: 0;
+}
+
+.user-id-row :deep(.t-button) {
+  height: 22px;
+  width: 22px;
 }
 
 @media (max-width: 640px) {

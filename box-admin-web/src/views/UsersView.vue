@@ -102,6 +102,10 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/datetime'
 
+function sameUserId(left: number | string | undefined, right: number | string | undefined) {
+  return left != null && right != null && String(left) === String(right)
+}
+
 const auth = useAuthStore()
 const canManageAdmins = computed(() => auth.isSuperAdmin)
 const loading = ref(false)
@@ -262,7 +266,7 @@ const columns = computed<PrimaryTableCol<PlatformUserVO>[]>(() => [
                 {
                   theme: row.status === 1 ? 'warning' : 'success',
                   hover: 'color',
-                  disabled: auth.user?.id === row.id,
+                  disabled: sameUserId(auth.user?.id, row.id),
                   onClick: () => toggleStatus(row),
                 },
                 () => (row.status === 1 ? '停用' : '启用'),
@@ -325,7 +329,7 @@ async function onAssignPlan() {
     await assignTenantPlan(planTarget.value.tenantId, Number(selectedPlanId.value))
     MessagePlugin.success('套餐已更新')
     planVisible.value = false
-    if (contextVisible.value && contextUser.value?.id === planTarget.value.user.id) {
+    if (contextVisible.value && sameUserId(contextUser.value?.id, planTarget.value.user.id)) {
       await openContext(planTarget.value.user)
     }
   } finally {
@@ -359,7 +363,7 @@ function onPageChange(pageInfo: PageInfo) {
 }
 
 function toggleStatus(row: PlatformUserVO) {
-  if (auth.user?.id === row.id) {
+  if (sameUserId(auth.user?.id, row.id)) {
     MessagePlugin.warning('不能停用当前登录账号')
     return
   }

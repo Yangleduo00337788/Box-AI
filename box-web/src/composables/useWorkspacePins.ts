@@ -5,12 +5,12 @@ const STORAGE_PREFIX = 'box.sidebar.pinnedWorkspaceIds'
 
 const pinnedWorkspaceIds = ref<number[]>([])
 
-function storageKey(userId: number) {
+function storageKey(userId: number | string) {
   return `${STORAGE_PREFIX}.${userId}`
 }
 
-function readPinnedWorkspaceIds(userId: number | undefined) {
-  if (!userId) {
+function readPinnedWorkspaceIds(userId: number | string | undefined) {
+  if (userId == null || userId === '') {
     return []
   }
   try {
@@ -23,8 +23,8 @@ function readPinnedWorkspaceIds(userId: number | undefined) {
   }
 }
 
-function writePinnedWorkspaceIds(userId: number | undefined, ids: number[]) {
-  if (!userId) return
+function writePinnedWorkspaceIds(userId: number | string | undefined, ids: number[]) {
+  if (userId == null || userId === '') return
   localStorage.setItem(storageKey(userId), JSON.stringify(ids))
 }
 
