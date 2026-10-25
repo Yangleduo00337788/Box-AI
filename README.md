@@ -361,6 +361,7 @@ flowchart LR
 | [`box-server`](box-server/) | 后端主工程，`com.boxai`，Spring Boot 3 + LangChain4j |
 | [`box-web`](box-web/) | C 端：对话、Agent Builder、插件市场、设置 |
 | [`box-admin-web`](box-admin-web/) | 平台管理：租户、套餐、模板、运营与审计 |
+| [`box-demo-web`](box-demo-web/) | 用户端 + 管理端一比一静态演示（`box-demo-mock`，可部署 Cloudflare） |
 | [`box-ui`](box-ui/) | 共享 UI 与布局（`@box/ui`） |
 | [`box-sdk`](box-sdk/) | 已发布 Agent 的 Open API 客户端（JS / Python） |
 | [`deploy`](deploy/) | Docker Compose 开发与部署 |
