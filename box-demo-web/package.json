@@ -1,0 +1,14 @@
+{
+  "name": "box-demo-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-static-demo.mjs",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=box-ai-demo --commit-dirty=true",
+    "deploy:pages": "npm run deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.14.0"
+  }
+}

@@ -1,0 +1,126 @@
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  background: linear-gradient(90deg, #222 0%, #484848 100%);
+  color: #fff;
+}
+
+.demo-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-shell__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.demo-shell__aside {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--td-component-border);
+  background: var(--td-bg-color-container);
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-shell__main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: var(--td-bg-color-page);
+}
+
+.demo-page {
+  padding: 20px 24px 32px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.demo-page__header {
+  margin-bottom: 16px;
+}
+
+.demo-page__header h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.demo-page__header p {
+  margin: 0;
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.demo-shot {
+  border-radius: 12px;
+  border: 1px solid var(--td-component-border);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.demo-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.landing-hero {
+  padding: 64px 24px 48px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 0%, #f0f0f0 0%, #fafafa 55%, #fff 100%);
+}
+
+.landing-hero__logo {
+  width: 120px;
+  height: auto;
+  margin-bottom: 16px;
+}
+
+.landing-hero h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  margin: 0 0 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.landing-hero__lead {
+  max-width: 640px;
+  margin: 0 auto 28px;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--td-text-color-secondary);
+}
+
+.landing-section {
+  padding: 48px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.landing-section h2 {
+  text-align: center;
+  font-size: 24px;
+  margin: 0 0 32px;
+}
+
+.landing-footer {
+  text-align: center;
+  padding: 32px 24px 48px;
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .demo-shell__aside {
+    display: none;
+  }
+}
