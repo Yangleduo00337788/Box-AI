@@ -4,7 +4,8 @@ import Components from 'unplugin-vue-components/vite'
 import { TDesignResolver } from 'unplugin-vue-components/resolvers'
 import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: process.env.VITE_BASE || '/',
   plugins: [
     vue(),
     Components({
@@ -18,6 +19,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@box/demo-mock': path.resolve(__dirname, '../box-demo-mock/src'),
       '@box/ui': path.resolve(__dirname, '../box-ui/src'),
       'tdesign-icons-vue-next': path.resolve(__dirname, 'node_modules/tdesign-icons-vue-next'),
     },
@@ -25,11 +27,14 @@ export default defineConfig({
   },
   server: {
     port: 5174,
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8080',
-        changeOrigin: true,
-      },
-    },
+    proxy:
+      mode === 'demo'
+        ? {}
+        : {
+            '/api': {
+              target: 'http://127.0.0.1:8080',
+              changeOrigin: true,
+            },
+          },
   },
-})
+}))

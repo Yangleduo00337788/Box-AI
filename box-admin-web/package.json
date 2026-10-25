@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:demo": "vite --mode demo --base /admin/",
+    "build:demo": "vite build --mode demo --base /admin/",
     "build": "vue-tsc -p tsconfig.build.json --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",

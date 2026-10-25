@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+declare module '@box/demo-mock' {
+  import type { AxiosInstance } from 'axios'
+  export function installBoxDemoMock(http: AxiosInstance, realm: 'consumer' | 'admin'): void
+}
+
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
   const component: DefineComponent<object, object, unknown>

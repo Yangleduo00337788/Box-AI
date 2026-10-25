@@ -1,8 +1,8 @@
 <template>
-  <auth-layout slogan="平台运营与租户治理" :show-mascot="false">
-    <span class="form-badge">管理端</span>
-    <h2 class="form-title">平台登录</h2>
-    <p class="form-desc">B 端管理后台 · 仅限 Box 平台管理员访问</p>
+  <auth-layout slogan="平台运营与租户治理" :show-mascot="false" demo-portal="admin">
+    <span v-if="!isDemo" class="form-badge">管理端</span>
+    <h2 class="form-title" :class="{ 'form-title--demo': isDemo }">平台登录</h2>
+    <p v-if="!isDemo" class="form-desc">B 端管理后台 · 仅限 Box 平台管理员访问</p>
 
     <t-form :data="formData" :rules="rules" label-width="0" @submit="onSubmit">
       <t-form-item name="account">
@@ -45,6 +45,7 @@ import type { FormProps } from 'tdesign-vue-next'
 import AuthLayout from '@box/ui/layouts/AuthLayout.vue'
 import { useAuthStore } from '@/stores/auth'
 
+const isDemo = import.meta.env.VITE_BOX_DEMO === 'true'
 const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(false)
@@ -97,6 +98,10 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   margin: 0 0 8px;
   font: var(--td-font-title-large);
   color: var(--box-ink);
+}
+
+.form-title--demo {
+  margin-bottom: 20px;
 }
 
 .form-desc {

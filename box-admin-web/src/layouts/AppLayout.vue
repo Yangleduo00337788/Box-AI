@@ -112,7 +112,6 @@ const themeVisible = ref(false)
 const active = computed(() => route.path)
 const userName = computed(() => auth.user?.nickname || auth.user?.email || '管理员')
 const avatarText = computed(() => userName.value.slice(0, 1).toUpperCase())
-
 const visibleMenuGroups = computed(() =>
   ADMIN_MENU_GROUPS.map((group) => ({
     ...group,

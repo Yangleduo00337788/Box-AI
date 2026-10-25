@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { MessagePlugin } from 'tdesign-vue-next'
+import { installBoxDemoMock } from '@box/demo-mock'
 
 export interface Result<T> {
   code: number
@@ -11,6 +12,10 @@ const http = axios.create({
   baseURL: '/api/v1/admin',
   timeout: 30000,
 })
+
+if (import.meta.env.VITE_BOX_DEMO === 'true') {
+  installBoxDemoMock(http, 'admin')
+}
 
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem('box.admin.token')
@@ -39,8 +44,9 @@ http.interceptors.response.use(
     const message = error.response?.data?.message || error.message || '网络异常'
     if (error.response?.status === 401) {
       localStorage.removeItem('box.admin.token')
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login'
+      const loginPath = `${import.meta.env.BASE_URL}login`.replace(/\/{2,}/g, '/')
+      if (!window.location.pathname.endsWith('/login')) {
+        window.location.href = loginPath
       }
     }
     MessagePlugin.error(message)

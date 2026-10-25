@@ -3,7 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import { canAccessAdminRoute } from '@/constants/rbac'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/login',

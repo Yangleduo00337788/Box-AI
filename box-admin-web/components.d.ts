@@ -50,7 +50,6 @@ declare module 'vue' {
     TLink: typeof import('tdesign-vue-next')['Link']
     TLoading: typeof import('tdesign-vue-next')['Loading']
     TMenu: typeof import('tdesign-vue-next')['Menu']
-    TMenuGroup: typeof import('tdesign-vue-next')['MenuGroup']
     TMenuItem: typeof import('tdesign-vue-next')['MenuItem']
     TPopup: typeof import('tdesign-vue-next')['Popup']
     TRadio: typeof import('tdesign-vue-next')['Radio']
