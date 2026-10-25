@@ -12,15 +12,17 @@
       <p v-if="props.slogan" class="auth-slogan">{{ props.slogan }}</p>
 
       <div class="auth-card">
+        <demo-entry-block v-if="props.demoPortal" :portal="props.demoPortal" />
         <slot />
       </div>
 
-      <p class="auth-footer">Copyright © Box. All Rights Reserved.</p>
+      <p class="auth-footer">Copyright © Yangleduo. All Rights Reserved.</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import DemoEntryBlock from '../components/DemoEntryBlock.vue'
 import PortalBadge from '../components/PortalBadge.vue'
 import mascotUrl from '../assets/logo-mascot.png'
 
@@ -32,11 +34,14 @@ const props = withDefaults(
     showMascot?: boolean
     portalLabel?: string
     portalTheme?: 'consumer' | 'enterprise' | 'personal' | 'admin'
+    /** 演示站登录卡：consumer / admin */
+    demoPortal?: 'consumer' | 'admin'
   }>(),
   {
     slogan: '把模型、知识、工具、工作流装进一个 Box',
     showMascot: true,
     portalTheme: 'consumer',
+    demoPortal: undefined,
   },
 )
 </script>
@@ -137,6 +142,7 @@ const props = withDefaults(
   margin: 24px 0 0;
   text-align: center;
   font: var(--td-font-body-small);
-  color: var(--box-muted);
+  font-weight: 600;
+  color: var(--td-text-color-primary);
 }
 </style>
