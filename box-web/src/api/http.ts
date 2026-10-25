@@ -16,6 +16,7 @@ import {
   UNAUTHORIZED_CODE,
 } from './apiError'
 import { requestQuotaRefresh } from '@/composables/quotaRefresh'
+import { installBoxDemoMock } from '@box/demo-mock'
 
 export interface Result<T> {
   code: number
@@ -29,6 +30,10 @@ const http = axios.create({
   baseURL: '/api/v1',
   timeout: 15000,
 })
+
+if (import.meta.env.VITE_BOX_DEMO === 'true') {
+  installBoxDemoMock(http, 'consumer')
+}
 
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem('box.token')

@@ -1,10 +1,8 @@
 <template>
-  <auth-layout
-    slogan="把模型、知识、工具、工作流装进一个 Box"
-  >
-    <h2 class="form-title">欢迎回来</h2>
+  <auth-layout slogan="把模型、知识、工具、工作流装进一个 Box" demo-portal="consumer">
+    <h2 class="form-title" :class="{ 'form-title--demo': isDemo }">欢迎回来</h2>
 
-    <div class="portal-switch">
+    <div v-if="!isDemo" class="portal-switch">
       <button
         v-for="item in PORTAL_OPTIONS"
         :key="item.value"
@@ -16,7 +14,7 @@
         {{ item.label }}
       </button>
     </div>
-    <p class="form-desc">{{ currentPortalDesc }}</p>
+    <p v-if="!isDemo" class="form-desc">{{ currentPortalDesc }}</p>
 
     <div v-if="verifiedOrg && enterpriseView !== 'email'" class="org-banner">
       <t-icon name="check-circle" />
@@ -177,6 +175,7 @@ import { useAuthStore } from '@/stores/auth'
 
 type EnterpriseView = 'email' | 'employee-org' | 'employee-login' | 'join'
 
+const isDemo = import.meta.env.VITE_BOX_DEMO === 'true'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
@@ -423,6 +422,10 @@ const onSubmit: FormProps['onSubmit'] = async ({ validateResult }) => {
   margin: 0 0 16px;
   font: var(--td-font-title-large);
   color: var(--box-ink);
+}
+
+.form-title--demo {
+  margin-bottom: 20px;
 }
 
 .portal-switch {

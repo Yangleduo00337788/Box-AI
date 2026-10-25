@@ -1,3 +1,5 @@
+import '@/api/http'
+
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import TDesign from 'tdesign-vue-next'

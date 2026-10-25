@@ -152,7 +152,12 @@ router.beforeEach(async (to) => {
   }
 
   const host = window.location.hostname
-  if ((to.path === '/' || to.path === '/chat') && !APP_HOSTS.has(host)) {
+  const skipEmbedForDemo = import.meta.env.VITE_BOX_DEMO === 'true'
+  if (
+    !skipEmbedForDemo &&
+    (to.path === '/' || to.path === '/chat') &&
+    !APP_HOSTS.has(host)
+  ) {
     const agentId = await resolveEmbedAgentId(host)
     if (agentId) {
       return { path: '/embed', query: to.query }

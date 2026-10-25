@@ -15,7 +15,7 @@
         <slot />
       </div>
 
-      <p class="auth-footer">Copyright © Box. All Rights Reserved.</p>
+      <p class="auth-footer">Copyright © Yangleduo. All Rights Reserved.</p>
     </div>
   </div>
 </template>
@@ -124,6 +124,7 @@ import logoMascot from '@/assets/logo-mascot.png'
   margin: 24px 0 0;
   text-align: center;
   font: var(--td-font-body-small);
-  color: var(--box-muted);
+  font-weight: 600;
+  color: var(--td-text-color-primary);
 }
 </style>

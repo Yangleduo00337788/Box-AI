@@ -1,3 +1,10 @@
+/// <reference types="vite/client" />
+
+declare module '@box/demo-mock' {
+  import type { AxiosInstance } from 'axios'
+  export function installBoxDemoMock(http: AxiosInstance, realm: 'consumer' | 'admin'): void
+}
+
 declare module '*.svg?url' {
   const src: string
   export default src

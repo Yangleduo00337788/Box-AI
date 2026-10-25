@@ -5,7 +5,8 @@ import { TDesignResolver } from 'unplugin-vue-components/resolvers'
 import path from 'path'
 import { TDesignChatResolver } from './src/resolvers/tdesignChatResolver'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: process.env.VITE_BASE || '/',
   build: {
     rollupOptions: {
       output: {
@@ -31,6 +32,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@box/demo-mock': path.resolve(__dirname, '../box-demo-mock/src'),
       '@box/ui': path.resolve(__dirname, '../box-ui/src'),
       'tdesign-icons-vue-next': path.resolve(__dirname, 'node_modules/tdesign-icons-vue-next'),
     },
@@ -39,15 +41,18 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/.well-known': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-    },
+    proxy:
+      mode === 'demo'
+        ? {}
+        : {
+            '/api': {
+              target: 'http://localhost:8080',
+              changeOrigin: true,
+            },
+            '/.well-known': {
+              target: 'http://localhost:8080',
+              changeOrigin: true,
+            },
+          },
   },
-})
+}))
