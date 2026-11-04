@@ -7,6 +7,7 @@ import com.boxai.domain.workflow.Workflow;
 import com.boxai.domain.workflow.WorkflowRepository;
 import com.boxai.runtime.api.WorkflowExecuteRequest;
 import com.boxai.runtime.api.WorkflowExecutionResultVO;
+import com.boxai.security.ratelimit.RateLimitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,8 @@ class WorkflowWebhookApplicationServiceTest {
     private WorkflowRepository workflowRepository;
     @Mock
     private WorkflowExecutionApplicationService workflowExecutionApplicationService;
+    @Mock
+    private RateLimitService rateLimitService;
 
     @Test
     void triggerRejectsUnknownToken() {
@@ -100,7 +103,7 @@ class WorkflowWebhookApplicationServiceTest {
 
     private WorkflowWebhookApplicationService service() {
         return new WorkflowWebhookApplicationService(
-                workflowRepository, workflowExecutionApplicationService, new ObjectMapper());
+                workflowRepository, workflowExecutionApplicationService, rateLimitService, new ObjectMapper());
     }
 
     private static Workflow publishedWorkflow() {

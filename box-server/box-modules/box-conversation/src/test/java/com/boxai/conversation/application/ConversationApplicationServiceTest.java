@@ -96,6 +96,7 @@ class ConversationApplicationServiceTest {
         Agent agent = new Agent();
         agent.setId(21L);
         agent.setWorkspaceId(7L);
+        agent.setPublishedVersionId(2L);
         agent.setName("Helper");
         when(agentRepository.findById(21L)).thenReturn(Optional.of(agent));
 
@@ -127,6 +128,20 @@ class ConversationApplicationServiceTest {
     }
 
     @Test
+    void createRejectsUnpublishedAgent() {
+        WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
+        Agent agent = new Agent();
+        agent.setId(21L);
+        agent.setWorkspaceId(7L);
+        agent.setPublishedVersionId(null);
+        when(agentRepository.findById(21L)).thenReturn(Optional.of(agent));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.create(new CreateConversationRequest(21L, "Hello", null)));
+        assertEquals(ErrorCode.AGENT_NOT_PUBLISHED, ex.getCode());
+    }
+
+    @Test
     void sendMessageRejectsBlankContentWithoutPlugins() {
         WorkspaceContext.set(new WorkspaceContext(7L, 3L, 1L, "MEMBER"));
         when(conversationRepository.findById(5L)).thenReturn(Optional.of(ownedConversation()));
@@ -155,13 +170,13 @@ class ConversationApplicationServiceTest {
         when(conversationRepository.findById(5L)).thenReturn(Optional.of(conversation));
         when(messagePluginContextService.enrich(7L, "hello", null))
                 .thenReturn(new MessagePluginContextService.EnrichedMessage("hello", null));
-        when(agentVersionRepository.findLatestDraft(21L)).thenReturn(Optional.empty());
+        stubPublishedAgent();
         Execution execution = new Execution();
         execution.setId(90L);
-        when(executionRecorder.startAgentExecution(eq(21L), isNull(), eq(5L), any())).thenReturn(execution);
+        when(executionRecorder.startAgentExecution(eq(21L), eq(2L), eq(5L), any())).thenReturn(execution);
         when(conversationPluginApplicationService.resolve(7L, null)).thenReturn(ConversationPluginRound.empty());
         PreparedAgentChat prepared = preparedChat();
-        when(agentChatPreparer.prepare(eq(21L), any(), eq("hello"), isNull(), any(), any())).thenReturn(prepared);
+        when(agentChatPreparer.preparePublished(eq(21L), any(), eq("hello"), any(), any(), isNull())).thenReturn(prepared);
         when(messageRepository.findMaxSequenceNo(5L)).thenReturn(Optional.of(0), Optional.of(1));
         when(messageRepository.listByConversationId(5L)).thenReturn(List.of());
         doAnswer(invocation -> {
@@ -189,13 +204,13 @@ class ConversationApplicationServiceTest {
         when(conversationRepository.findById(5L)).thenReturn(Optional.of(ownedConversation()));
         when(messagePluginContextService.enrich(7L, "hello", null))
                 .thenReturn(new MessagePluginContextService.EnrichedMessage("hello", null));
-        when(agentVersionRepository.findLatestDraft(21L)).thenReturn(Optional.empty());
+        stubPublishedAgent();
         Execution execution = new Execution();
         execution.setId(90L);
-        when(executionRecorder.startAgentExecution(eq(21L), isNull(), eq(5L), any())).thenReturn(execution);
+        when(executionRecorder.startAgentExecution(eq(21L), eq(2L), eq(5L), any())).thenReturn(execution);
         when(conversationPluginApplicationService.resolve(7L, null)).thenReturn(ConversationPluginRound.empty());
         PreparedAgentChat prepared = preparedChat();
-        when(agentChatPreparer.prepare(eq(21L), any(), eq("hello"), isNull(), any(), any())).thenReturn(prepared);
+        when(agentChatPreparer.preparePublished(eq(21L), any(), eq("hello"), any(), any(), isNull())).thenReturn(prepared);
         when(messageRepository.findMaxSequenceNo(5L)).thenReturn(Optional.of(0));
         when(messageRepository.listByConversationId(5L)).thenReturn(List.of());
         doAnswer(invocation -> invocation.getArgument(0)).when(messageRepository).save(any(Message.class));
@@ -225,10 +240,10 @@ class ConversationApplicationServiceTest {
         when(conversationRepository.findById(5L)).thenReturn(Optional.of(conversation));
         when(messagePluginContextService.enrich(7L, "hello", null))
                 .thenReturn(new MessagePluginContextService.EnrichedMessage("hello", null));
-        when(agentVersionRepository.findLatestDraft(21L)).thenReturn(Optional.empty());
+        stubPublishedAgent();
         when(conversationPluginApplicationService.resolve(7L, null)).thenReturn(ConversationPluginRound.empty());
         PreparedAgentChat prepared = preparedChat();
-        when(agentChatPreparer.prepare(eq(21L), any(), eq("hello"), isNull(), any(), any())).thenReturn(prepared);
+        when(agentChatPreparer.preparePublished(eq(21L), any(), eq("hello"), any(), any(), isNull())).thenReturn(prepared);
         Execution execution = new Execution();
         execution.setId(90L);
         when(executionRecorder.startAgentExecution(eq(21L), eq(2L), eq(5L), any())).thenReturn(execution);
@@ -252,6 +267,20 @@ class ConversationApplicationServiceTest {
         assertEquals("ASSISTANT", captor.getAllValues().get(1).getRole());
         assertEquals("streamed", captor.getAllValues().get(1).getContent());
         assertEquals(2, conversation.getMessageCount());
+    }
+
+    private void stubPublishedAgent() {
+        Agent agent = new Agent();
+        agent.setId(21L);
+        agent.setWorkspaceId(7L);
+        agent.setPublishedVersionId(2L);
+        when(agentRepository.findById(21L)).thenReturn(Optional.of(agent));
+        com.boxai.domain.agent.AgentVersion version = new com.boxai.domain.agent.AgentVersion();
+        version.setId(2L);
+        version.setKnowledgeEnabled(false);
+        version.setMemoryEnabled(true);
+        version.setMemoryWindowSize(20);
+        when(agentVersionRepository.findById(2L)).thenReturn(Optional.of(version));
     }
 
     private static Conversation ownedConversation() {

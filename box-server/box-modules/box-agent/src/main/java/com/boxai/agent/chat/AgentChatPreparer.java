@@ -122,13 +122,23 @@ public class AgentChatPreparer {
                                               List<ChatTurn> history,
                                               String userMessage,
                                               KnowledgeRetrievalResult retrieval) {
+        return preparePublished(agentId, history, userMessage, retrieval, ConversationPluginRound.empty(), null);
+    }
+
+    public PreparedAgentChat preparePublished(Long agentId,
+                                              List<ChatTurn> history,
+                                              String userMessage,
+                                              KnowledgeRetrievalResult retrieval,
+                                              ConversationPluginRound pluginRound,
+                                              Long platformModelOverride) {
         Agent agent = requireAgent(agentId);
         if (agent.getPublishedVersionId() == null) {
             throw new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体尚未发布");
         }
         AgentVersion version = agentVersionRepository.findById(agent.getPublishedVersionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "发布版本不存在"));
-        return prepareWithVersion(agent, version, history, userMessage, null, retrieval, ConversationPluginRound.empty());
+        ConversationPluginRound effectiveRound = pluginRound == null ? ConversationPluginRound.empty() : pluginRound;
+        return prepareWithVersion(agent, version, history, userMessage, platformModelOverride, retrieval, effectiveRound);
     }
 
     private PreparedAgentChat prepareWithVersion(Agent agent,

@@ -2,6 +2,7 @@ package com.boxai.user.application;
 
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
+import com.boxai.user.config.OAuthProperties;
 import com.boxai.user.support.OAuthClientConfigResolver;
 import com.boxai.user.support.OAuthRemoteClient;
 import com.boxai.user.support.OAuthStateStore;
@@ -37,7 +38,7 @@ class OAuthApplicationServiceTest {
     @BeforeEach
     void setUp() {
         service = new OAuthApplicationService(
-                clientConfigResolver, stateStore, remoteClient, authApplicationService);
+                clientConfigResolver, stateStore, remoteClient, authApplicationService, new OAuthProperties());
     }
 
     @Test
@@ -86,6 +87,14 @@ class OAuthApplicationServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.buildAuthorizeUrl("GitHub", "http://localhost:5173/login", "personal"));
         assertEquals(ErrorCode.OAUTH_NOT_CONFIGURED, ex.getCode());
+    }
+
+    @Test
+    void startAuthorizeRejectsUnlistedRedirectUri() {
+        when(clientConfigResolver.resolve("github")).thenReturn(enabled("github", "gh-id", "gh-secret"));
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.buildAuthorizeUrl("github", "https://evil.example/steal", "personal"));
+        assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
     }
 
     @Test

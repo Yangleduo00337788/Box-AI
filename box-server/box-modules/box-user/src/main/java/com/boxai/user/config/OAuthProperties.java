@@ -7,6 +7,8 @@ public class OAuthProperties {
 
     /** 对外可访问的后端根地址，用于拼接 OAuth 回调 URL（如 http://localhost:8080）。 */
     private String publicBaseUrl = "http://localhost:8080";
+    /** 逗号分隔的前端 Origin 白名单，OAuth 成功后只允许跳回这些站点。 */
+    private String allowedRedirectOrigins = "http://localhost:5173,http://127.0.0.1:5173";
     private final Provider github = new Provider();
     private final Provider google = new Provider();
 
@@ -16,6 +18,14 @@ public class OAuthProperties {
 
     public void setPublicBaseUrl(String publicBaseUrl) {
         this.publicBaseUrl = publicBaseUrl;
+    }
+
+    public String getAllowedRedirectOrigins() {
+        return allowedRedirectOrigins;
+    }
+
+    public void setAllowedRedirectOrigins(String allowedRedirectOrigins) {
+        this.allowedRedirectOrigins = allowedRedirectOrigins;
     }
 
     public Provider getGithub() {

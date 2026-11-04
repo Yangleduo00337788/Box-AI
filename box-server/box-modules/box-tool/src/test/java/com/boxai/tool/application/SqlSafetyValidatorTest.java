@@ -21,6 +21,12 @@ class SqlSafetyValidatorTest {
     }
 
     @Test
+    void rejectsSelectIntoOutfile() {
+        assertThrows(BusinessException.class,
+                () -> SqlSafetyValidator.validateSelectOnly("SELECT * FROM users INTO OUTFILE '/tmp/x'"));
+    }
+
+    @Test
     void rejectsMultiStatement() {
         assertThrows(BusinessException.class,
                 () -> SqlSafetyValidator.validateSelectOnly("SELECT 1; DROP TABLE users"));

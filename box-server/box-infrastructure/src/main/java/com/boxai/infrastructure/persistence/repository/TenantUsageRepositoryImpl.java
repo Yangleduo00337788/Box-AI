@@ -55,6 +55,11 @@ public class TenantUsageRepositoryImpl implements TenantUsageRepository {
         usage.setUpdatedAt(row.getUpdatedAt());
     }
 
+    @Override
+    public int incrementUsage(Long tenantId, String period, int aiCalls, long tokens, int overageAiCalls, long overageTokens) {
+        return tenantUsageMapper.incrementUsage(tenantId, period, aiCalls, tokens, overageAiCalls, overageTokens);
+    }
+
     private TenantUsage toDomain(TenantUsageDO row) {
         TenantUsage usage = new TenantUsage();
         usage.setId(row.getId());

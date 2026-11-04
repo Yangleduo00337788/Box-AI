@@ -72,6 +72,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/box?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-box}
@@ -88,6 +89,7 @@ services:
       BOX_SECURITY_JWT_SECRET: ${BOX_SECURITY_JWT_SECRET:-box-docker-jwt-secret-change-me-please-32b}
       BOX_SECURITY_CRYPTO_AES_KEY: ${BOX_SECURITY_CRYPTO_AES_KEY:-box-docker-aes-256-key-change!!}
       BOX_OAUTH_PUBLIC_BASE_URL: ${BOX_OAUTH_PUBLIC_BASE_URL:-http://localhost:8080}
+      BOX_OAUTH_ALLOWED_REDIRECT_ORIGINS: ${BOX_OAUTH_ALLOWED_REDIRECT_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       BOX_OAUTH_GITHUB_ENABLED: ${BOX_OAUTH_GITHUB_ENABLED:-false}
       BOX_OAUTH_GITHUB_CLIENT_ID: ${BOX_OAUTH_GITHUB_CLIENT_ID:-}
       BOX_OAUTH_GITHUB_CLIENT_SECRET: ${BOX_OAUTH_GITHUB_CLIENT_SECRET:-}

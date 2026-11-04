@@ -50,6 +50,23 @@ class ProductionSecretStartupValidatorTest {
     }
 
     @Test
+    void rejectsDockerDefaultJwtSecretInProdProfile() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
+        jwtProperties.setSecret(ProductionSecretStartupValidator.DOCKER_JWT_SECRET);
+        cryptoProperties.setAesKey("custom-aes-key-32-chars-minimum!");
+        assertThrows(IllegalStateException.class, () -> validator.validate(environment));
+    }
+
+    @Test
+    void rejectsDefaultSecretsWhenNoProfileActive() {
+        MockEnvironment environment = new MockEnvironment();
+        jwtProperties.setSecret(ProductionSecretStartupValidator.DEFAULT_JWT_SECRET);
+        cryptoProperties.setAesKey("custom-aes-key-32-chars-minimum!");
+        assertThrows(IllegalStateException.class, () -> validator.validate(environment));
+    }
+
+    @Test
     void acceptsCustomSecretsInProdProfile() {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("prod");

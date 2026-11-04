@@ -15,12 +15,12 @@ import com.boxai.domain.workspace.Workspace;
 import com.boxai.domain.workspace.WorkspaceRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +28,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -91,10 +94,7 @@ class QuotaApplicationServiceTest {
 
         service.consumeAiUsage(8L, 15);
 
-        ArgumentCaptor<TenantUsage> captor = ArgumentCaptor.forClass(TenantUsage.class);
-        verify(tenantUsageRepository).update(captor.capture());
-        assertEquals(2, captor.getValue().getAiCalls());
-        assertEquals(35L, captor.getValue().getTokens());
+        verify(tenantUsageRepository).incrementUsage(1L, currentPeriod(), 1, 15L, 0, 0L);
     }
 
     @Test
@@ -106,7 +106,7 @@ class QuotaApplicationServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.consumeAiUsage(8L, 1));
         assertEquals(ErrorCode.QUOTA_EXCEEDED, ex.getCode());
-        verify(tenantUsageRepository, never()).update(any());
+        verify(tenantUsageRepository, never()).incrementUsage(any(), anyString(), anyInt(), anyLong(), anyInt(), anyLong());
     }
 
     @Test
@@ -118,12 +118,19 @@ class QuotaApplicationServiceTest {
 
         service.consumeAiUsage(8L, 8);
 
-        ArgumentCaptor<TenantUsage> captor = ArgumentCaptor.forClass(TenantUsage.class);
-        verify(tenantUsageRepository).update(captor.capture());
-        assertEquals(1, captor.getValue().getAiCalls());
-        assertEquals(10L, captor.getValue().getTokens());
-        assertEquals(1, captor.getValue().getOverageAiCalls());
-        assertEquals(8L, captor.getValue().getOverageTokens());
+        verify(tenantUsageRepository).incrementUsage(1L, currentPeriod(), 0, 0L, 1, 8L);
+    }
+
+    @Test
+    void consumeAiUsageRejectsWhenThisCallWouldExceedTokenQuota() {
+        stubWorkspaceTenant(8L, 1L);
+        stubTenantAndPlan(1L, plan(100, 50, 3, 2, 4, OveragePolicies.REJECT));
+        when(tenantUsageRepository.findByTenantAndPeriod(1L, currentPeriod()))
+                .thenReturn(Optional.of(usage(1L, 1, 40L)));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.consumeAiUsage(8L, 20));
+        assertEquals(ErrorCode.QUOTA_EXCEEDED, ex.getCode());
+        verify(tenantUsageRepository, never()).incrementUsage(any(), anyString(), anyInt(), anyLong(), anyInt(), anyLong());
     }
 
     @Test
@@ -177,6 +184,6 @@ class QuotaApplicationServiceTest {
     }
 
     private static String currentPeriod() {
-        return LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        return LocalDate.now(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.ofPattern("yyyy-MM"));
     }
 }

@@ -15,6 +15,8 @@ public class ProductionSecretStartupValidator implements ApplicationListener<App
 
     static final String DEFAULT_JWT_SECRET = "box-dev-jwt-secret-change-me-please-32b";
     static final String DEFAULT_AES_KEY = "box-dev-aes-256-key-change-me!!";
+    static final String DOCKER_JWT_SECRET = "box-docker-jwt-secret-change-me-please-32b";
+    static final String DOCKER_AES_KEY = "box-docker-aes-256-key-change!!";
 
     private static final Set<String> NON_PRODUCTION_PROFILES = Set.of("dev", "test", "integration", "default");
 
@@ -35,30 +37,35 @@ public class ProductionSecretStartupValidator implements ApplicationListener<App
         if (isNonProductionProfile(environment)) {
             return;
         }
-        if (isDefaultSecret(jwtProperties.getSecret(), DEFAULT_JWT_SECRET)) {
+        if (isForbiddenSecret(jwtProperties.getSecret(), DEFAULT_JWT_SECRET, DOCKER_JWT_SECRET)) {
             throw new IllegalStateException(
-                    "生产环境必须配置 box.security.jwt.secret，不能使用默认值");
+                    "生产环境必须配置 box.security.jwt.secret，不能使用仓库默认值");
         }
-        if (isDefaultSecret(cryptoProperties.getAesKey(), DEFAULT_AES_KEY)) {
+        if (isForbiddenSecret(cryptoProperties.getAesKey(), DEFAULT_AES_KEY, DOCKER_AES_KEY)) {
             throw new IllegalStateException(
-                    "生产环境必须配置 box.security.crypto.aes-key，不能使用默认值");
+                    "生产环境必须配置 box.security.crypto.aes-key，不能使用仓库默认值");
         }
     }
 
     private static boolean isNonProductionProfile(Environment environment) {
         String[] activeProfiles = environment.getActiveProfiles();
         if (activeProfiles.length == 0) {
-            return true;
+            return false;
         }
         return Arrays.stream(activeProfiles)
                 .map(profile -> profile == null ? "" : profile.trim().toLowerCase())
                 .allMatch(NON_PRODUCTION_PROFILES::contains);
     }
 
-    private static boolean isDefaultSecret(String actual, String defaultValue) {
+    private static boolean isForbiddenSecret(String actual, String... forbidden) {
         if (actual == null || actual.isBlank()) {
             return true;
         }
-        return defaultValue.equals(actual);
+        for (String item : forbidden) {
+            if (item.equals(actual)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

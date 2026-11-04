@@ -37,6 +37,17 @@ public class HealthController {
 
     @GetMapping("/health")
     public Result<Map<String, Object>> health() {
+        boolean mysql = pingMysql();
+        boolean redis = ping(() -> redisService.ping());
+        Map<String, Object> checks = new LinkedHashMap<>();
+        checks.put("status", mysql && redis ? "UP" : "DEGRADED");
+        checks.put("mysql", mysql);
+        checks.put("redis", redis);
+        return Result.success(checks);
+    }
+
+    @GetMapping("/health/details")
+    public Result<Map<String, Object>> healthDetails() {
         Map<String, Object> checks = new LinkedHashMap<>();
         checks.put("mysql", pingMysql());
         checks.put("redis", ping(() -> redisService.ping()));

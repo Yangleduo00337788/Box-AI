@@ -101,7 +101,7 @@ public class ConversationApplicationService {
     @Transactional
     public ConversationVO create(CreateConversationRequest request) {
         workspacePermissionService.requirePermission(PermissionCodes.AGENT_READ);
-        Agent agent = requireAgent(request.agentId());
+        Agent agent = requirePublishedAgent(request.agentId());
         Long userId = WorkspaceContext.require().userId();
         Conversation conversation = new Conversation();
         conversation.setWorkspaceId(workspaceId());
@@ -190,15 +190,15 @@ public class ConversationApplicationService {
         Conversation conversation = requireConversation(id);
         MessagePluginContextService.EnrichedMessage outgoing = resolveOutgoingMessage(request);
         String content = outgoing.content();
-        AgentVersion draft = agentVersionRepository.findLatestDraft(conversation.getAgentId()).orElse(null);
+        AgentVersion published = requirePublishedVersion(conversation.getAgentId());
         Execution execution = executionRecorder.startAgentExecution(
                 conversation.getAgentId(),
-                draft == null ? null : draft.getId(),
+                published.getId(),
                 conversation.getId(),
                 toInputJson(content));
-        KnowledgeRetrievalResult retrieval = draft == null
-                ? KnowledgeRetrievalResult.empty()
-                : agentChatPreparer.retrieveKnowledge(draft, content);
+        KnowledgeRetrievalResult retrieval = Boolean.TRUE.equals(published.getKnowledgeEnabled())
+                ? agentChatPreparer.retrieveKnowledge(published, content)
+                : KnowledgeRetrievalResult.empty();
         PreparedAgentChat prepared = buildPreparedChat(
                 conversation,
                 content,
@@ -221,7 +221,7 @@ public class ConversationApplicationService {
             maybeUpdateTitle(conversation, content);
             updateConversationMeta(conversation, 2);
             executionRecorder.succeed(execution, toOutputJson(assistantContent), estimateTokens(assistantContent));
-            captureLongTermMemory(draft, conversation, content, assistantContent);
+            captureLongTermMemory(published, conversation, content, assistantContent);
             return new SendMessageVO(toMessageVO(userMessage), toMessageVO(assistantMessage));
         } catch (RuntimeException e) {
             executionRecorder.fail(execution, e.getMessage());
@@ -235,10 +235,10 @@ public class ConversationApplicationService {
         Conversation conversation = requireConversation(id);
         MessagePluginContextService.EnrichedMessage outgoing = resolveOutgoingMessage(request);
         String content = outgoing.content();
-        AgentVersion draft = agentVersionRepository.findLatestDraft(conversation.getAgentId()).orElse(null);
-        KnowledgeRetrievalResult retrieval = draft == null
-                ? KnowledgeRetrievalResult.empty()
-                : agentChatPreparer.retrieveKnowledge(draft, content);
+        AgentVersion published = requirePublishedVersion(conversation.getAgentId());
+        KnowledgeRetrievalResult retrieval = Boolean.TRUE.equals(published.getKnowledgeEnabled())
+                ? agentChatPreparer.retrieveKnowledge(published, content)
+                : KnowledgeRetrievalResult.empty();
         PreparedAgentChat prepared = buildPreparedChat(
                 conversation,
                 content,
@@ -267,7 +267,7 @@ public class ConversationApplicationService {
             updateConversationMeta(fresh, 1);
             executionRecorder.recordLlmSpan(execution, content, Map.of("content", assistantContent));
             executionRecorder.succeed(execution, toOutputJson(assistantContent), estimateTokens(assistantContent));
-            captureLongTermMemory(draft, fresh, content, assistantContent);
+            captureLongTermMemory(published, fresh, content, assistantContent);
         }), execution.getId(), citationsJson, execution);
     }
 
@@ -288,13 +288,13 @@ public class ConversationApplicationService {
                                                 KnowledgeRetrievalResult retrieval,
                                                 List<Long> pluginIds) {
         ConversationPluginRound pluginRound = conversationPluginApplicationService.resolve(workspaceId(), pluginIds);
-        PreparedAgentChat prepared = agentChatPreparer.prepare(
+        PreparedAgentChat prepared = agentChatPreparer.preparePublished(
                 conversation.getAgentId(),
                 historyTurns(conversation, userMessage),
                 userMessage,
-                platformModelId,
                 retrieval,
-                pluginRound);
+                pluginRound,
+                platformModelId);
         if (toolConfirmationToken == null || toolConfirmationToken.isBlank()) {
             return prepared;
         }
@@ -302,13 +302,13 @@ public class ConversationApplicationService {
     }
 
     private List<ChatTurn> historyTurns(Conversation conversation, String currentUserMessage) {
-        AgentVersion draft = agentVersionRepository.findLatestDraft(conversation.getAgentId()).orElse(null);
-        if (draft != null && Boolean.FALSE.equals(draft.getMemoryEnabled())) {
+        AgentVersion published = requirePublishedVersion(conversation.getAgentId());
+        if (Boolean.FALSE.equals(published.getMemoryEnabled())) {
             return List.of();
         }
-        int windowSize = draft == null || draft.getMemoryWindowSize() == null
+        int windowSize = published.getMemoryWindowSize() == null
                 ? DEFAULT_HISTORY_MESSAGES
-                : Math.max(0, draft.getMemoryWindowSize());
+                : Math.max(0, published.getMemoryWindowSize());
         if (windowSize == 0) {
             return List.of();
         }
@@ -374,10 +374,10 @@ public class ConversationApplicationService {
         conversationRepository.update(conversation);
 
         String content = userMessage.getContent().trim();
-        AgentVersion draft = agentVersionRepository.findLatestDraft(conversation.getAgentId()).orElse(null);
-        KnowledgeRetrievalResult retrieval = draft == null
-                ? KnowledgeRetrievalResult.empty()
-                : agentChatPreparer.retrieveKnowledge(draft, content);
+        AgentVersion published = requirePublishedVersion(conversation.getAgentId());
+        KnowledgeRetrievalResult retrieval = Boolean.TRUE.equals(published.getKnowledgeEnabled())
+                ? agentChatPreparer.retrieveKnowledge(published, content)
+                : KnowledgeRetrievalResult.empty();
         PreparedAgentChat prepared = buildPreparedChat(conversation, content, platformModelId, null, retrieval, null);
         agentChatExecutor.assertQuotaAvailable();
         configureSseResponse(response);
@@ -397,7 +397,7 @@ public class ConversationApplicationService {
             updateConversationMeta(fresh, 1);
             executionRecorder.recordLlmSpan(execution, content, Map.of("content", assistantContent));
             executionRecorder.succeed(execution, toOutputJson(assistantContent), estimateTokens(assistantContent));
-            captureLongTermMemory(draft, fresh, content, assistantContent);
+            captureLongTermMemory(published, fresh, content, assistantContent);
         }), execution.getId(), citationsJson, execution);
     }
 
@@ -495,6 +495,20 @@ public class ConversationApplicationService {
             throw new BusinessException(ErrorCode.WORKSPACE_ACCESS_DENIED, "无权访问该智能体");
         }
         return agent;
+    }
+
+    private Agent requirePublishedAgent(Long id) {
+        Agent agent = requireAgent(id);
+        if (agent.getPublishedVersionId() == null) {
+            throw new BusinessException(ErrorCode.AGENT_NOT_PUBLISHED, "智能体尚未发布，请先在 Builder 中发布后再对话");
+        }
+        return agent;
+    }
+
+    private AgentVersion requirePublishedVersion(Long agentId) {
+        Agent agent = requirePublishedAgent(agentId);
+        return agentVersionRepository.findById(agent.getPublishedVersionId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_VERSION_NOT_FOUND, "发布版本不存在"));
     }
 
     private ConversationVO toVO(Conversation conversation, String agentName) {

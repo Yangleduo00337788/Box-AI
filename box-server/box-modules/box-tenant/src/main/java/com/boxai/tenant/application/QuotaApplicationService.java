@@ -13,16 +13,19 @@ import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.workspace.Workspace;
 import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.tenant.api.QuotaSnapshotVO;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 @Service
 public class QuotaApplicationService {
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final ZoneId BILLING_ZONE = ZoneId.of("Asia/Shanghai");
 
     private final TenantRepository tenantRepository;
     private final PlanRepository planRepository;
@@ -75,13 +78,16 @@ public class QuotaApplicationService {
         Plan plan = resolvePlan(tenantId);
         TenantUsage usage = getOrCreateUsage(tenantId, currentPeriod());
         long tokenDelta = Math.max(tokens, 0);
+        String period = usage.getPeriod();
         if (wouldExceedAiLimit(plan, usage, tokenDelta)) {
-            handleOverage(plan, usage, tokenDelta);
+            if (OveragePolicies.REJECT.equals(
+                    plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy())) {
+                throw new BusinessException(ErrorCode.QUOTA_EXCEEDED, "本月 AI 用量已达套餐上限");
+            }
+            tenantUsageRepository.incrementUsage(tenantId, period, 0, 0, 1, tokenDelta);
         } else {
-            usage.setAiCalls(usage.getAiCalls() + 1);
-            usage.setTokens(usage.getTokens() + tokenDelta);
+            tenantUsageRepository.incrementUsage(tenantId, period, 1, tokenDelta, 0, 0);
         }
-        tenantUsageRepository.update(usage);
     }
 
     public void assertMemberQuotaAvailable(Long tenantId) {
@@ -198,16 +204,6 @@ public class QuotaApplicationService {
         return false;
     }
 
-    private void handleOverage(Plan plan, TenantUsage usage, long tokenDelta) {
-        String policy = plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy();
-        if (OveragePolicies.REJECT.equals(policy)) {
-            assertAiWithinLimit(plan, usage);
-            return;
-        }
-        usage.setOverageAiCalls((usage.getOverageAiCalls() == null ? 0 : usage.getOverageAiCalls()) + 1);
-        usage.setOverageTokens((usage.getOverageTokens() == null ? 0L : usage.getOverageTokens()) + tokenDelta);
-    }
-
     private Tenant requireTenant(Long tenantId) {
         return tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TENANT_NOT_FOUND, "租户不存在"));
@@ -239,12 +235,17 @@ public class QuotaApplicationService {
                     usage.setPeriod(period);
                     usage.setAiCalls(0);
                     usage.setTokens(0L);
-                    return tenantUsageRepository.save(usage);
+                    try {
+                        return tenantUsageRepository.save(usage);
+                    } catch (DuplicateKeyException ex) {
+                        return tenantUsageRepository.findByTenantAndPeriod(tenantId, period)
+                                .orElseThrow(() -> ex);
+                    }
                 });
     }
 
     private String currentPeriod() {
-        return LocalDate.now().format(PERIOD_FORMAT);
+        return LocalDate.now(BILLING_ZONE).format(PERIOD_FORMAT);
     }
 
     private Integer remaining(Integer quota, int used) {

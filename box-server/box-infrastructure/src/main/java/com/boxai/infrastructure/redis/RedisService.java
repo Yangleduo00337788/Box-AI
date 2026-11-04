@@ -26,6 +26,11 @@ public class RedisService {
         redisTemplate.delete(key);
     }
 
+    public long increment(String key) {
+        Long count = redisTemplate.opsForValue().increment(key);
+        return count == null ? 0L : count;
+    }
+
     /**
      * 固定窗口计数：首次写入时设置 TTL，超过 maxAttempts 返回 false。
      */

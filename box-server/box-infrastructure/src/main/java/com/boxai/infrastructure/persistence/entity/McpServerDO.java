@@ -38,5 +38,6 @@ public class McpServerDO {
     private LocalDateTime createdAt;
     @Column("updated_at")
     private LocalDateTime updatedAt;
+    @Column(value = "deleted", isLogicDelete = true)
     private Integer deleted;
 }

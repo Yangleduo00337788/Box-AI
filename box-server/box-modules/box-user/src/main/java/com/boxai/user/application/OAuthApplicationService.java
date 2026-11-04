@@ -4,6 +4,7 @@ import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.user.api.OAuthProviderVO;
+import com.boxai.user.config.OAuthProperties;
 import com.boxai.user.support.OAuthClientConfigResolver;
 import com.boxai.user.support.OAuthRemoteClient;
 import com.boxai.user.support.OAuthStateStore;
@@ -32,15 +33,18 @@ public class OAuthApplicationService {
     private final OAuthStateStore stateStore;
     private final OAuthRemoteClient remoteClient;
     private final AuthApplicationService authApplicationService;
+    private final OAuthProperties oauthProperties;
 
     public OAuthApplicationService(OAuthClientConfigResolver clientConfigResolver,
                                    OAuthStateStore stateStore,
                                    OAuthRemoteClient remoteClient,
-                                   AuthApplicationService authApplicationService) {
+                                   AuthApplicationService authApplicationService,
+                                   OAuthProperties oauthProperties) {
         this.clientConfigResolver = clientConfigResolver;
         this.stateStore = stateStore;
         this.remoteClient = remoteClient;
         this.authApplicationService = authApplicationService;
+        this.oauthProperties = oauthProperties;
     }
 
     public List<OAuthProviderVO> listProviders() {
@@ -54,7 +58,7 @@ public class OAuthApplicationService {
         String portalType = normalizePortal(portal);
         assertProviderMatchesPortal(normalized, portalType);
         OAuthClientConfigResolver.ResolvedOAuthClient client = requireEnabledClient(normalized);
-        String safeRedirect = sanitizeFrontendRedirect(redirectUri);
+        String safeRedirect = sanitizeFrontendRedirect(redirectUri, oauthProperties);
         String state = stateStore.create(new OAuthStateStore.OAuthStatePayload(
                 normalized,
                 portalType,
@@ -84,7 +88,7 @@ public class OAuthApplicationService {
     public String buildErrorRedirect(String state, String message) {
         stateStore.consume(state);
         String error = message == null || message.isBlank() ? "登录失败" : message.trim();
-        return UriComponentsBuilder.fromUriString(defaultFrontendRedirect())
+        return UriComponentsBuilder.fromUriString(defaultFrontendRedirect(oauthProperties))
                 .queryParam("oauth_error", error)
                 .encode(StandardCharsets.UTF_8)
                 .build()
@@ -139,9 +143,9 @@ public class OAuthApplicationService {
         return TenantTypes.PERSONAL;
     }
 
-    private static String sanitizeFrontendRedirect(String redirectUri) {
+    static String sanitizeFrontendRedirect(String redirectUri, OAuthProperties properties) {
         if (redirectUri == null || redirectUri.isBlank()) {
-            return defaultFrontendRedirect();
+            return defaultFrontendRedirect(properties);
         }
         String trimmed = redirectUri.trim();
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
@@ -152,14 +156,41 @@ public class OAuthApplicationService {
             if (uri.getHost() == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "redirectUri 无效");
             }
+            String origin = originOf(uri);
+            if (!allowedOrigins(properties).contains(origin)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "redirectUri 不在允许的前端域名列表中");
+            }
             return trimmed;
         } catch (IllegalArgumentException ex) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "redirectUri 无效");
         }
     }
 
-    private static String defaultFrontendRedirect() {
-        return "http://localhost:5173/login";
+    private static String defaultFrontendRedirect(OAuthProperties properties) {
+        java.util.List<String> origins = allowedOrigins(properties);
+        String origin = origins.isEmpty() ? "http://localhost:5173" : origins.get(0);
+        return origin + "/login";
+    }
+
+    private static java.util.List<String> allowedOrigins(OAuthProperties properties) {
+        String raw = properties == null ? null : properties.getAllowedRedirectOrigins();
+        if (raw == null || raw.isBlank()) {
+            return java.util.List.of("http://localhost:5173", "http://127.0.0.1:5173");
+        }
+        return java.util.Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(item -> !item.isBlank())
+                .toList();
+    }
+
+    private static String originOf(URI uri) {
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        int port = uri.getPort();
+        boolean defaultPort = port == -1
+                || ("http".equalsIgnoreCase(scheme) && port == 80)
+                || ("https".equalsIgnoreCase(scheme) && port == 443);
+        return defaultPort ? scheme + "://" + host : scheme + "://" + host + ":" + port;
     }
 
     private static String appendToken(String redirectUri, String token) {

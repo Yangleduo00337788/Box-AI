@@ -12,4 +12,6 @@ public interface TenantUsageRepository {
     TenantUsage save(TenantUsage usage);
 
     void update(TenantUsage usage);
+
+    int incrementUsage(Long tenantId, String period, int aiCalls, long tokens, int overageAiCalls, long overageTokens);
 }

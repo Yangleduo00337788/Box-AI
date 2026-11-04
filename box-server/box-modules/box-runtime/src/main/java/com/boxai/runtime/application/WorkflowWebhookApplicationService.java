@@ -3,6 +3,7 @@ package com.boxai.runtime.application;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.common.security.WebhookSignature;
+import com.boxai.security.ratelimit.RateLimitService;
 import com.boxai.domain.workflow.Workflow;
 import com.boxai.domain.workflow.WorkflowRepository;
 import com.boxai.runtime.api.WorkflowExecuteRequest;
@@ -12,6 +13,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -20,17 +22,21 @@ public class WorkflowWebhookApplicationService {
 
     private final WorkflowRepository workflowRepository;
     private final WorkflowExecutionApplicationService workflowExecutionApplicationService;
+    private final RateLimitService rateLimitService;
     private final ObjectMapper objectMapper;
 
     public WorkflowWebhookApplicationService(WorkflowRepository workflowRepository,
                                              WorkflowExecutionApplicationService workflowExecutionApplicationService,
+                                             RateLimitService rateLimitService,
                                              ObjectMapper objectMapper) {
         this.workflowRepository = workflowRepository;
         this.workflowExecutionApplicationService = workflowExecutionApplicationService;
+        this.rateLimitService = rateLimitService;
         this.objectMapper = objectMapper;
     }
 
     public WorkflowExecutionResultVO trigger(String token, String payload, String signature) {
+        rateLimitService.assertAllowed("workflow-webhook", token == null ? "unknown" : token, 60, Duration.ofMinutes(1));
         Workflow workflow = workflowRepository.findByWebhookToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Webhook 不存在或已失效"));
         if (workflow.getPublishedVersionId() == null || !"PUBLISHED".equalsIgnoreCase(workflow.getStatus())) {

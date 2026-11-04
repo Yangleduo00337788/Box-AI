@@ -38,6 +38,7 @@ box:
       expose-code: ${BOX_AUTH_VERIFICATION_EXPOSE_CODE:false}
   oauth:
     public-base-url: ${BOX_OAUTH_PUBLIC_BASE_URL:http://localhost:8080}
+    allowed-redirect-origins: ${BOX_OAUTH_ALLOWED_REDIRECT_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
     github:
       enabled: ${BOX_OAUTH_GITHUB_ENABLED:false}
       client-id: ${BOX_OAUTH_GITHUB_CLIENT_ID:}

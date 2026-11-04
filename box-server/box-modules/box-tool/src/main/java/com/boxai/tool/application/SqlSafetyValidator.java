@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 public final class SqlSafetyValidator {
 
     private static final Pattern BLOCKED_KEYWORDS = Pattern.compile(
-            "\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|EXEC|EXECUTE|CALL|MERGE|REPLACE)\\b",
+            "\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|EXEC|EXECUTE|CALL|MERGE|REPLACE|INTO|OUTFILE|DUMPFILE|LOAD_FILE)\\b",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern MULTI_STATEMENT = Pattern.compile(";\\s*\\S");
 
