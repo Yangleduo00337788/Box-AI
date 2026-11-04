@@ -416,7 +416,7 @@ await box.chat(agentId, 'Hello', {
 |-------|-------|--------|
 | **V1 P0** | Agent / RAG / Tool / Workflow / Publish / API Key / RBAC / Trace | **Released** ([v1.0.0](releases/v1.0.0.md)) |
 | **V1 P1** | MCP, long-term memory, multi-agent, webhook, marketplace | Partially shipped — [Gaps](docx/10-Gaps.md) |
-| **V2** | Billing, enterprise SSO, distributed runtime, K8s | Future |
+| **V2** | Billing, distributed runtime, K8s | Future |
 
 ---
 

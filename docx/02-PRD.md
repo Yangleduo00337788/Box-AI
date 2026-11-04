@@ -87,10 +87,15 @@ P2
 - Billing
 - Quota
 - Team Collaboration
-- Enterprise SSO
 - Kubernetes
 - 分布式 Runtime
 - Marketplace
+
+登录口径（已定稿，不做企业 SSO）：
+
+- 个人端：Email + Password，以及 GitHub / Google OAuth
+- 企业端：企业邮箱 + 组织标识 / 邀请码
+- 明确不做：飞书、钉钉、SAML / 企业 IdP SSO
 
 ---
 
@@ -219,13 +224,11 @@ Create account
 
 支持：
 
-Email + Password
+个人端：Email + Password；GitHub / Google OAuth
 
-未来：
+企业端：企业邮箱 + 组织标识 / 邀请码
 
-GitHub
-Google
-企业 SSO
+明确不做：飞书、钉钉、SAML 等企业 SSO
 
 ---
 

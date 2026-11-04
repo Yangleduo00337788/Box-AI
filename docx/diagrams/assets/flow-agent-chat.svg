@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="chatTitle">
+  <title id="chatTitle">Agent 对话时序</title>
+  <rect width="1200" height="360" rx="20" fill="#fafafa"/>
+  <text x="60" y="48" fill="#222222" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="24" font-weight="700">Agent 对话时序（SSE）</text>
+  <text x="60" y="76" fill="#777777" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="16">POST /api/v1/agents/{id}/chat · 生产环境读取 Published Version</text>
+  <g transform="translate(60 110)">
+    <rect x="0" y="0" width="1080" height="56" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="24" y="34" fill="#484848" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">1. 用户请求</text>
+    <path d="M200 28h40" stroke="#c5c5c5" stroke-width="2"/><polygon points="240,28 232,24 232,32" fill="#c5c5c5"/>
+    <text x="280" y="34" fill="#484848" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">2. 鉴权（JWT / API Key）</text>
+    <path d="M480 28h40" stroke="#c5c5c5" stroke-width="2"/><polygon points="520,28 512,24 512,32" fill="#c5c5c5"/>
+    <text x="560" y="34" fill="#484848" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">3. 加载已发布配置</text>
+    <path d="M760 28h40" stroke="#c5c5c5" stroke-width="2"/><polygon points="800,28 792,24 792,32" fill="#c5c5c5"/>
+    <text x="840" y="34" fill="#484848" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">4. 构建 ExecutionContext</text>
+  </g>
+  <g transform="translate(60 186)">
+    <rect x="0" y="0" width="250" height="56" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="125" y="34" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">5. RAG 混合检索（可选）</text>
+    <path d="M258 28h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="290,28 282,24 282,32" fill="#c5c5c5"/>
+    <rect x="298" y="0" width="220" height="56" rx="12" fill="#ffffff" stroke="#222222" stroke-width="1.5"/>
+    <text x="408" y="34" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">6. Tool 执行（可选）</text>
+    <path d="M526 28h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="558,28 550,24 550,32" fill="#c5c5c5"/>
+    <rect x="566" y="0" width="220" height="56" rx="12" fill="#222222"/>
+    <text x="676" y="34" fill="#ffffff" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">7. LangChain4j → LLM</text>
+    <path d="M794 28h32" stroke="#c5c5c5" stroke-width="2"/><polygon points="826,28 818,24 818,32" fill="#c5c5c5"/>
+    <rect x="834" y="0" width="246" height="56" rx="12" fill="#ffffff" stroke="#48c79c" stroke-width="2"/>
+    <text x="957" y="34" fill="#484848" text-anchor="middle" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="14">8. SSE delta / done</text>
+  </g>
+  <g transform="translate(60 262)">
+    <rect x="0" y="0" width="1080" height="56" rx="12" fill="#ffffff" stroke="#e7e7e7"/>
+    <text x="24" y="34" fill="#8b8b8b" font-family="system-ui, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" font-size="13">并行落库：Message · Trace Span · Token 用量 · 执行状态</text>
+  </g>
+</svg>

@@ -1,8 +1,8 @@
 # Box 未完成项 — 可执行 TODO 清单
 
-文档版本：V1.1  
-更新说明：2026-09-16 补平台 RBAC 细化与 `05-Backend.md` B 端路由抽检；主清单仍全部 ✅  
-整体完成度估算：后端 ~96% · 前端 ~96% · **文档同步 ~96%**
+文档版本：V1.2  
+更新说明：2026-11-04 对齐登录口径：个人 GitHub/Google OAuth；企业邮箱登录；飞书/钉钉/SAML SSO 不做。主清单仍全部 ✅  
+整体完成度估算：后端 ~96% · 前端 ~96% · **文档同步 ~97%**
 
 ---
 
@@ -10,7 +10,7 @@
 
 - **优先级**：P0（V1 必补）→ P1（体验/质量）→ P2（对齐 PRD 远期）
 - **任务 ID**：`B-*` 后端 · `F-*` 前端 · `D-*` 文档
-- **状态标记**：`⬜` 未开始 · `🟡` 进行中 · `✅` 已完成
+- **状态标记**：`⬜` 未开始 · `🟡` 进行中 · `✅` 已完成 · `⛔` 明确不做
 - 完成某项后，在本文件勾选状态，并同步更新 `09-Progress.md`
 
 ---
@@ -47,7 +47,7 @@
 | ID | 状态 | 任务 | 验收标准 |
 |----|------|------|----------|
 | B-16 | ✅ | **通知中心后端完善** | 知识库文档完成/失败、工作流失败、Agent 发布、MCP 同步失败写入 notification |
-| B-17 | ✅ | **OAuth / SSO 预留** | `GET /auth/oauth/providers` + GitHub/Google/SSO authorize/callback stub（501 + `box.oauth` 配置占位） |
+| B-17 | ✅ | **个人端 GitHub / Google OAuth** | `GET /auth/oauth/providers` + `{github,google}/authorize` + `/callback` 真实换票；管理端或 `box.oauth` 配 Client ID/Secret。企业门户拒绝该入口 |
 | B-18 | ✅ | **docker-compose 加入 box-server** | `box-server/Dockerfile` + `deploy/docker-compose.yml` profile `app` 一键起全栈 |
 
 ---
@@ -168,7 +168,7 @@ B-15  +  D-11
 B-17 B-18  +  F-17 F-19 F-20
 ```
 
-目标：OAuth stub、Docker 全栈 profile、Embed 定制、模板向导、Workflow 大屏布局。**已于 2026-09 完成。**
+目标：个人端 GitHub/Google OAuth、Docker 全栈 profile、Embed 定制、模板向导、Workflow 大屏布局。**已于 2026-09 完成。**
 
 ---
 
@@ -224,7 +224,7 @@ P0 / P1 / P2 共 50 项已全部完成。后续需求见下方 §八，勿与本
 
 | ID | 优先级 | 状态 | 任务 | 说明 |
 |----|--------|------|------|------|
-| BL-01 | P2 | 🟡 | 真实 OAuth / 企业 SSO | providers + authorize/callback **stub（501）**；身份表 V40 已预留，登录流待下一迭代 |
+| BL-01 | P2 | ⛔ | 企业 SSO（飞书 / 钉钉 / SAML） | **不做。** 个人仅 GitHub/Google；企业仅企业邮箱 + 组织标识/邀请码。遗留 `tenant_oauth_org` 表与飞书/钉钉图标不作为交付范围 |
 | BL-26 | P1 | ✅ | B 端市场灰度 UI | 模板/插件 `rollout_percent` + TENANT 白名单；`PUT .../rollout` |
 | BL-27 | P1 | ✅ | C 端 Model Router | Builder `AUTO` + `routing_preference`；chat 运行时自动选模 |
 | BL-28 | P1 | ✅ | C 端套餐 Mock 支付 | Settings 套餐订阅 + `confirmPayment`；真实 Stripe/Alipay 待下一迭代 |

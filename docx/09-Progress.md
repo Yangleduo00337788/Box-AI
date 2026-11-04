@@ -1,6 +1,6 @@
 # Box V1 进度追踪
 
-文档版本：V1.12 · **发行版 v1.0.0（2026-09-28）** · 整体完成度：**~97%**
+文档版本：V1.13 · **发行版 v1.0.0（2026-09-28）** · 整体完成度：**~97%**
 
 > 未完成项与执行顺序见 [`10-Gaps.md`](./10-Gaps.md)。本文档反映代码库真实状态，不再使用「100%」表述。
 
@@ -11,7 +11,7 @@
 | 维度 | 完成度 | 说明 |
 |------|--------|------|
 | 文档规划 | ~97% | 2026-09-16 对齐 C 端侧栏/弹窗 IA 与 B 端 RBAC 单源 |
-| 后端实现 | ~98% | 市场灰度、Model Router、Mock 订阅支付已落地；OAuth 仍为 stub |
+| 后端实现 | ~98% | 市场灰度、Model Router、Mock 订阅支付已落地；个人端 GitHub/Google OAuth 已接通；企业走企业邮箱登录，不做飞书/钉钉/SAML SSO |
 | 前端实现 | ~97% | B 端灰度 UI、C 端 Auto 路由与套餐模拟支付已对齐 |
 | V1 可演示 | ~98% | **`10-Gaps.md` P0/P1/P2 主清单已全部完成** |
 
@@ -74,7 +74,7 @@
 
 | ID | 任务 | 状态 |
 |----|------|------|
-| B-17 | OAuth / SSO stub（providers + authorize/callback） | ✅ |
+| B-17 | 个人端 GitHub / Google OAuth（providers + authorize/callback，非 501） | ✅ |
 | B-18 | `box-server/Dockerfile` + compose profile `app` | ✅ |
 | F-17 | Embed Web Chat 定制（Builder + 公开 embed-config） | ✅ |
 | F-19 | CreateAgentDialog 模板向导 | ✅ |
@@ -407,7 +407,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 | Plugin / Marketplace | P1 | ✅ | `/plugin-market` · `/market` |
 | Billing / Quota | P2 | ✅ | `box-tenant` · `/settings/quota` · `/settings/billing` |
 | Team Collaboration | P2 | ✅ | `/team` |
-| Enterprise SSO | P2 | 🟡 | OAuth stub 已预留（B-17）；真实 IdP 对接待 backlog |
+| 企业登录 | P2 | ✅ | 企业邮箱 + 组织标识/邀请码；**不做**飞书/钉钉/SAML SSO。个人端 GitHub/Google OAuth |
 
 ---
 
@@ -415,7 +415,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 
 | 域 | 路径前缀 | 状态 | 备注 |
 |----|----------|------|------|
-| 身份 | `/api/v1/auth/*` | ✅ | 注册/登录/忘记密码 + OAuth providers stub |
+| 身份 | `/api/v1/auth/*` | ✅ | 注册/登录/忘记密码；个人端 GitHub/Google OAuth |
 | 工作区 | `/api/v1/workspaces/*` | ✅ | |
 | Agent | `/api/v1/agents/*` | ✅ | 含 chat SSE、工具/知识库绑定 |
 | 对话 | `/api/v1/conversations/*` | ✅ | 含 stream/regenerate |
@@ -426,7 +426,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 | 分析 | `/api/v1/analytics/*` | ✅ | `box-analytics` 模块 |
 | 审计 | `/api/v1/audit-logs` | ✅ | |
 | 发布/API Key | `/api/v1/published/*`、`/api-keys/*` | ✅ | 含 embed-config 公开读取 |
-| OAuth/SSO | `/api/v1/auth/oauth/*` | 🟡 | providers 列表 + authorize/callback stub（501） |
+| OAuth | `/api/v1/auth/oauth/*` | ✅ | 仅个人端 GitHub/Google；企业门户拒绝第三方 OAuth，改走企业邮箱 |
 | 通知 | `/api/v1/notifications/*` | ✅ | 未读角标、已读；顶栏 `NotificationCenter` |
 | 账单/额度 | `/api/v1/billing/*` | ✅ | `box-tenant` |
 | 侧栏 | `/api/v1/sidebar` | ✅ | C 端菜单与工作区上下文 |
@@ -454,7 +454,7 @@ C 端用户在工作区内操作；平台管理员在 `box-admin-web` 管理租�
 
 ## V1.5 商业化与运营（2026-09）
 
-Flyway **V35–V39**；市场审核（通过/拒绝）、Embed 域名真校验与网关 CNAME 指引、**Mock 订阅支付**、**Model Router（AUTO + routing_preference）**、**B 端市场灰度 UI** 均已落地；Stripe/Alipay 真实网关与 OAuth 登录待下一迭代。
+Flyway **V35–V39**；市场审核（通过/拒绝）、Embed 域名真校验与网关 CNAME 指引、**Mock 订阅支付**、**Model Router（AUTO + routing_preference）**、**B 端市场灰度 UI** 均已落地；个人端 GitHub/Google OAuth 已接通（管理端 SMTP/OAuth 配置或 `box.oauth`）。企业登录为**企业邮箱**（组织标识 / 邀请码），明确**不做**飞书、钉钉、SAML SSO。Stripe/Alipay 真实网关待下一迭代。
 
 | 域 | 交付 | 状态 |
 |----|------|------|
@@ -494,3 +494,4 @@ Flyway **V35–V39**；市场审核（通过/拒绝）、Embed 域名真校验�
 7. `08-Name&slogan.md` — 品牌
 8. **`09-Progress.md`** — 本文档（进度追踪）
 9. **`10-Gaps.md`** — 未完成项可执行 TODO 清单
+10. **`diagrams/`** — 架构图、流程图、时序图（中英文标注）

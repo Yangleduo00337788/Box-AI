@@ -420,7 +420,7 @@ await box.chat(agentId, '你好', {
 |------|------|------|
 | **V1 P0** | Agent / RAG / Tool / Workflow / Publish / API Key / RBAC / Trace | **已发布**（[v1.0.0](releases/v1.0.0.md)） |
 | **V1 P1** | MCP 深化、长期记忆、多 Agent、Webhook、插件市场 | 部分已落地，见 [待办缺口](docx/10-Gaps.md) |
-| **V2** | 计费配额、企业 SSO、分布式 Runtime、K8s 部署 | 远期 |
+| **V2** | 计费配额、分布式 Runtime、K8s 部署 | 远期 |
 
 ---
 

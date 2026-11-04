@@ -14,7 +14,7 @@ const testAnswer = ref('')
 
 function runTest() {
   testAnswer.value =
-    '（模拟检索）企业版支持对接企业 IdP 进行 SSO；OAuth 占位可在系统配置中启用 GitHub / Google 或接入 SAML。（演示数据）'
+    '（模拟检索）个人端支持 GitHub / Google 登录；企业端使用企业邮箱与组织标识登录，不提供飞书/钉钉/SAML SSO。（演示数据）'
 }
 
 const columns = [
