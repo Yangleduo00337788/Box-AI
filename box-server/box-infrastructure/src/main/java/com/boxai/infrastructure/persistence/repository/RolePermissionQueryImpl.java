@@ -11,9 +11,11 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Repository
@@ -59,16 +61,21 @@ public class RolePermissionQueryImpl implements RolePermissionQuery {
         }
         Map<String, Long> codeToId = permissionMapper.selectAll().stream()
                 .collect(Collectors.toMap(PermissionDO::getPermissionCode, PermissionDO::getId, (a, b) -> a, HashMap::new));
-        for (String code : permissionCodes) {
-            Long permissionId = codeToId.get(code);
-            if (permissionId == null) {
-                continue;
-            }
-            RolePermissionDO row = new RolePermissionDO();
-            row.setRoleId(roleId);
-            row.setPermissionId(permissionId);
-            row.setCreatedAt(LocalDateTime.now());
-            rolePermissionMapper.insert(row);
+        LocalDateTime now = LocalDateTime.now();
+        List<RolePermissionDO> rows = permissionCodes.stream()
+                .map(codeToId::get)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(permissionId -> {
+                    RolePermissionDO row = new RolePermissionDO();
+                    row.setRoleId(roleId);
+                    row.setPermissionId(permissionId);
+                    row.setCreatedAt(now);
+                    return row;
+                })
+                .toList();
+        if (!rows.isEmpty()) {
+            rolePermissionMapper.insertBatch(new ArrayList<>(rows));
         }
     }
 

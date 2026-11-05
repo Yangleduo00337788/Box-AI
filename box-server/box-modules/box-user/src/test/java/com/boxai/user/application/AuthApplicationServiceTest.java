@@ -8,6 +8,7 @@ import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.tenant.Tenant;
 import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.user.User;
+import com.boxai.domain.workspace.Workspace;
 import com.boxai.domain.user.UserOAuthIdentityRepository;
 import com.boxai.domain.user.UserRepository;
 import com.boxai.security.audit.AuditLogService;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -41,7 +43,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -97,7 +102,48 @@ class AuthApplicationServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> service.register(request));
         assertEquals(ErrorCode.USER_ALREADY_EXISTS, ex.getCode());
         verify(verificationCodeService).verify("a@example.com",
-                com.boxai.user.support.VerificationCodePurpose.REGISTER, "123456");
+                com.boxai.user.support.VerificationCodePurpose.REGISTER, "123456", false);
+        verify(verificationCodeService).consume("a@example.com",
+                com.boxai.user.support.VerificationCodePurpose.REGISTER);
+    }
+
+    @Test
+    void registerRetriesAfterDeadlock() {
+        RegisterRequest request = new RegisterRequest(
+                "A@Example.com", "password1", "123456", "Nick", TenantTypes.PERSONAL, null, null);
+        when(userRepository.findByEmail("a@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("a@example.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("password1")).thenReturn("hash");
+        doAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            saved.setId(9L);
+            return null;
+        }).when(userRepository).save(any(User.class));
+        Tenant tenant = new Tenant();
+        tenant.setId(1L);
+        tenant.setTenantType(TenantTypes.PERSONAL);
+        when(tenantApplicationService.createForRegistration(any(User.class), eq(TenantTypes.PERSONAL), isNull(), isNull()))
+                .thenReturn(tenant);
+        Workspace workspace = new Workspace();
+        workspace.setId(10L);
+        when(workspaceApplicationService.createDefaultWorkspace(any(User.class), eq(1L), eq(TenantTypes.PERSONAL)))
+                .thenThrow(new CannotAcquireLockException("Deadlock found when trying to get lock"))
+                .thenReturn(workspace);
+        when(userSessionApplicationService.createSession(9L)).thenReturn("sess");
+        when(jwtService.generate(9L, "a@example.com", UserTypes.TENANT_USER, "sess")).thenReturn("jwt");
+        when(workspaceApplicationService.listMineByUserId(9L)).thenReturn(List.of(
+                new WorkspaceDetailVO(10L, "我的工作台", "workspace-9", null, null, 1, "OWNER")));
+        when(userPreferenceApplicationService.getCurrentWorkspaceId(9L)).thenReturn(10L);
+
+        AuthVO auth = service.register(request);
+
+        assertEquals("jwt", auth.token());
+        verify(workspaceApplicationService, times(2))
+                .createDefaultWorkspace(any(User.class), eq(1L), eq(TenantTypes.PERSONAL));
+        verify(verificationCodeService).verify("a@example.com",
+                com.boxai.user.support.VerificationCodePurpose.REGISTER, "123456", false);
+        verify(verificationCodeService).consume("a@example.com",
+                com.boxai.user.support.VerificationCodePurpose.REGISTER);
     }
 
     @Test

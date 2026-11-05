@@ -77,4 +77,17 @@ class VerificationCodeServiceTest {
         verify(redisService).delete(codeKey);
         verify(redisService).delete(attemptKey);
     }
+
+    @Test
+    void verifyCanKeepCodeForCallerToConsumeLater() {
+        String email = "user@example.com";
+        String codeKey = "box:auth:code:REGISTER:" + email;
+        when(redisService.get(codeKey)).thenReturn("123456");
+
+        service.verify(email, VerificationCodePurpose.REGISTER, "123456", false);
+
+        verify(redisService, never()).delete(codeKey);
+        service.consume(email, VerificationCodePurpose.REGISTER);
+        verify(redisService).delete(codeKey);
+    }
 }

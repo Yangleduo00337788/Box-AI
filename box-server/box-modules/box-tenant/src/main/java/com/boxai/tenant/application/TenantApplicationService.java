@@ -21,10 +21,7 @@ import com.boxai.tenant.api.EnterpriseOrgAccessVO;
 import com.boxai.tenant.api.TenantVO;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Locale;
@@ -34,8 +31,6 @@ import java.util.UUID;
 @Service
 public class TenantApplicationService {
 
-    private static final int SLUG_SAVE_ATTEMPTS = 5;
-
     private final TenantRepository tenantRepository;
     private final TenantAccessGuard tenantAccessGuard;
     private final QuotaApplicationService quotaApplicationService;
@@ -43,7 +38,6 @@ public class TenantApplicationService {
     private final WorkspaceRepository workspaceRepository;
     private final PlanRepository planRepository;
     private final TenantOAuthOrgRepository tenantOAuthOrgRepository;
-    private final TransactionTemplate requiresNewTx;
 
     public TenantApplicationService(TenantRepository tenantRepository,
                                     TenantAccessGuard tenantAccessGuard,
@@ -51,8 +45,7 @@ public class TenantApplicationService {
                                     PlanApplicationService planApplicationService,
                                     WorkspaceRepository workspaceRepository,
                                     PlanRepository planRepository,
-                                    TenantOAuthOrgRepository tenantOAuthOrgRepository,
-                                    PlatformTransactionManager transactionManager) {
+                                    TenantOAuthOrgRepository tenantOAuthOrgRepository) {
         this.tenantRepository = tenantRepository;
         this.tenantAccessGuard = tenantAccessGuard;
         this.quotaApplicationService = quotaApplicationService;
@@ -60,67 +53,49 @@ public class TenantApplicationService {
         this.workspaceRepository = workspaceRepository;
         this.planRepository = planRepository;
         this.tenantOAuthOrgRepository = tenantOAuthOrgRepository;
-        TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        this.requiresNewTx = tx;
     }
 
+    @Transactional
     public Tenant createForRegistration(User user, String accountType, String companyName, String contactEmail) {
         String normalizedType = normalizeAccountType(accountType);
         String slugBase = TenantTypes.ENTERPRISE.equals(normalizedType)
                 ? companyName
                 : personalSlugBase(user);
-        for (int attempt = 0; attempt < SLUG_SAVE_ATTEMPTS; attempt++) {
-            String slugSeed = attempt == 0
-                    ? slugBase
-                    : slugBase + "-" + UUID.randomUUID().toString().substring(0, 8);
-            String slug = uniqueSlug(slugSeed);
-            try {
-                return insertRegistrationTenant(user, normalizedType, companyName, contactEmail, slug);
-            } catch (RuntimeException ex) {
-                if (!isSlugConflict(ex)) {
-                    throw ex;
-                }
-            }
+        Tenant tenant = new Tenant();
+        if (TenantTypes.ENTERPRISE.equals(normalizedType)) {
+            tenant.setName(companyName.trim());
+            tenant.setContactEmail(contactEmail == null || contactEmail.isBlank() ? user.getEmail() : contactEmail.trim());
+            tenant.setTenantType(TenantTypes.ENTERPRISE);
+            tenant.setInviteCode(newUniqueInviteCode());
+        } else {
+            String nickname = user.getNickname() == null || user.getNickname().isBlank()
+                    ? "用户"
+                    : user.getNickname();
+            tenant.setName(nickname + " 的个人空间");
+            tenant.setContactEmail(user.getEmail());
+            tenant.setTenantType(TenantTypes.PERSONAL);
         }
-        throw new BusinessException(ErrorCode.CONFLICT, "空间标识被占用，请稍后重试");
-    }
-
-    private Tenant insertRegistrationTenant(User user,
-                                            String normalizedType,
-                                            String companyName,
-                                            String contactEmail,
-                                            String slug) {
-        return requiresNewTx.execute(status -> {
-            Tenant tenant = new Tenant();
-            if (TenantTypes.ENTERPRISE.equals(normalizedType)) {
-                tenant.setName(companyName.trim());
-                tenant.setContactEmail(contactEmail == null || contactEmail.isBlank() ? user.getEmail() : contactEmail.trim());
-                tenant.setTenantType(TenantTypes.ENTERPRISE);
-                tenant.setInviteCode(newUniqueInviteCode());
-            } else {
-                String nickname = user.getNickname() == null || user.getNickname().isBlank()
-                        ? "用户"
-                        : user.getNickname();
-                tenant.setName(nickname + " 的个人空间");
-                tenant.setContactEmail(user.getEmail());
-                tenant.setTenantType(TenantTypes.PERSONAL);
-            }
-            tenant.setSlug(slug);
-            tenant.setOwnerId(user.getId());
-            tenant.setStatus(1);
-            quotaApplicationService.assignDefaultPlan(tenant);
+        tenant.setSlug(uniqueSlug(slugBase));
+        tenant.setOwnerId(user.getId());
+        tenant.setStatus(1);
+        quotaApplicationService.assignDefaultPlan(tenant);
+        try {
             tenantRepository.save(tenant);
+        } catch (RuntimeException ex) {
+            if (isSlugConflict(ex)) {
+                throw new BusinessException(ErrorCode.CONFLICT, "空间标识被占用，请稍后重试");
+            }
+            throw ex;
+        }
 
-            TenantMember member = new TenantMember();
-            member.setTenantId(tenant.getId());
-            member.setUserId(user.getId());
-            member.setRoleCode(RoleCodes.TENANT_ADMIN);
-            member.setLoginName(defaultLoginName(user));
-            member.setStatus(1);
-            tenantRepository.addMember(member);
-            return tenant;
-        });
+        TenantMember member = new TenantMember();
+        member.setTenantId(tenant.getId());
+        member.setUserId(user.getId());
+        member.setRoleCode(RoleCodes.TENANT_ADMIN);
+        member.setLoginName(defaultLoginName(user));
+        member.setStatus(1);
+        tenantRepository.addMember(member);
+        return tenant;
     }
 
     public Optional<Tenant> findByOAuthOrg(String provider, String orgId) {

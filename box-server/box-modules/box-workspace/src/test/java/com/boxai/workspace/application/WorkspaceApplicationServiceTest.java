@@ -1,12 +1,14 @@
 package com.boxai.workspace.application;
 
 import com.boxai.common.constant.RoleCodes;
+import com.boxai.common.constant.TenantTypes;
 import com.boxai.common.exception.BusinessException;
 import com.boxai.common.exception.ErrorCode;
 import com.boxai.domain.rbac.Role;
 import com.boxai.domain.rbac.RoleRepository;
 import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.tenant.TenantRepository;
+import com.boxai.domain.user.User;
 import com.boxai.domain.workspace.Workspace;
 import com.boxai.domain.workspace.WorkspaceMember;
 import com.boxai.domain.workspace.WorkspaceRepository;
@@ -27,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -77,6 +80,31 @@ class WorkspaceApplicationServiceTest {
         assertEquals("Team Space", vo.name());
         assertEquals(RoleCodes.TENANT_ADMIN, vo.roleCode());
         assertEquals(10L, vo.id());
+        verify(workspaceRepository).save(argThat(workspace -> "team-space-3".equals(workspace.getSlug())));
+    }
+
+    @Test
+    void createDefaultPersonalWorkspaceUsesOwnerIdInSlug() {
+        User user = new User();
+        user.setId(9L);
+        user.setNickname("Ada");
+        when(workspaceRepository.findBySlug(any())).thenReturn(Optional.empty());
+        doAnswer(invocation -> {
+            Workspace workspace = invocation.getArgument(0);
+            workspace.setId(10L);
+            return null;
+        }).when(workspaceRepository).save(any(Workspace.class));
+        AtomicLong roleIds = new AtomicLong(100);
+        doAnswer(invocation -> {
+            Role role = invocation.getArgument(0);
+            role.setId(roleIds.getAndIncrement());
+            return role;
+        }).when(roleRepository).save(any(Role.class));
+        when(tenantRepository.listMembersByTenantId(1L)).thenReturn(List.of());
+
+        service.createDefaultWorkspace(user, 1L, TenantTypes.PERSONAL);
+
+        verify(workspaceRepository).save(argThat(workspace -> "9".equals(workspace.getSlug())));
     }
 
     @Test

@@ -51,12 +51,19 @@ public class VerificationEmailSender {
             helper.setText(textBody(purpose, code), htmlBody(purpose, code));
             resolved.sender().send(message);
         } catch (MessagingException e) {
-            log.error("Failed to compose verification email to {}", email, e);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "验证码邮件发送失败，请稍后重试");
+            handleSendFailure(email, e);
         } catch (Exception e) {
-            log.error("Failed to send verification email to {}", email, e);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "验证码邮件发送失败，请稍后重试");
+            handleSendFailure(email, e);
         }
+    }
+
+    private void handleSendFailure(String email, Exception e) {
+        log.error("Failed to send verification email to {}", email, e);
+        if (exposeCode) {
+            log.warn("Expose-code is on; keeping the verification code despite mail failure");
+            return;
+        }
+        throw new BusinessException(ErrorCode.INTERNAL_ERROR, "验证码邮件发送失败，请稍后重试");
     }
 
     private ResolvedMail resolveMailSender() {

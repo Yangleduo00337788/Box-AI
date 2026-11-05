@@ -18,6 +18,7 @@ import com.boxai.workspace.api.CreateWorkspaceRequest;
 import com.boxai.workspace.api.UpdateWorkspaceRequest;
 import com.boxai.workspace.api.WorkspaceDetailVO;
 import com.boxai.workspace.support.RolePermissionSeeder;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -135,12 +136,19 @@ public class WorkspaceApplicationService {
         Workspace workspace = new Workspace();
         workspace.setTenantId(tenantId);
         workspace.setName(name);
-        workspace.setSlug(uniqueSlug(name));
+        workspace.setSlug(uniqueSlug(slugBase(name, ownerId)));
         workspace.setDescription(blankToNull(description));
         workspace.setAvatarUrl(blankToNull(avatarUrl));
         workspace.setOwnerId(ownerId);
         workspace.setStatus(1);
-        workspaceRepository.save(workspace);
+        try {
+            workspaceRepository.save(workspace);
+        } catch (RuntimeException ex) {
+            if (isSlugConflict(ex)) {
+                throw new BusinessException(ErrorCode.CONFLICT, "工作空间标识被占用，请稍后重试");
+            }
+            throw ex;
+        }
 
         Role admin = saveRole(workspace.getId(), RoleCodes.TENANT_ADMIN, "工作空间管理员");
         Role developer = saveRole(workspace.getId(), RoleCodes.DEVELOPER, "开发者");
@@ -205,6 +213,28 @@ public class WorkspaceApplicationService {
                     member.setRoleCode(role.getRoleCode());
                     return workspaceRepository.addMember(member);
                 });
+    }
+
+    static String slugBase(String name, Long ownerId) {
+        if (ownerId == null) {
+            return name;
+        }
+        return name + "-" + ownerId;
+    }
+
+    static boolean isSlugConflict(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof DuplicateKeyException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && message.contains("uk_slug")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String uniqueSlug(String name) {

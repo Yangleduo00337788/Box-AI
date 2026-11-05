@@ -45,7 +45,7 @@ public class VerificationCodeService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "发送过于频繁，请稍后再试");
         }
         String code = String.format("%06d", random.nextInt(1_000_000));
-        String codeKey = CODE_KEY_PREFIX + purpose.name() + ":" + normalized;
+        String codeKey = codeKey(purpose, normalized);
         String attemptKey = attemptKey(purpose, normalized);
         redisService.delete(attemptKey);
         redisService.set(codeKey, code, CODE_TTL);
@@ -61,25 +61,39 @@ public class VerificationCodeService {
     }
 
     public void verify(String email, VerificationCodePurpose purpose, String code) {
+        verify(email, purpose, code, true);
+    }
+
+    public void verify(String email, VerificationCodePurpose purpose, String code, boolean consume) {
         if (code == null || code.isBlank()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请输入验证码");
         }
         String normalized = normalizeEmail(email);
-        String codeKey = CODE_KEY_PREFIX + purpose.name() + ":" + normalized;
-        String attemptKey = attemptKey(purpose, normalized);
-        String stored = redisService.get(codeKey);
+        String stored = redisService.get(codeKey(purpose, normalized));
         if (stored == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码已过期，请重新获取");
         }
         if (!stored.equals(code.trim())) {
+            String attemptKey = attemptKey(purpose, normalized);
             if (!redisService.incrementWithinLimit(attemptKey, MAX_VERIFY_ATTEMPTS, CODE_TTL)) {
-                redisService.delete(codeKey);
+                redisService.delete(codeKey(purpose, normalized));
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码尝试次数过多，请重新获取");
             }
             throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码错误");
         }
-        redisService.delete(codeKey);
-        redisService.delete(attemptKey);
+        if (consume) {
+            consume(normalized, purpose);
+        }
+    }
+
+    public void consume(String email, VerificationCodePurpose purpose) {
+        String normalized = normalizeEmail(email);
+        redisService.delete(codeKey(purpose, normalized));
+        redisService.delete(attemptKey(purpose, normalized));
+    }
+
+    private static String codeKey(VerificationCodePurpose purpose, String normalizedEmail) {
+        return CODE_KEY_PREFIX + purpose.name() + ":" + normalizedEmail;
     }
 
     private static String attemptKey(VerificationCodePurpose purpose, String normalizedEmail) {

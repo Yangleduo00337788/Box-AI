@@ -38,6 +38,10 @@ import com.boxai.user.support.OAuthRemoteClient;
 import com.boxai.user.support.VerificationCodePurpose;
 import com.boxai.domain.user.UserOAuthIdentityRepository;
 import com.boxai.workspace.application.WorkspaceApplicationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +67,7 @@ public class AuthApplicationService {
     private final UserOAuthIdentityRepository userOAuthIdentityRepository;
     private final OAuthIdentityLinkService oauthIdentityLinkService;
     private final TenantMemberApplicationService tenantMemberApplicationService;
+    private AuthApplicationService transactionalSelf;
 
     public AuthApplicationService(UserRepository userRepository,
                                   WorkspaceApplicationService workspaceApplicationService,
@@ -92,7 +97,12 @@ public class AuthApplicationService {
         this.tenantMemberApplicationService = tenantMemberApplicationService;
     }
 
-    @Transactional
+    @Autowired
+    @Lazy
+    public void setTransactionalSelf(AuthApplicationService transactionalSelf) {
+        this.transactionalSelf = transactionalSelf;
+    }
+
     public AuthVO register(RegisterRequest request) {
         String accountType = normalizeAccountType(request.accountType());
         if (TenantTypes.ENTERPRISE.equals(accountType)
@@ -100,7 +110,27 @@ public class AuthApplicationService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写企业名称");
         }
         String email = request.email().trim().toLowerCase(Locale.ROOT);
-        verificationCodeService.verify(email, VerificationCodePurpose.REGISTER, request.verificationCode());
+        verificationCodeService.verify(email, VerificationCodePurpose.REGISTER, request.verificationCode(), false);
+        try {
+            RuntimeException last = null;
+            for (int attempt = 1; attempt <= 4; attempt++) {
+                try {
+                    return txSelf().registerPersisted(request, accountType, email);
+                } catch (RuntimeException ex) {
+                    last = ex;
+                    if (!isDeadlock(ex) || attempt == 4) {
+                        throw ex;
+                    }
+                }
+            }
+            throw last;
+        } finally {
+            verificationCodeService.consume(email, VerificationCodePurpose.REGISTER);
+        }
+    }
+
+    @Transactional
+    public AuthVO registerPersisted(RegisterRequest request, String accountType, String email) {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, "邮箱已注册");
         }
@@ -478,5 +508,25 @@ public class AuthApplicationService {
             return TenantTypes.ENTERPRISE;
         }
         throw new BusinessException(ErrorCode.BAD_REQUEST, "账号类型无效");
+    }
+
+    private AuthApplicationService txSelf() {
+        return transactionalSelf != null ? transactionalSelf : this;
+    }
+
+    static boolean isDeadlock(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof DeadlockLoserDataAccessException
+                    || current instanceof CannotAcquireLockException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && message.contains("Deadlock found")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }
