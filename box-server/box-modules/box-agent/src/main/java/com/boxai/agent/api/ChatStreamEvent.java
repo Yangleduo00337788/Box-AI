@@ -26,6 +26,13 @@ public record ChatStreamEvent(String type, String content, String message, Long 
         return new ChatStreamEvent("error", null, message, null);
     }
 
+    public static ChatStreamEvent queued(int position) {
+        String hint = position <= 0
+                ? "当前对话火爆，正在排队"
+                : "排队中，前面还有 " + position + " 人";
+        return new ChatStreamEvent("queued", String.valueOf(Math.max(position, 1)), hint, null);
+    }
+
     public static ChatStreamEvent toolStart(String payload) {
         return new ChatStreamEvent("tool.start", payload, null, null);
     }

@@ -773,12 +773,14 @@ async function sendChat(id?: number, preset?: string) {
     await scrollChatToBottom()
 
     await sendMessageStream(targetId, text, (delta) => {
-      messages.value[assistantIndex].content += delta
-      scrollChatToBottom()
+      appendAssistantDelta(assistantIndex, delta)
     }, {
       signal: controller.signal,
       platformModelId,
       pluginIds: pluginIds.length ? pluginIds : undefined,
+      onQueued: (_position, message) => {
+        applyQueueHint(assistantIndex, message)
+      },
       onCitations: (citations) => applyStreamCitations(assistantIndex, citations),
       onToolStart: (payload) => {
         const assistant = messages.value[assistantIndex]
@@ -809,10 +811,10 @@ async function sendChat(id?: number, preset?: string) {
     })
 
     if (stoppedByUser.value) {
-      if (!messages.value[assistantIndex]?.content) {
+      if (isEmptyAssistantContent(messages.value[assistantIndex]?.content)) {
         messages.value[assistantIndex].content = '（已停止生成）'
       }
-    } else if (!messages.value[assistantIndex]?.content) {
+    } else if (isEmptyAssistantContent(messages.value[assistantIndex]?.content)) {
       messages.value[assistantIndex].content = '（无回复）'
     }
     await refreshConversationNav()
@@ -821,12 +823,12 @@ async function sendChat(id?: number, preset?: string) {
     }
   } catch (error) {
     if (isAbortError(error)) {
-      if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+      if (assistantIndex >= 0 && isEmptyAssistantContent(messages.value[assistantIndex]?.content)) {
         messages.value[assistantIndex].content = '（已停止生成）'
       }
     } else {
       notifyApiError(error, '发送失败')
-      if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+      if (assistantIndex >= 0 && isEmptyAssistantContent(messages.value[assistantIndex]?.content)) {
         messages.value.splice(assistantIndex, 1)
       }
       await loadMessages(targetId)
@@ -853,13 +855,15 @@ async function regenerateReply(index: number) {
 
   try {
     await regenerateMessageStream(targetId, (delta) => {
-      messages.value[index].content += delta
-      scrollChatToBottom()
+      appendAssistantDelta(index, delta)
     }, {
       signal: controller.signal,
       platformModelId: resolvePlatformModelId(),
       onCitations: (citations) => {
         messages.value[index].citations = citations
+      },
+      onQueued: (_position, message) => {
+        applyQueueHint(index, message)
       },
       onDone: (executionId) => {
         requestQuotaRefresh()
@@ -870,10 +874,10 @@ async function regenerateReply(index: number) {
     })
 
     if (stoppedByUser.value) {
-      if (!messages.value[index]?.content) {
+      if (isEmptyAssistantContent(messages.value[index]?.content)) {
         messages.value[index].content = '（已停止生成）'
       }
-    } else if (!messages.value[index]?.content) {
+    } else if (isEmptyAssistantContent(messages.value[index]?.content)) {
       messages.value[index].content = '（无回复）'
     }
     await refreshConversationNav()
@@ -882,7 +886,7 @@ async function regenerateReply(index: number) {
     }
   } catch (error) {
     if (isAbortError(error)) {
-      if (!messages.value[index]?.content) {
+      if (isEmptyAssistantContent(messages.value[index]?.content)) {
         messages.value[index].content = '（已停止生成）'
       }
     } else {
@@ -893,6 +897,34 @@ async function regenerateReply(index: number) {
     chatting.value = false
     streamAbortController = null
   }
+}
+
+function isQueueHint(text?: string) {
+  return Boolean(text && (text.startsWith('排队中') || text.startsWith('当前对话火爆')))
+}
+
+function isEmptyAssistantContent(text?: string) {
+  return !text || isQueueHint(text)
+}
+
+function applyQueueHint(index: number, message: string) {
+  const item = messages.value[index]
+  if (!item) return
+  if (isEmptyAssistantContent(item.content)) {
+    item.content = message
+    void scrollChatToBottom()
+  }
+}
+
+function appendAssistantDelta(index: number, delta: string) {
+  const item = messages.value[index]
+  if (!item) return
+  if (isEmptyAssistantContent(item.content)) {
+    item.content = delta
+  } else {
+    item.content += delta
+  }
+  void scrollChatToBottom()
 }
 
 function onComposerSend(value: string) {

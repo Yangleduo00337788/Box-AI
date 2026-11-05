@@ -2,6 +2,8 @@ package com.boxai.security.config;
 
 import com.boxai.security.filter.JwtAuthenticationFilter;
 import com.boxai.security.jwt.JwtProperties;
+import com.boxai.security.ratelimit.ChatAdmissionProperties;
+import com.boxai.security.ratelimit.RateLimitProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.boxai.common.result.Result;
 import jakarta.servlet.DispatcherType;
@@ -28,7 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, RateLimitProperties.class, ChatAdmissionProperties.class})
 public class SecurityConfig {
 
     @Bean

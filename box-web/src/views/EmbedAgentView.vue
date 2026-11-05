@@ -136,19 +136,31 @@ async function sendMessage(text: string) {
   streamAbortController.value = controller
   try {
     await chatPublishedAgentStream(agentId.value, apiKey.value, text, async (chunk) => {
-      assistant.content += chunk
+      if (!assistant.content || assistant.content.startsWith('排队中') || assistant.content.startsWith('当前对话火爆')) {
+        assistant.content = chunk
+      } else {
+        assistant.content += chunk
+      }
       await scrollToBottom()
-    }, { signal: controller.signal })
-    if (!assistant.content) {
+    }, {
+      signal: controller.signal,
+      onQueued: (_position, message) => {
+        if (!assistant.content || assistant.content.startsWith('排队中') || assistant.content.startsWith('当前对话火爆')) {
+          assistant.content = message
+          void scrollToBottom()
+        }
+      },
+    })
+    if (!assistant.content || assistant.content.startsWith('排队中') || assistant.content.startsWith('当前对话火爆')) {
       assistant.content = '（无回复）'
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      if (!assistant.content) {
+      if (!assistant.content || assistant.content.startsWith('排队中') || assistant.content.startsWith('当前对话火爆')) {
         assistant.content = '（已停止生成）'
       }
     } else {
-      if (!assistant.content) {
+      if (!assistant.content || assistant.content.startsWith('排队中') || assistant.content.startsWith('当前对话火爆')) {
         messages.value.pop()
       }
       MessagePlugin.error(error instanceof Error ? error.message : '发送失败')

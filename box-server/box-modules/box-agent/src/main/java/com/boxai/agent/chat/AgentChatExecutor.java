@@ -10,6 +10,7 @@ import com.boxai.common.exception.ToolConfirmationRequiredException;
 import com.boxai.domain.model.ModelCredentialRepository;
 import com.boxai.model.application.PlatformModelApplicationService;
 import com.boxai.security.context.WorkspaceContext;
+import com.boxai.security.ratelimit.ChatAdmissionService;
 import com.boxai.security.ratelimit.RateLimitService;
 import com.boxai.domain.trace.Execution;
 import com.boxai.tenant.application.QuotaApplicationService;
@@ -20,7 +21,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import com.boxai.security.context.WorkspaceContext;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -36,13 +36,7 @@ import java.util.function.Consumer;
 public class AgentChatExecutor {
 
     private static final long STREAM_TIMEOUT_MS = 120_000L;
-    private static final ExecutorService STREAM_EXECUTOR = Executors.newFixedThreadPool(
-            Math.max(4, Runtime.getRuntime().availableProcessors()),
-            runnable -> {
-                Thread thread = new Thread(runnable, "box-chat-stream");
-                thread.setDaemon(true);
-                return thread;
-            });
+    private static final ExecutorService STREAM_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
     private final ChatModelGateway chatModelGateway;
     private final ModelCredentialRepository credentialRepository;
@@ -52,6 +46,7 @@ public class AgentChatExecutor {
     private final ExecutionRecorder executionRecorder;
     private final ObjectMapper objectMapper;
     private final RateLimitService rateLimitService;
+    private final ChatAdmissionService chatAdmissionService;
     private final ToolConfirmationService toolConfirmationService;
 
     public AgentChatExecutor(ChatModelGateway chatModelGateway,
@@ -62,6 +57,7 @@ public class AgentChatExecutor {
                              ExecutionRecorder executionRecorder,
                              ObjectMapper objectMapper,
                              RateLimitService rateLimitService,
+                             ChatAdmissionService chatAdmissionService,
                              ToolConfirmationService toolConfirmationService) {
         this.chatModelGateway = chatModelGateway;
         this.credentialRepository = credentialRepository;
@@ -71,6 +67,7 @@ public class AgentChatExecutor {
         this.executionRecorder = executionRecorder;
         this.objectMapper = objectMapper;
         this.rateLimitService = rateLimitService;
+        this.chatAdmissionService = chatAdmissionService;
         this.toolConfirmationService = toolConfirmationService;
     }
 
@@ -105,7 +102,7 @@ public class AgentChatExecutor {
         Long workspaceId = WorkspaceContext.require().workspaceId();
         assertChatRateLimit();
         quotaApplicationService.assertAiQuotaAvailable(workspaceId);
-        try {
+        try (ChatAdmissionService.ChatSlot ignored = chatAdmissionService.acquire(null)) {
             String content;
             if (prepared.tools() != null && !prepared.tools().isEmpty()) {
                 List<ResolvedAgentTool> resolvedTools = prepared.resolvedTools();
@@ -172,12 +169,31 @@ public class AgentChatExecutor {
                 WorkspaceContext.set(workspaceContext);
             }
             SecurityContextHolder.setContext(securityContext);
+            ChatAdmissionService.ChatSlot slot = null;
+            boolean slotHeldByStream = false;
             try {
+                slot = chatAdmissionService.acquire(position -> {
+                    try {
+                        sendStreamEvent(emitter, ChatStreamEvent.queued(position));
+                    } catch (IOException e) {
+                        throw new IllegalStateException(e);
+                    }
+                });
                 if (citationsJson != null && !citationsJson.isBlank()) {
                     sendStreamEvent(emitter, ChatStreamEvent.citations(citationsJson));
                 }
+                ChatAdmissionService.ChatSlot inflight = slot;
                 if (prepared.tools() != null && !prepared.tools().isEmpty()) {
-                    streamWithTools(emitter, prepared, onCompleted, executionId, execution, workspaceId, contentBuilder);
+                    streamWithTools(
+                            emitter,
+                            prepared,
+                            onCompleted,
+                            executionId,
+                            execution,
+                            workspaceId,
+                            contentBuilder,
+                            inflight);
+                    slotHeldByStream = true;
                     return;
                 }
                 chatModelGateway.streamChat(
@@ -212,19 +228,29 @@ public class AgentChatExecutor {
                                     emitter.complete();
                                 } catch (Exception e) {
                                     emitter.completeWithError(e);
+                                } finally {
+                                    inflight.close();
                                 }
                             }
 
                             @Override
                             public void onError(Throwable error) {
-                                completeStreamWithError(emitter, error);
+                                try {
+                                    completeStreamWithError(emitter, error);
+                                } finally {
+                                    inflight.close();
+                                }
                             }
                         });
+                slotHeldByStream = true;
             } catch (BusinessException e) {
                 completeStreamWithError(emitter, e);
             } catch (Exception e) {
                 completeStreamWithError(emitter, new BusinessException(ErrorCode.EXECUTION_FAILED, "模型调用失败"));
             } finally {
+                if (!slotHeldByStream && slot != null) {
+                    slot.close();
+                }
                 WorkspaceContext.clear();
                 SecurityContextHolder.clearContext();
             }
@@ -238,7 +264,8 @@ public class AgentChatExecutor {
                                  Long executionId,
                                  Execution execution,
                                  Long workspaceId,
-                                 StringBuilder contentBuilder) throws IOException {
+                                 StringBuilder contentBuilder,
+                                 ChatAdmissionService.ChatSlot slot) throws IOException {
         List<ResolvedAgentTool> resolvedTools = prepared.resolvedTools();
         try {
             chatModelGateway.streamChatWithTools(
@@ -308,19 +335,32 @@ public class AgentChatExecutor {
                                 emitter.complete();
                             } catch (Exception e) {
                                 emitter.completeWithError(e);
+                            } finally {
+                                slot.close();
                             }
                         }
 
                         @Override
                         public void onError(Throwable error) {
-                            completeStreamWithError(emitter, error);
+                            try {
+                                completeStreamWithError(emitter, error);
+                            } finally {
+                                slot.close();
+                            }
                         }
                     },
                     null);
         } catch (ToolConfirmationRequiredException confirmation) {
-            sendStreamEvent(emitter, ChatStreamEvent.toolConfirmRequired(confirmPayload(confirmation)));
-            sendStreamEvent(emitter, executionId == null ? ChatStreamEvent.done() : ChatStreamEvent.done(executionId));
-            emitter.complete();
+            try {
+                sendStreamEvent(emitter, ChatStreamEvent.toolConfirmRequired(confirmPayload(confirmation)));
+                sendStreamEvent(emitter, executionId == null ? ChatStreamEvent.done() : ChatStreamEvent.done(executionId));
+                emitter.complete();
+            } finally {
+                slot.close();
+            }
+        } catch (RuntimeException e) {
+            slot.close();
+            throw e;
         }
     }
 

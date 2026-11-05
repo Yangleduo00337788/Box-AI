@@ -13,6 +13,8 @@ import com.boxai.domain.tenant.TenantMember;
 import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.workspace.Workspace;
 import com.boxai.domain.workspace.WorkspaceRepository;
+import com.boxai.tenant.config.QuotaProperties;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,9 +53,16 @@ class QuotaApplicationServiceTest {
     private KnowledgeBaseRepository knowledgeBaseRepository;
     @Mock
     private PlanApplicationService planApplicationService;
+    @Mock
+    private QuotaProperties quotaProperties;
 
     @InjectMocks
     private QuotaApplicationService service;
+
+    @BeforeEach
+    void enableQuotaEnforcement() {
+        lenient().when(quotaProperties.isEnabled()).thenReturn(true);
+    }
 
     @Test
     void assertMemberQuotaRejectsWhenAtLimit() {
@@ -82,6 +92,20 @@ class QuotaApplicationServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.assertKnowledgeBaseQuotaAvailable(8L));
         assertEquals(ErrorCode.QUOTA_EXCEEDED, ex.getCode());
+    }
+
+    @Test
+    void skipsAiQuotaWhenDisabled() {
+        when(quotaProperties.isEnabled()).thenReturn(false);
+        stubWorkspaceTenant(8L, 1L);
+        stubTenantAndPlan(1L, plan(1, 1, 1, 1, 1, OveragePolicies.REJECT));
+        TenantUsage usage = usage(1L, 99, 99L);
+        when(tenantUsageRepository.findByTenantAndPeriod(1L, currentPeriod())).thenReturn(Optional.of(usage));
+
+        service.assertAiQuotaAvailable(8L);
+        service.consumeAiUsage(8L, 20);
+
+        verify(tenantUsageRepository).incrementUsage(1L, currentPeriod(), 1, 20L, 0, 0L);
     }
 
     @Test

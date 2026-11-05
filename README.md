@@ -365,6 +365,7 @@ flowchart LR
 | [`box-ui`](box-ui/) | 共享 UI 与布局（`@box/ui`） |
 | [`box-sdk`](box-sdk/) | 已发布 Agent 的 Open API 客户端（JS / Python） |
 | [`deploy`](deploy/) | Docker Compose 开发与部署 |
+| [`loadtest/k6`](loadtest/k6/) | 上线前 k6 压测脚本（健康检查、工作台读路径、Chat/RAG） |
 | [`docx`](docx/) | 产品 PRD、架构、进度等设计文档 |
 
 **`box-server` 领域模块（节选）**

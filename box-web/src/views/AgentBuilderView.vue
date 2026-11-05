@@ -1432,10 +1432,10 @@ async function sendChat(raw?: string) {
       messages.value.push({ role: 'assistant', content: '' })
       await scrollChatToBottom()
       await chatAgentStream(agentId.value, text, (delta) => {
-        messages.value[assistantIndex].content += delta
-        scrollChatToBottom()
+        appendBuilderDelta(assistantIndex, delta)
       }, history, {
         signal: controller.signal,
+        onQueued: (_position, message) => applyBuilderQueueHint(assistantIndex, message),
         onCitations: (citations) => {
           messages.value[assistantIndex].citations = citations
         },
@@ -1447,9 +1447,9 @@ async function sendChat(raw?: string) {
           }
         },
       })
-      if (stoppedByUser.value && !messages.value[assistantIndex].content) {
+      if (stoppedByUser.value && isEmptyBuilderContent(messages.value[assistantIndex].content)) {
         messages.value[assistantIndex].content = '（已停止生成）'
-      } else if (!messages.value[assistantIndex].content) {
+      } else if (isEmptyBuilderContent(messages.value[assistantIndex].content)) {
         messages.value[assistantIndex].content = '（无回复）'
       }
     } else {
@@ -1463,12 +1463,12 @@ async function sendChat(raw?: string) {
     }
   } catch (error) {
     if (isAbortError(error)) {
-      if (useStream && assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+      if (useStream && assistantIndex >= 0 && isEmptyBuilderContent(messages.value[assistantIndex]?.content)) {
         messages.value[assistantIndex].content = '（已停止生成）'
       }
     } else {
       notifyApiError(error, '对话失败')
-      if (useStream && assistantIndex >= 0 && !messages.value[assistantIndex]?.content) {
+      if (useStream && assistantIndex >= 0 && isEmptyBuilderContent(messages.value[assistantIndex]?.content)) {
         messages.value.splice(assistantIndex, 1)
       }
     }
@@ -1476,6 +1476,34 @@ async function sendChat(raw?: string) {
     chatting.value = false
     streamAbortController = null
   }
+}
+
+function isQueueHint(text?: string) {
+  return Boolean(text && (text.startsWith('排队中') || text.startsWith('当前对话火爆')))
+}
+
+function isEmptyBuilderContent(text?: string) {
+  return !text || isQueueHint(text)
+}
+
+function applyBuilderQueueHint(index: number, message: string) {
+  const item = messages.value[index]
+  if (!item) return
+  if (isEmptyBuilderContent(item.content)) {
+    item.content = message
+    void scrollChatToBottom()
+  }
+}
+
+function appendBuilderDelta(index: number, delta: string) {
+  const item = messages.value[index]
+  if (!item) return
+  if (isEmptyBuilderContent(item.content)) {
+    item.content = delta
+  } else {
+    item.content += delta
+  }
+  void scrollChatToBottom()
 }
 
 watch(

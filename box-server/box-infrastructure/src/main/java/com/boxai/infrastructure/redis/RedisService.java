@@ -1,9 +1,11 @@
 package com.boxai.infrastructure.redis;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 @Service
 public class RedisService {
@@ -48,5 +50,22 @@ public class RedisService {
     public boolean ping() {
         String pong = redisTemplate.getConnectionFactory().getConnection().ping();
         return pong != null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Object> eval(String lua, List<String> keys, String... args) {
+        DefaultRedisScript<List> script = new DefaultRedisScript<>();
+        script.setScriptText(lua);
+        script.setResultType(List.class);
+        List<Object> result = redisTemplate.execute(script, keys, (Object[]) args);
+        return result == null ? List.of() : result;
+    }
+
+    public long evalLong(String lua, List<String> keys, String... args) {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(lua);
+        script.setResultType(Long.class);
+        Long value = redisTemplate.execute(script, keys, (Object[]) args);
+        return value == null ? 0L : value;
     }
 }

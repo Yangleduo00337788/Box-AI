@@ -214,6 +214,7 @@ export async function chatAgentStream(
   options?: {
     signal?: AbortSignal
     toolConfirmationToken?: string
+    onQueued?: (position: number, message: string) => void
     onCitations?: (citations: KnowledgeCitation[]) => void
     onToolStart?: (payload: ChatToolEventPayload) => void
     onToolDelta?: (payload: ChatToolEventPayload) => void
@@ -235,6 +236,7 @@ export async function chatAgentStream(
 
   const handlers: StreamEventHandlers = {
     onDelta,
+    onQueued: options?.onQueued,
     onCitations: options?.onCitations,
     onToolStart: options?.onToolStart,
     onToolDelta: options?.onToolDelta,
@@ -253,6 +255,7 @@ export async function chatPublishedAgentStream(
     signal?: AbortSignal
     history?: AgentChatHistoryItem[]
     toolConfirmationToken?: string
+    onQueued?: (position: number, message: string) => void
     onCitations?: (citations: KnowledgeCitation[]) => void
     onToolStart?: (payload: ChatToolEventPayload) => void
     onToolDelta?: (payload: ChatToolEventPayload) => void
@@ -278,6 +281,7 @@ export async function chatPublishedAgentStream(
 
   const handlers: StreamEventHandlers = {
     onDelta,
+    onQueued: options?.onQueued,
     onCitations: options?.onCitations,
     onToolStart: options?.onToolStart,
     onToolDelta: options?.onToolDelta,

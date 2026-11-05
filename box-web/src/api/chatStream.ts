@@ -16,7 +16,7 @@ export interface ChatToolConfirmPayload {
 }
 
 export interface ChatStreamEvent {
-  type: 'delta' | 'done' | 'error' | 'citations' | 'tool.start' | 'tool.delta' | 'tool.end' | 'tool.confirm'
+  type: 'delta' | 'done' | 'error' | 'citations' | 'queued' | 'tool.start' | 'tool.delta' | 'tool.end' | 'tool.confirm'
   content?: string
   message?: string
   executionId?: number
@@ -25,6 +25,7 @@ export interface ChatStreamEvent {
 export interface StreamEventHandlers {
   onDelta: (chunk: string) => void
   onDone?: (executionId?: number) => void
+  onQueued?: (position: number, message: string) => void
   onCitations?: (citations: KnowledgeCitation[]) => void
   onToolStart?: (payload: ChatToolEventPayload) => void
   onToolDelta?: (payload: ChatToolEventPayload) => void
@@ -71,6 +72,13 @@ export function parseSseEvent(rawEvent: string, handlers: StreamEventHandlers): 
     if (!payload) continue
     try {
       const event = JSON.parse(payload) as ChatStreamEvent
+      if (event.type === 'queued') {
+        const position = Number.parseInt(event.content || '1', 10)
+        handlers.onQueued?.(
+          Number.isFinite(position) ? position : 1,
+          event.message || '当前对话火爆，正在排队',
+        )
+      }
       if (event.type === 'delta' && event.content) {
         handlers.onDelta(event.content)
       }

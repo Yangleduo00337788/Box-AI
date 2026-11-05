@@ -107,6 +107,7 @@ export async function sendMessageStream(
   options?: {
     signal?: AbortSignal
     onDone?: (executionId?: number) => void
+    onQueued?: (position: number, message: string) => void
     onCitations?: (citations: KnowledgeCitation[]) => void
     onToolStart?: (payload: ChatToolEventPayload) => void
     onToolDelta?: (payload: ChatToolEventPayload) => void
@@ -145,6 +146,7 @@ export async function sendMessageStream(
   const handlers: StreamEventHandlers = {
     onDelta,
     onDone: options?.onDone,
+    onQueued: options?.onQueued,
     onCitations: options?.onCitations,
     onToolStart: options?.onToolStart,
     onToolDelta: options?.onToolDelta,
@@ -160,6 +162,7 @@ export async function regenerateMessageStream(
   options?: {
     signal?: AbortSignal
     onDone?: (executionId?: number) => void
+    onQueued?: (position: number, message: string) => void
     onCitations?: (citations: KnowledgeCitation[]) => void
     onToolStart?: (payload: ChatToolEventPayload) => void
     onToolDelta?: (payload: ChatToolEventPayload) => void
@@ -180,6 +183,7 @@ export async function regenerateMessageStream(
   const handlers: StreamEventHandlers = {
     onDelta,
     onDone: options?.onDone,
+    onQueued: options?.onQueued,
     onCitations: options?.onCitations,
     onToolStart: options?.onToolStart,
     onToolDelta: options?.onToolDelta,

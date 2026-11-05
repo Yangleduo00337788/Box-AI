@@ -53,6 +53,21 @@ box:
       expire-seconds: 86400
     crypto:
       aes-key: ${BOX_SECURITY_CRYPTO_AES_KEY}
+  rate-limit:
+    enabled: ${BOX_RATE_LIMIT_ENABLED:true}
+    login-per-minute: ${BOX_RATE_LIMIT_LOGIN_PER_MINUTE:20}
+    chat-per-minute: ${BOX_RATE_LIMIT_CHAT_PER_MINUTE:60}
+    published-chat-per-minute: ${BOX_RATE_LIMIT_PUBLISHED_CHAT_PER_MINUTE:60}
+    api-key-per-minute: ${BOX_RATE_LIMIT_API_KEY_PER_MINUTE:120}
+    tool-exec-per-minute: ${BOX_RATE_LIMIT_TOOL_EXEC_PER_MINUTE:30}
+    webhook-per-minute: ${BOX_RATE_LIMIT_WEBHOOK_PER_MINUTE:60}
+  quota:
+    enabled: ${BOX_QUOTA_ENABLED:true}
+  chat-admission:
+    enabled: ${BOX_CHAT_ADMISSION_ENABLED:true}
+    max-inflight: ${BOX_CHAT_ADMISSION_MAX_INFLIGHT:200}
+    max-queue: ${BOX_CHAT_ADMISSION_MAX_QUEUE:800}
+    queue-wait-seconds: ${BOX_CHAT_ADMISSION_QUEUE_WAIT_SECONDS:60}
   embed:
     skip-domain-verify: ${BOX_EMBED_SKIP_DOMAIN_VERIFY:true}
     gateway-host: ${BOX_EMBED_GATEWAY_HOST:embed.box.ai}

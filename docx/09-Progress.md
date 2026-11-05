@@ -495,3 +495,5 @@ Flyway **V35–V39**；市场审核（通过/拒绝）、Embed 域名真校验�
 8. **`09-Progress.md`** — 本文档（进度追踪）
 9. **`10-Gaps.md`** — 未完成项可执行 TODO 清单
 10. **`diagrams/`** — 架构图、流程图、时序图（中英文标注）
+11. [`loadtest/k6/README.md`](../loadtest/k6/README.md) — 上线前 k6 压测脚本
+12. [`loadtest/`](./loadtest/) — 压测报告（无采样全集、1000 VU、带采样对照）

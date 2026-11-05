@@ -13,6 +13,7 @@ import com.boxai.domain.tenant.TenantRepository;
 import com.boxai.domain.workspace.Workspace;
 import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.tenant.api.QuotaSnapshotVO;
+import com.boxai.tenant.config.QuotaProperties;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,19 +34,22 @@ public class QuotaApplicationService {
     private final WorkspaceRepository workspaceRepository;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final PlanApplicationService planApplicationService;
+    private final QuotaProperties quotaProperties;
 
     public QuotaApplicationService(TenantRepository tenantRepository,
                                    PlanRepository planRepository,
                                    TenantUsageRepository tenantUsageRepository,
                                    WorkspaceRepository workspaceRepository,
                                    KnowledgeBaseRepository knowledgeBaseRepository,
-                                   PlanApplicationService planApplicationService) {
+                                   PlanApplicationService planApplicationService,
+                                   QuotaProperties quotaProperties) {
         this.tenantRepository = tenantRepository;
         this.planRepository = planRepository;
         this.tenantUsageRepository = tenantUsageRepository;
         this.workspaceRepository = workspaceRepository;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.planApplicationService = planApplicationService;
+        this.quotaProperties = quotaProperties;
     }
 
     public QuotaSnapshotVO getQuotaForUser(Long userId) {
@@ -66,6 +70,9 @@ public class QuotaApplicationService {
     }
 
     public void assertAiQuotaAvailable(Long workspaceId) {
+        if (!enforcementEnabled()) {
+            return;
+        }
         Long tenantId = resolveTenantId(workspaceId);
         Plan plan = resolvePlan(tenantId);
         TenantUsage usage = getOrCreateUsage(tenantId, currentPeriod());
@@ -79,7 +86,7 @@ public class QuotaApplicationService {
         TenantUsage usage = getOrCreateUsage(tenantId, currentPeriod());
         long tokenDelta = Math.max(tokens, 0);
         String period = usage.getPeriod();
-        if (wouldExceedAiLimit(plan, usage, tokenDelta)) {
+        if (enforcementEnabled() && wouldExceedAiLimit(plan, usage, tokenDelta)) {
             if (OveragePolicies.REJECT.equals(
                     plan.getOveragePolicy() == null ? OveragePolicies.REJECT : plan.getOveragePolicy())) {
                 throw new BusinessException(ErrorCode.QUOTA_EXCEEDED, "本月 AI 用量已达套餐上限");
@@ -91,6 +98,9 @@ public class QuotaApplicationService {
     }
 
     public void assertMemberQuotaAvailable(Long tenantId) {
+        if (!enforcementEnabled()) {
+            return;
+        }
         Plan plan = resolvePlan(tenantId);
         if (plan.getQuotaMembers() == null || plan.getQuotaMembers() <= 0) {
             return;
@@ -102,6 +112,9 @@ public class QuotaApplicationService {
     }
 
     public void assertWorkspaceQuotaAvailable(Long tenantId) {
+        if (!enforcementEnabled()) {
+            return;
+        }
         Plan plan = resolvePlan(tenantId);
         if (plan.getQuotaWorkspaces() == null || plan.getQuotaWorkspaces() <= 0) {
             return;
@@ -113,6 +126,9 @@ public class QuotaApplicationService {
     }
 
     public void assertKnowledgeBaseQuotaAvailable(Long workspaceId) {
+        if (!enforcementEnabled()) {
+            return;
+        }
         Long tenantId = resolveTenantId(workspaceId);
         Plan plan = resolvePlan(tenantId);
         if (plan.getQuotaKnowledgeBases() == null || plan.getQuotaKnowledgeBases() <= 0) {
@@ -202,6 +218,10 @@ public class QuotaApplicationService {
             return true;
         }
         return false;
+    }
+
+    private boolean enforcementEnabled() {
+        return quotaProperties == null || quotaProperties.isEnabled();
     }
 
     private Tenant requireTenant(Long tenantId) {

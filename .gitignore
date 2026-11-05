@@ -105,6 +105,10 @@ Desktop.ini
 .cursor/
 skills-lock.json
 
+# k6 压测本地配置与结果
+loadtest/k6/.env
+loadtest/k6/results/
+
 # Docker 本地数据卷（如有）
 deploy/data/
 
