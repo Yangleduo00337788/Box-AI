@@ -14,19 +14,29 @@ import com.boxai.domain.user.User;
 import com.boxai.domain.workspace.WorkspaceRepository;
 import com.boxai.security.tenant.TenantAccessGuard;
 import com.boxai.tenant.api.CreateTenantRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
+import java.sql.SQLIntegrityConstraintViolationException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,9 +57,21 @@ class TenantApplicationServiceTest {
     private PlanRepository planRepository;
     @Mock
     private TenantOAuthOrgRepository tenantOAuthOrgRepository;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private TenantApplicationService service;
+
+    @BeforeEach
+    void runRegistrationInsertsInline() {
+        TransactionTemplate tx = mock(TransactionTemplate.class);
+        org.mockito.Mockito.lenient().when(tx.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        ReflectionTestUtils.setField(service, "requiresNewTx", tx);
+    }
 
     @Test
     void createForRegistrationBuildsPersonalTenantAndAdminMember() {
@@ -57,7 +79,7 @@ class TenantApplicationServiceTest {
         user.setId(3L);
         user.setNickname("Ada");
         user.setEmail("ada@example.com");
-        when(tenantRepository.findBySlug("ada-personal")).thenReturn(Optional.empty());
+        when(tenantRepository.findBySlug("ada-3-personal")).thenReturn(Optional.empty());
         when(tenantRepository.save(any())).thenAnswer(invocation -> {
             Tenant tenant = invocation.getArgument(0);
             tenant.setId(11L);
@@ -68,7 +90,7 @@ class TenantApplicationServiceTest {
 
         assertEquals(TenantTypes.PERSONAL, tenant.getTenantType());
         assertEquals("Ada 的个人空间", tenant.getName());
-        assertEquals("ada-personal", tenant.getSlug());
+        assertEquals("ada-3-personal", tenant.getSlug());
         assertEquals(3L, tenant.getOwnerId());
         verify(quotaApplicationService).assignDefaultPlan(any(Tenant.class));
         ArgumentCaptor<TenantMember> memberCaptor = ArgumentCaptor.forClass(TenantMember.class);
@@ -176,5 +198,50 @@ class TenantApplicationServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> service.updateOrgId(3L, "taken"));
         assertEquals(ErrorCode.BAD_REQUEST, ex.getCode());
         verify(tenantRepository, never()).update(any());
+    }
+
+    @Test
+    void createForRegistrationRetriesWhenSlugUniqueIndexHits() {
+        User user = new User();
+        user.setId(3L);
+        user.setNickname("Ada");
+        user.setEmail("ada@example.com");
+        when(tenantRepository.findBySlug(any())).thenReturn(Optional.empty());
+        when(tenantRepository.save(any())).thenThrow(duplicateSlug("ada-3-personal"))
+                .thenAnswer(invocation -> {
+                    Tenant tenant = invocation.getArgument(0);
+                    tenant.setId(11L);
+                    return tenant;
+                });
+
+        Tenant tenant = service.createForRegistration(user, "personal", null, null);
+
+        assertTrue(tenant.getSlug().startsWith("ada-3-personal"));
+        verify(tenantRepository, times(2)).save(any());
+        verify(tenantRepository).addMember(any());
+    }
+
+    @Test
+    void createForRegistrationGivesFriendlyErrorAfterSlugRetries() {
+        User user = new User();
+        user.setId(3L);
+        user.setNickname("Ada");
+        user.setEmail("ada@example.com");
+        when(tenantRepository.findBySlug(any())).thenReturn(Optional.empty());
+        when(tenantRepository.save(any())).thenThrow(duplicateSlug("ada-3-personal"));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.createForRegistration(user, "personal", null, null));
+        assertEquals(ErrorCode.CONFLICT, ex.getCode());
+        assertEquals("空间标识被占用，请稍后重试", ex.getMessage());
+        verify(tenantRepository, times(5)).save(any());
+        verify(tenantRepository, never()).addMember(any());
+    }
+
+    private static DuplicateKeyException duplicateSlug(String slug) {
+        return new DuplicateKeyException(
+                "Duplicate entry",
+                new SQLIntegrityConstraintViolationException(
+                        "Duplicate entry '" + slug + "' for key 'tenant.uk_slug'"));
     }
 }
