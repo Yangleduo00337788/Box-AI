@@ -32,6 +32,7 @@ cp loadtest/k6/env.example loadtest/k6/.env
 | `chat` | `POST /conversations/{id}/messages`（`stream=false`） | 是 | 单独压，VU 低 |
 | `rag` | `POST /knowledge-bases/{id}/search` | 检索/Embedding | 单独压 |
 | `published` | `POST /published/agents/{id}/chat` + API Key | 是 | 开放调用容量 |
+| `register` | 发注册验证码 + `POST /auth/register`（独立邮箱） | 否 | 需 `BOX_AUTH_VERIFICATION_EXPOSE_CODE=true` |
 
 `PROFILE`：
 
@@ -112,4 +113,5 @@ BOX_QUOTA_ENABLED=false
 1. `smoke`：进程与依赖探活  
 2. `workspace` + `mixed`（`PROFILE=load`）：平台容量  
 3. `auth` 小流量：登录是否被 Redis 限流打满  
-4. `rag` / `chat` / `published`：检索与模型链路，VU 远低于读接口
+4. `register`：并发建账号（先开 `expose-code`）  
+5. `rag` / `chat` / `published`：检索与模型链路，VU 远低于读接口
