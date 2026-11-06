@@ -28,6 +28,17 @@ export function apiKeyHeaders() {
   });
 }
 
+export function apiKeySseHeaders() {
+  const headers = apiKeyHeaders();
+  headers.Accept = 'text/event-stream';
+  return headers;
+}
+
+export function getPublic(path, name) {
+  const res = request('GET', path, null, jsonHeaders(), cfg.timeout, name);
+  return expectOk(res, name);
+}
+
 export function request(method, path, body, headers, timeout, name) {
   const params = {
     headers,
@@ -96,7 +107,47 @@ export function getJson(session, path, name) {
   return expectOk(res, name);
 }
 
+/** Prefer Aliyun MaaS (provider 4) when the same modelCode exists on two providers. */
+export function resolvePreferredPlatformModel(session) {
+  const code = cfg.platformModelCode;
+  const models = getJson(session, '/api/v1/platform/models', 'platform.models');
+  const list = Array.isArray(models.data) ? models.data : [];
+  const matches = list.filter((item) => item && item.modelCode === code);
+  const match = matches.find((item) => Number(item.providerId) === 4) || matches[0];
+  if (match && match.id != null) {
+    return match;
+  }
+  throw new Error('platform model ' + code + ' is required');
+}
+
 export function postJson(session, path, body, name, timeout) {
   const res = request('POST', path, body, authHeaders(session), timeout || cfg.timeout, name);
   return expectOk(res, name);
+}
+
+export function putJson(session, path, body, name, timeout) {
+  const res = request('PUT', path, body, authHeaders(session), timeout || cfg.timeout, name);
+  return expectOk(res, name);
+}
+
+export function sseHeaders(session) {
+  const headers = authHeaders(session);
+  headers.Accept = 'text/event-stream';
+  return headers;
+}
+
+/** k6 waits until the SSE connection closes; success is HTTP 200 + a done event. */
+export function postSse(session, path, body, name, timeout) {
+  return postSseWithHeaders(path, body, sseHeaders(session), name, timeout);
+}
+
+export function postSseWithHeaders(path, body, headers, name, timeout) {
+  const res = request('POST', path, body, headers, timeout || cfg.chatTimeout, name);
+  const text = res.body ? String(res.body) : '';
+  const passed = check(res, {
+    [`${name} HTTP 200`]: (r) => r.status === 200,
+    [`${name} sse done`]: () => text.indexOf('"type":"done"') !== -1,
+    [`${name} sse not error`]: () => text.indexOf('"type":"error"') === -1,
+  });
+  return { passed, res, body: text };
 }

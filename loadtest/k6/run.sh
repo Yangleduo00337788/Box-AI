@@ -7,7 +7,7 @@ PROFILE="${PROFILE:-}"
 OUT_DIR="${OUT_DIR:-$(dirname "$0")/results}"
 
 if [[ -z "$SCENARIO" ]]; then
-  echo "usage: $0 <smoke|auth|workspace|mixed|chat|rag|published>" >&2
+  echo "usage: $0 <smoke|auth|workspace|mixed|chat|chat-sse|rag|published|register|workflow|embed|chat-tool|chat-mcp>" >&2
   exit 1
 fi
 

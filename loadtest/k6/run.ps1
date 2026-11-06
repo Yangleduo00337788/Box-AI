@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('smoke', 'auth', 'workspace', 'mixed', 'chat', 'rag', 'published', 'register')]
+    [ValidateSet('smoke', 'auth', 'workspace', 'mixed', 'chat', 'chat-sse', 'rag', 'published', 'register', 'workflow', 'embed', 'chat-tool', 'chat-mcp')]
     [string]$Scenario,
     [string]$EnvFile = (Join-Path $PSScriptRoot '.env'),
     [string]$Profile = '',

@@ -1,8 +1,8 @@
 # Box 未完成项 — 可执行 TODO 清单
 
 文档版本：V1.2  
-更新说明：2026-11-04 对齐登录口径：个人 GitHub/Google OAuth；企业邮箱登录；飞书/钉钉/SAML SSO 不做。主清单仍全部 ✅  
-整体完成度估算：后端 ~96% · 前端 ~96% · **文档同步 ~97%**
+更新说明：2026-11-06 上线前 k6 告一段落（LT-01～06 均已写入 `docx/loadtest/SUMMARY.md`）  
+整体完成度估算：后端 ~96% · 前端 ~96% · **文档同步 ~98%**
 
 ---
 
@@ -257,6 +257,12 @@ P0 / P1 / P2 共 50 项已全部完成。后续需求见下方 §八，勿与本
 | E2E-03 | P1 | ✅ | 插件目录缺上架/下架行操作 | R5：对齐模板市场，审核通过后可直接上/下架 |
 | E2E-04 | P1 | ✅ | 市场列出不可运行模板 | R2：`listMarket` 过滤 `isRunnable`；启用失败文案明确 |
 | E2E-05 | P2 | ✅ | B 端用户关键字搜索参数绑定 | R11：`email/nickname/username` 分别绑定 like 参数 |
+| LT-01 | P1 | ✅ | 上线前 k6 压测归档 | 读路径 1000 VU、注册/登录 180 VU、非流式与 SSE Chat 200 VU、开放 API 200 VU；总表 `docx/loadtest/SUMMARY.md` |
+| LT-02 | P2 | ✅ | RAG 检索压测 | 200 VU × 2 分钟，0 失败，p95 2.33s；报告 `docx/loadtest/2026-11-06-rag-200vu.md` |
+| LT-03 | P2 | ✅ | 已发布 Agent / API Key 压测 | 200 VU × 2 分钟通过，失败 0.28%（开闸拒连），p95 576ms；报告 `docx/loadtest/2026-11-06-published-200vu.md` |
+| LT-04 | P2 | ✅ | 工作流执行压测 | 27b：2678/2678 p95 15.7s；**max-0902：3056/3056 p95 9.83s**。Flash 失败是额度。`docx/loadtest/2026-11-06-workflow-max0902.md` |
+| LT-05 | P2 | ✅ | Embed 公开页压测 | 200 VU × 2 分钟，0 失败，p95 543ms；公开配置 + SSE。报告 `docx/loadtest/2026-11-06-embed-200vu.md` |
+| LT-06 | P2 | ✅ | 带工具 / MCP 的对话压测 | HTTP Tool Flash 50 VU 过。MCP 1 VU 通、50 VU `done` 21%（公网 MCP）。`docx/loadtest/2026-11-06-chat-mcp.md` |
 
 **已对齐、文档曾滞后（现已写入 `09-Progress.md`）**：Flyway V25–V29；B 端工作台/用户/审计/租户类型/知识库配额；C 端默认入口 `/chat`（PRD 写 Dashboard 首页，以 F-06 产品决策为准）；对话 UI 三处统一见 Sprint 8。
 
@@ -271,5 +277,7 @@ P0 / P1 / P2 共 50 项已全部完成。后续需求见下方 §八，勿与本
 5. `05-Backend.md` — 后端与 Phase 顺序
 6. `06-Runtime.md` — Runtime 设计
 7. `08-Name&slogan.md` — 品牌
-8. `09-Progress.md` — 进度追踪
+8. `09-Progress.md` — 进度追踪（含 2026-11 压测小节）
 9. **`10-Gaps.md`** — 本文档（未完成项 TODO）
+10. [`loadtest/`](./loadtest/) — 压测报告；[`SUMMARY.md`](./loadtest/SUMMARY.md) 数字总表
+11. [`../loadtest/k6/README.md`](../loadtest/k6/README.md) — k6 脚本

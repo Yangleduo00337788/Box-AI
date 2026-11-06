@@ -19,7 +19,7 @@ cp loadtest/k6/env.example loadtest/k6/.env
 
 必填（除 `smoke` 外）：`ACCOUNT`、`PASSWORD`。企业登录再填 `ACCOUNT_TYPE=ENTERPRISE` 和 `ORG_ID`。
 
-可选：`AGENT_ID`、`CONVERSATION_ID`、`KNOWLEDGE_BASE_ID`、`API_KEY`、`PUBLISHED_AGENT_ID`。不填时脚本会用列表接口的第一项，或为 chat 新建一条会话。
+可选：`AGENT_ID`、`CONVERSATION_ID`、`KNOWLEDGE_BASE_ID`、`API_KEY`、`PUBLISHED_AGENT_ID`、`WORKFLOW_ID`。不填时脚本会用列表接口的第一项，或为 chat / workflow 新建资源。
 
 ## 场景
 
@@ -30,8 +30,13 @@ cp loadtest/k6/env.example loadtest/k6/.env
 | `workspace` | 工作台读路径：Agent / 会话 / 知识库 / 通知 / 额度 | 否 | 上线主压测 |
 | `mixed` | 按权重混合上述读接口 | 否 | 模拟控制台流量 |
 | `chat` | `POST /conversations/{id}/messages`（`stream=false`） | 是 | 单独压，VU 低 |
+| `chat-sse` | 同上，`stream=true`（工作台主路径；每 VU 独立会话） | 是 | 测长连接/准入，VU 勿上到读路径量级 |
 | `rag` | `POST /knowledge-bases/{id}/search` | 检索/Embedding | 单独压 |
 | `published` | `POST /published/agents/{id}/chat` + API Key | 是 | 开放调用容量 |
+| `workflow` | `POST /runtime/workflows/{id}/execute`（Start→Knowledge→LLM→Output） | 是 | 完整图；VU 勿上到读路径量级 |
+| `embed` | 公开 `GET embed-config` + Embed SSE Chat（API Key） | 是 | 对齐公开页；VU 勿上到读路径量级 |
+| `chat-tool` | 绑定 HTTP Tool 的 SSE 对话（`tool.start`/`tool.end`） | 是 | VU 低于纯对话 |
+| `chat-mcp` | 绑定 MCP 的 SSE 对话（公开 Streamable HTTP） | 是 | VU 低于纯对话；本机 SSRF 禁 localhost |
 | `register` | 发注册验证码 + `POST /auth/register`（独立邮箱） | 否 | 需 `BOX_AUTH_VERIFICATION_EXPOSE_CODE=true` |
 
 `PROFILE`：
@@ -56,6 +61,7 @@ cd loadtest/k6
 .\run.ps1 -Scenario smoke
 .\run.ps1 -Scenario mixed -Profile load
 .\run.ps1 -Scenario chat -Profile smoke
+.\run.ps1 -Scenario chat-sse -Vus 200 -Duration 2m
 ```
 
 Linux / macOS：
@@ -75,7 +81,9 @@ k6 run -e BASE_URL=http://localhost:8080 -e ACCOUNT=you@example.com -e PASSWORD=
   -e PROFILE=load loadtest/k6/scenarios/mixed.js
 ```
 
-摘要会写到 `loadtest/k6/results/`（已 gitignore）。
+摘要会写到 `loadtest/k6/results/`（已 gitignore）。结论报告在 [`docx/loadtest/`](../../docx/loadtest/)，数字总表 [`SUMMARY.md`](../../docx/loadtest/SUMMARY.md)。
+
+**已跑（本机 `dev`，2026-11）**：`smoke` / `workspace` / `mixed`（含 1000 VU）、`register`、`auth`、`chat` 非流式、`chat-sse`、`rag`、`published` 200 VU、`workflow` 200 VU、`embed` 200 VU、`chat-tool`。工作台对话以 `chat-sse` 200 VU 为准。
 
 主机采样（Redis / MySQL / jstat / 线程栈 / JFR），与 k6 **并行**另开窗口：
 
@@ -106,7 +114,7 @@ BOX_QUOTA_ENABLED=false
 
 或只把某个 per-minute 调大（`0` 表示该范围不限）。生产不要关限流、配额或对话准入。
 
-压测请用**预发/隔离环境**，不要对生产真实用户和付费模型做 stress。Chat 使用非流式 JSON，便于看 p95；SSE 长连接不在本套脚本里。
+压测请用**预发/隔离环境**，不要对生产真实用户和付费模型做 stress。非流式看 JSON p95；工作台主路径用 `chat-sse`（k6 等到 SSE `done` 才结束该次请求）。
 
 ## 建议顺序
 
@@ -114,4 +122,11 @@ BOX_QUOTA_ENABLED=false
 2. `workspace` + `mixed`（`PROFILE=load`）：平台容量  
 3. `auth` 小流量：登录是否被 Redis 限流打满  
 4. `register`：并发建账号（先开 `expose-code`）  
-5. `rag` / `chat` / `published`：检索与模型链路，VU 远低于读接口
+5. `chat-sse`（工作台主路径）再 `chat` 非流式对照；VU 以准入 `maxInflight`（默认 200）为上限，不要上到读路径 1000  
+6. `rag`：检索已跑 200 VU（通过）  
+7. `published`：200 VU 已通过（`qwen-flash`）
+
+8. `workflow`：200 VU 已通过（仅 `qwen3.8-27b`）
+9. `embed`：200 VU 已通过（公开配置 + SSE）
+10. `chat-tool`：Flash 50 VU 通过；27b 同规模未过  
+11. `chat-mcp`：1 VU 通；50 VU HTTP 通、SSE checks 未过（公网 MCP）

@@ -471,6 +471,32 @@ Flyway **V35–V39**；市场审核（通过/拒绝）、Embed 域名真校验�
 
 ---
 
+## 上线前压测（2026-11）
+
+本机 `dev`、k6 v2.3.0。数字总表 [`docx/loadtest/SUMMARY.md`](./loadtest/SUMMARY.md)，脚本 [`loadtest/k6/README.md`](../loadtest/k6/README.md)。
+
+| 场景 | 规模 | 判定 | 报告 |
+|------|------|------|------|
+| 读路径 `mixed` | 1000 VU × 2 分钟 | 阈值过；开闸约 0.8% 拒连 | [无采样全集](./loadtest/2026-11-04-k6-nosample.md) |
+| 注册 | 180 VU × 1 分钟 | 修后 0 死锁；p95 1.84s | [register](./loadtest/2026-11-06-register-180vu.md) |
+| 登录 | 180 VU × 1 分钟 | 业务通；开闸 1～2s 拒连，不修 | [auth](./loadtest/2026-11-06-auth-180vu.md) |
+| 非流式 Chat | 200 VU × 2 分钟 | 单路通；200 路失败 92%，不当事故 | [chat](./loadtest/2026-11-06-chat-200vu.md) |
+| **SSE Chat（工作台）** | **200 VU × 2 分钟** | **阈值全过；done 99.6%；p95 4.9s** | [chat-sse](./loadtest/2026-11-06-chat-sse-200vu.md) |
+| RAG 检索 | **200 VU × 2 分钟** | **阈值全过；0 失败；p95 2.33s** | [rag](./loadtest/2026-11-06-rag-200vu.md) |
+| 开放 API `published` | **200 VU × 2 分钟** | **阈值全过；0.28% 开闸拒连；p95 576ms** | [published 200](./loadtest/2026-11-06-published-200vu.md) |
+| 完整工作流 `workflow` | **200 VU × 2 分钟** | **阈值全过；2678/2678 `SUCCEEDED`；p95 15.7s**（`qwen3.8-27b`） | [workflow 200](./loadtest/2026-11-06-workflow-200vu.md) |
+| 同上 | **200 VU × 2 分钟** | **阈值全过；3056/3056 `SUCCEEDED`；p95 9.83s**（`qwen3.8-max-0902`） | [max-0902](./loadtest/2026-11-06-workflow-max0902.md) |
+| Embed 公开页 `embed` | **200 VU × 2 分钟** | **阈值全过；0 失败；p95 543ms** | [embed 200](./loadtest/2026-11-06-embed-200vu.md) |
+| HTTP Tool SSE `chat-tool` | 1 VU 通；**50 VU × 2 分钟** checks 未过 | HTTP 0 失败；`done` 73%；tool 88% | [chat-tool](./loadtest/2026-11-06-chat-tool.md) |
+| 同上 + **`qwen3.8-flash`** | **50 VU 阈值过**；工作流 200 VU 0 `SUCCEEDED` | Tool `done` 706/707 | [flash](./loadtest/2026-11-06-qwen38-flash.md) |
+| MCP SSE `chat-mcp` | 1 VU 通；**50 VU checks 未过** | HTTP 0 失败；`done` 21% | [chat-mcp](./loadtest/2026-11-06-chat-mcp.md) |
+
+对话容量以 SSE 为准。非流式失败是同步事务占连接池。带工具对话不要按 200 VU 验收。本机结果不能写成生产 SLA。
+
+**2026-11-06 本轮 k6 告一段落**：规划场景数字均在 [`docx/loadtest/SUMMARY.md`](./loadtest/SUMMARY.md)。
+
+---
+
 ## 文档维护规范（D-11）
 
 完成一项 B/F/D 任务或一个 Sprint 后：
@@ -496,4 +522,4 @@ Flyway **V35–V39**；市场审核（通过/拒绝）、Embed 域名真校验�
 9. **`10-Gaps.md`** — 未完成项可执行 TODO 清单
 10. **`diagrams/`** — 架构图、流程图、时序图（中英文标注）
 11. [`loadtest/k6/README.md`](../loadtest/k6/README.md) — 上线前 k6 压测脚本
-12. [`loadtest/`](./loadtest/) — 压测报告（注册 180 VU 对照、无采样全集、1000 VU、带采样对照）
+12. [`loadtest/`](./loadtest/) — 压测报告；数字总表 [`SUMMARY.md`](./loadtest/SUMMARY.md)
