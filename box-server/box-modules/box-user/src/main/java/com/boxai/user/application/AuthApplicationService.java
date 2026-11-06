@@ -111,22 +111,20 @@ public class AuthApplicationService {
         }
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         verificationCodeService.verify(email, VerificationCodePurpose.REGISTER, request.verificationCode(), false);
-        try {
-            RuntimeException last = null;
-            for (int attempt = 1; attempt <= 4; attempt++) {
-                try {
-                    return txSelf().registerPersisted(request, accountType, email);
-                } catch (RuntimeException ex) {
-                    last = ex;
-                    if (!isDeadlock(ex) || attempt == 4) {
-                        throw ex;
-                    }
+        RuntimeException last = null;
+        for (int attempt = 1; attempt <= 4; attempt++) {
+            try {
+                AuthVO auth = txSelf().registerPersisted(request, accountType, email);
+                verificationCodeService.consume(email, VerificationCodePurpose.REGISTER);
+                return auth;
+            } catch (RuntimeException ex) {
+                last = ex;
+                if (!isDeadlock(ex) || attempt == 4) {
+                    throw ex;
                 }
             }
-            throw last;
-        } finally {
-            verificationCodeService.consume(email, VerificationCodePurpose.REGISTER);
         }
+        throw last;
     }
 
     @Transactional

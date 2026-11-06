@@ -1,10 +1,13 @@
 package com.boxai.infrastructure.persistence.repository;
 
+import com.boxai.common.constant.BuiltInRolePermissions;
 import com.boxai.domain.rbac.Permission;
 import com.boxai.domain.rbac.RolePermissionQuery;
 import com.boxai.infrastructure.persistence.entity.PermissionDO;
+import com.boxai.infrastructure.persistence.entity.RoleDO;
 import com.boxai.infrastructure.persistence.entity.RolePermissionDO;
 import com.boxai.infrastructure.persistence.mapper.PermissionMapper;
+import com.boxai.infrastructure.persistence.mapper.RoleMapper;
 import com.boxai.infrastructure.persistence.mapper.RolePermissionMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Repository;
@@ -23,11 +26,14 @@ public class RolePermissionQueryImpl implements RolePermissionQuery {
 
     private final PermissionMapper permissionMapper;
     private final RolePermissionMapper rolePermissionMapper;
+    private final RoleMapper roleMapper;
 
     public RolePermissionQueryImpl(PermissionMapper permissionMapper,
-                                   RolePermissionMapper rolePermissionMapper) {
+                                   RolePermissionMapper rolePermissionMapper,
+                                   RoleMapper roleMapper) {
         this.permissionMapper = permissionMapper;
         this.rolePermissionMapper = rolePermissionMapper;
+        this.roleMapper = roleMapper;
     }
 
     @Override
@@ -37,6 +43,13 @@ public class RolePermissionQueryImpl implements RolePermissionQuery {
 
     @Override
     public List<String> listPermissionCodes(Long roleId) {
+        if (roleId == null) {
+            return List.of();
+        }
+        RoleDO role = roleMapper.selectOneById(roleId);
+        if (isBuiltIn(role)) {
+            return BuiltInRolePermissions.codesFor(role.getRoleCode(), allPermissionCodes());
+        }
         List<Long> permissionIds = rolePermissionMapper.selectListByQuery(
                         QueryWrapper.create().eq("role_id", roleId))
                 .stream()
@@ -85,6 +98,16 @@ public class RolePermissionQueryImpl implements RolePermissionQuery {
             return false;
         }
         return listPermissionCodes(roleId).contains(permissionCode);
+    }
+
+    private List<String> allPermissionCodes() {
+        return permissionMapper.selectAll().stream()
+                .map(PermissionDO::getPermissionCode)
+                .toList();
+    }
+
+    private static boolean isBuiltIn(RoleDO role) {
+        return role != null && role.getBuiltIn() != null && role.getBuiltIn() == 1;
     }
 
     private Permission toDomain(PermissionDO row) {

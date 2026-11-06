@@ -103,7 +103,7 @@ class AuthApplicationServiceTest {
         assertEquals(ErrorCode.USER_ALREADY_EXISTS, ex.getCode());
         verify(verificationCodeService).verify("a@example.com",
                 com.boxai.user.support.VerificationCodePurpose.REGISTER, "123456", false);
-        verify(verificationCodeService).consume("a@example.com",
+        verify(verificationCodeService, never()).consume("a@example.com",
                 com.boxai.user.support.VerificationCodePurpose.REGISTER);
     }
 
